@@ -1,0 +1,132 @@
+# ----------------------------
+# Python bytecode / cache
+# ----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ----------------------------
+# Distribution / packaging
+# ----------------------------
+.Python
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ----------------------------
+# Virtual environments
+# ----------------------------
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ----------------------------
+# Testing / coverage
+# ----------------------------
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+TEST*.*
+
+# ----------------------------
+# Logs / runtime files
+# ----------------------------
+*.log
+*.pot
+*.pid
+*.seed
+*.out
+*.err
+
+# ----------------------------
+# IDE / Editor
+# ----------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ----------------------------
+# Jupyter Notebook
+# ----------------------------
+.ipynb_checkpoints/
+
+# ----------------------------
+# Environment variables
+# ----------------------------
+.env
+.env.*
+*.env
+
+# ----------------------------
+# OS files
+# ----------------------------
+.DS_Store
+Thumbs.db
+
+# ----------------------------
+# Secrets / keys
+# ----------------------------
+*.pem
+*.key
+*.crt
+secrets.json
+
+# ----------------------------
+# mypy / type checkers
+# ----------------------------
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ----------------------------
+# Ruff / linters
+# ----------------------------
+.ruff_cache/
+
+# ----------------------------
+# Pyre / Pytype
+# ----------------------------
+.pyre/
+.pytype/
+
+# ----------------------------
+# PyInstaller
+# ----------------------------
+*.manifest
+*.spec
+
+# ----------------------------
+# Pipenv / Poetry
+# ----------------------------
+Pipfile.lock
+poetry.lock
+
+# (optional — keep if reproducibility matters)
+# Uncomment if you DO want lock files:
+# !Pipfile.lock
+# !poetry.lock
