@@ -1,0 +1,630 @@
+/* Darts Scoring System - CSS for iPad touch interface - UPDATED */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff;
+    height: 100vh;
+    overflow-y: auto; /* Changed from hidden to auto */
+    touch-action: manipulation;
+    padding: 0;
+    margin: 0;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* Changed from height to min-height */
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+/* Header - Make it more compact */
+.header {
+    text-align: center;
+    padding: 10px 0; /* Reduced padding */
+    border-bottom: 2px solid #0f3460;
+    margin-bottom: 15px; /* Reduced margin */
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+.header h1 {
+    font-size: 1.8rem; /* Reduced from 2.2rem */
+    margin-bottom: 10px; /* Reduced margin */
+    color: #e94560;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.game-info {
+    display: flex;
+    justify-content: space-around;
+    font-size: 1.2rem; /* Reduced from 1.5rem */
+    font-weight: bold;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.game-info > div {
+    padding: 8px 15px; /* Reduced padding */
+    background: #0f3460;
+    border-radius: 8px;
+    min-width: 100px; /* Reduced from 120px */
+    font-size: 1rem;
+}
+
+#remaining-score {
+    color: #4ecca3;
+    font-size: 1.5rem; /* Reduced from 2rem */
+}
+
+/* Main Content - Make it scrollable */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Reduced from 25px */
+    overflow-y: auto;
+    padding-bottom: 10px;
+}
+
+/* Score Display - Make it more compact */
+.score-display {
+    background: rgba(15, 52, 96, 0.7);
+    border-radius: 12px; /* Reduced from 15px */
+    padding: 15px; /* Reduced from 20px */
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Reduced from 20px */
+    flex-shrink: 0;
+}
+
+.player-scores {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 10px; /* Reduced from 15px */
+}
+
+.player-score {
+    background: #1a1a2e;
+    padding: 10px; /* Reduced from 15px */
+    border-radius: 8px; /* Reduced from 10px */
+    text-align: center;
+    min-width: 120px; /* Reduced from 150px */
+    transition: all 0.3s ease;
+    flex: 1;
+    max-width: 200px;
+}
+
+.player-score.active {
+    background: #e94560;
+    transform: scale(1.03); /* Reduced from 1.05 */
+    box-shadow: 0 0 15px rgba(233, 69, 96, 0.5); /* Reduced from 20px */
+}
+
+.player-name {
+    font-size: 1.1rem; /* Reduced from 1.3rem */
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.player-total {
+    font-size: 1.5rem; /* Reduced from 2rem */
+    color: #4ecca3;
+}
+
+.turn-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 10px; /* Reduced from 15px */
+    border-top: 1px solid #0f3460;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dart-throws {
+    display: flex;
+    gap: 10px; /* Reduced from 15px */
+    flex-wrap: wrap;
+}
+
+.dart {
+    background: #1a1a2e;
+    padding: 8px 12px; /* Reduced from 10px 15px */
+    border-radius: 6px; /* Reduced from 8px */
+    font-size: 1rem; /* Reduced from 1.2rem */
+    min-width: 70px; /* Reduced from 80px */
+    text-align: center;
+}
+
+.turn-total {
+    font-size: 1.5rem; /* Reduced from 1.8rem */
+    font-weight: bold;
+    color: #e94560;
+}
+
+/* Dartboard Input - Make it more compact */
+.dartboard-input {
+    background: rgba(15, 52, 96, 0.7);
+    border-radius: 12px; /* Reduced from 15px */
+    padding: 15px; /* Reduced from 20px */
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Reduced from 20px */
+    flex-shrink: 0;
+}
+
+.multiplier-selector {
+    display: flex;
+    gap: 8px; /* Reduced from 10px */
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.multiplier-btn {
+    flex: 1;
+    padding: 12px 8px; /* Reduced from 15px 10px */
+    font-size: 1rem; /* Reduced from 1.2rem */
+    background: #1a1a2e;
+    border: none;
+    border-radius: 6px; /* Reduced from 8px */
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 80px;
+}
+
+.multiplier-btn:hover,
+.multiplier-btn.active {
+    background: #e94560;
+    transform: translateY(-2px);
+}
+
+.segment-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px; /* Reduced from 10px */
+    padding: 8px; /* Reduced from 10px */
+}
+
+.segment-btn {
+    aspect-ratio: 1;
+    font-size: 1.2rem; /* Reduced from 1.5rem */
+    font-weight: bold;
+    background: #1a1a2e;
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 50px;
+}
+
+.segment-btn:hover {
+    background: #4ecca3;
+    transform: scale(1.05); /* Reduced from 1.1 */
+}
+
+.segment-btn.bull {
+    grid-column: span 2;
+    aspect-ratio: unset;
+    border-radius: 8px; /* Reduced from 10px */
+    font-size: 1rem;
+}
+
+.special-buttons {
+    display: flex;
+    gap: 8px; /* Reduced from 10px */
+    flex-wrap: wrap;
+}
+
+.special-btn {
+    flex: 1;
+    padding: 15px 8px; /* Reduced from 20px 10px */
+    font-size: 1.1rem; /* Reduced from 1.3rem */
+    background: #1a1a2e;
+    border: none;
+    border-radius: 8px; /* Reduced from 10px */
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 150px;
+}
+
+.special-btn:hover {
+    background: #e94560;
+    transform: translateY(-2px);
+}
+
+/* Game Controls - Make buttons smaller */
+.game-controls {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px; /* Reduced from 15px */
+    flex-shrink: 0;
+    margin-top: auto; /* Push to bottom */
+}
+
+.control-btn {
+    padding: 15px 8px; /* Reduced from 20px 10px */
+    font-size: 1rem; /* Reduced from 1.2rem */
+    background: #0f3460;
+    border: none;
+    border-radius: 8px; /* Reduced from 10px */
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.control-btn:hover {
+    background: #e94560;
+    transform: translateY(-2px);
+}
+
+#undo-btn {
+    background: #ff9a3c;
+}
+
+#next-player-btn {
+    background: #4ecca3;
+}
+
+/* Footer - Make it more compact */
+.footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0; /* Reduced from 15px 0 */
+    border-top: 2px solid #0f3460;
+    margin-top: 15px; /* Reduced from 20px */
+    font-size: 0.9rem; /* Reduced from 1rem */
+    flex-shrink: 0;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Reduced from 10px */
+}
+
+.status-indicator {
+    width: 10px; /* Reduced from 12px */
+    height: 10px; /* Reduced from 12px */
+    border-radius: 50%;
+}
+
+.status-indicator.online {
+    background: #4ecca3;
+    box-shadow: 0 0 8px #4ecca3; /* Reduced from 10px */
+}
+
+.status-indicator.offline {
+    background: #e94560;
+    box-shadow: 0 0 8px #e94560; /* Reduced from 10px */
+}
+
+.offline-queue {
+    background: rgba(233, 69, 96, 0.2);
+    padding: 6px 12px; /* Reduced from 8px 15px */
+    border-radius: 6px; /* Reduced from 8px */
+}
+
+/* Modals - Ensure they fit on screen */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.modal-content {
+    background: #1a1a2e;
+    padding: 20px; /* Reduced from 30px */
+    border-radius: 12px; /* Reduced from 15px */
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    margin: auto;
+}
+
+.modal h2 {
+    color: #e94560;
+    margin-bottom: 15px; /* Reduced from 20px */
+    text-align: center;
+    font-size: 1.5rem;
+}
+
+.player-selection {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Reduced from 15px */
+    margin-bottom: 20px; /* Reduced from 25px */
+}
+
+.player-option {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Reduced from 15px */
+    padding: 12px; /* Reduced from 15px */
+    background: #0f3460;
+    border-radius: 8px; /* Reduced from 10px */
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.player-option:hover {
+    background: #16213e;
+}
+
+.player-option input {
+    transform: scale(1.3); /* Reduced from 1.5 */
+}
+
+.player-option label {
+    font-size: 1.1rem; /* Reduced from 1.2rem */
+    flex: 1;
+    cursor: pointer;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 10px; /* Reduced from 15px */
+}
+
+.modal-btn {
+    flex: 1;
+    padding: 12px; /* Reduced from 15px */
+    font-size: 1.1rem; /* Reduced from 1.2rem */
+    background: #0f3460;
+    border: none;
+    border-radius: 8px; /* Reduced from 10px */
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.modal-btn:hover {
+    background: #e94560;
+}
+
+.modal-btn.cancel {
+    background: #666;
+}
+
+.stats-display {
+    margin-bottom: 20px; /* Reduced from 25px */
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0; /* Reduced from 12px 0 */
+    border-bottom: 1px solid #0f3460;
+}
+
+.stat-label {
+    color: #aaa;
+    font-size: 0.95rem;
+}
+
+.stat-value {
+    font-weight: bold;
+    color: #4ecca3;
+    font-size: 0.95rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header h1 {
+        font-size: 1.5rem; /* Reduced from 1.8rem */
+    }
+    
+    .game-info {
+        font-size: 1rem; /* Reduced from 1.2rem */
+    }
+    
+    .game-info > div {
+        min-width: 80px; /* Reduced from 100px */
+        padding: 6px 10px; /* Reduced from 8px 15px */
+    }
+    
+    #remaining-score {
+        font-size: 1.2rem; /* Reduced from 1.5rem */
+    }
+    
+    .player-score {
+        min-width: 100px; /* Reduced from 120px */
+        padding: 8px; /* Reduced from 10px */
+    }
+    
+    .player-name {
+        font-size: 1rem; /* Reduced from 1.1rem */
+    }
+    
+    .player-total {
+        font-size: 1.2rem; /* Reduced from 1.5rem */
+    }
+    
+    .multiplier-btn,
+    .special-btn,
+    .control-btn,
+    .modal-btn {
+        font-size: 0.9rem; /* Reduced from 1rem */
+        padding: 10px 6px; /* Reduced from 12px 8px */
+    }
+    
+    .segment-btn {
+        font-size: 1rem; /* Reduced from 1.2rem */
+        min-height: 40px;
+    }
+    
+    .game-controls {
+        grid-template-columns: 1fr;
+    }
+    
+    .special-buttons {
+        flex-direction: column;
+    }
+}
+
+@media (max-height: 800px) {
+    /* Extra adjustments for shorter screens */
+    .container {
+        padding: 5px;
+    }
+    
+    .header {
+        padding: 5px 0;
+        margin-bottom: 10px;
+    }
+    
+    .header h1 {
+        font-size: 1.4rem;
+        margin-bottom: 5px;
+    }
+    
+    .main-content {
+        gap: 10px;
+    }
+    
+    .score-display,
+    .dartboard-input {
+        padding: 10px;
+        border-radius: 8px;
+    }
+    
+    .segment-btn {
+        min-height: 35px;
+        font-size: 1rem;
+    }
+    
+    .game-controls {
+        gap: 8px;
+    }
+    
+    .control-btn {
+        padding: 12px 6px;
+        font-size: 0.9rem;
+    }
+    .turn-status {
+        text-align: center;
+        padding: 8px;
+        margin: 10px 0;
+        background: #0f3460;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+
+    #darts-remaining {
+        color: #4ecca3;
+    }
+
+    .turn-status.complete {
+        background: #e94560;
+    }
+
+    .turn-status.complete #darts-remaining {
+        color: white;
+    }
+}
+
+/* Touch feedback */
+button:active {
+    transform: scale(0.95) !important;
+    opacity: 0.9;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 6px; /* Reduced from 8px */
+}
+
+::-webkit-scrollbar-track {
+    background: #0f3460;
+    border-radius: 3px; /* Reduced from 4px */
+}
+
+::-webkit-scrollbar-thumb {
+    background: #e94560;
+    border-radius: 3px; /* Reduced from 4px */
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #ff6b8b;
+}
+
+/* Ensure body scrolls if content is too tall */
+body.scrollable {
+    overflow-y: auto;
+}
+
+/* Celebration Overlay */
+#celebration-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9997; /* Lower than modal */
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 9998; /* Higher than celebration */
+    display: none;
+}
+
+/* Modal Backdrop */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 9997; /* Lower than modal */
+}
+
+/* Ensure modal content is clickable */
+.modal-content {
+    pointer-events: auto !important;
+}
