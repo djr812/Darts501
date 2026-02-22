@@ -1,6 +1,6 @@
-from flask import render_template, request, redirect, url_for
+from flask import render_template, request, redirect, url_for, jsonify
 from app import app, SessionLocal
-from app.models import Turn
+from app.models import Turn, Player
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -50,3 +50,20 @@ def score(success):
         turns=turns,
         remaining_total=remaining_total,
     )
+
+@app.route("/players/active")
+def get_active_players():
+    try:
+        active_players = Player.query.filter(Player.is_active).all()
+        players_list = [
+            {
+                "id": player.id,
+                "name": player.name,
+                "nickname": player.nickname
+            }
+            for player in active_players
+        ]
+        return jsonify(players_list)
+    except Exception as e:
+        app.logger.error(f"Error fetching active players: {str(e)}")
+        return jsonify({"error": "Failed to fetch active players"}), 500
