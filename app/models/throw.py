@@ -90,7 +90,7 @@ def get_throws_for_turn(turn_id: int) -> list:
         List of dicts, one per throw, ordered by dart_number ASC.
     """
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
 
     sql = """
         SELECT
@@ -125,7 +125,7 @@ def delete_last_throw(turn_id: int) -> dict | None:
     darts_thrown count and the player's running score after deletion.
     """
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
 
     # Find the last dart thrown in this turn
     cursor.execute(

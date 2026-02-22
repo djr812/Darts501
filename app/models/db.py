@@ -41,17 +41,13 @@ def get_db():
     """
     if "db" not in g:
         g.db = pymysql.connect(
-            host     = current_app.config.get("DB_HOST", "localhost"),
-            port     = current_app.config.get("DB_PORT", 3306),
-            user     = current_app.config["DB_USER"],
-            password = current_app.config["DB_PASSWORD"],
-            database = current_app.config.get("DB_NAME", "darts"),
-            # Return column values as Python-native types (e.g. bool for TINYINT(1))
-            cursorclass = pymysql.cursors.DictCursor,
-            # Automatically decode bytes to str
-            charset  = "utf8mb4",
-            # Raise exceptions on warnings (catches silent data truncation etc.)
-            sql_mode = "STRICT_TRANS_TABLES",
+            host        = current_app.config.get("DB_HOST", "localhost"),
+            port        = current_app.config.get("DB_PORT", 3306),
+            user        = current_app.config["DB_USER"],
+            password    = current_app.config["DB_PASSWORD"],
+            database    = current_app.config.get("DB_NAME", "darts"),
+            cursorclass = pymysql.cursors.DictCursor,  # ← returns dicts by default
+            charset     = "utf8mb4",
         )
     return g.db
 

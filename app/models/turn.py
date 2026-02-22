@@ -34,7 +34,7 @@ def get_active_turn(leg_id: int, player_id: int) -> dict | None:
         A dict of the turn row, or None if no open turn exists.
     """
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
 
     sql = """
         SELECT
@@ -79,11 +79,9 @@ def open_turn(leg_id: int, player_id: int, score_before: int) -> int:
     cursor = db.cursor()
 
     # Determine the next sequential turn number within this leg
-    cursor.execute(
-        "SELECT COUNT(*) FROM turns WHERE leg_id = %s",
-        (leg_id,)
-    )
-    turn_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) AS turn_count FROM turns WHERE leg_id = %s", (leg_id,))
+    
+    turn_count = cursor.fetchone()['turn_count']
     turn_number = turn_count + 1
 
     sql = """
@@ -166,7 +164,7 @@ def get_turn_by_id(turn_id: int) -> dict | None:
         A dict of the turn row, or None if not found.
     """
     db = get_db()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor()
 
     cursor.execute(
         """
