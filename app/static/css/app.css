@@ -473,56 +473,71 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     margin-top: 4px;
 }
 
-#setup-count-section {
+/* Setup sections */
+.setup-section {
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 640px;
 }
 
-.setup-label {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.2em;
-    color: var(--text-secondary);
-    margin-bottom: 12px;
-}
-
-#setup-count-row {
+/* Generic option button used for game type, checkout rule, player count */
+.setup-option-row {
     display: flex;
     gap: var(--gap);
     justify-content: center;
+    flex-wrap: wrap;
 }
 
-.count-btn {
-    width: 90px;
-    height: 64px;
+.option-btn {
+    min-width: 80px;
+    height: 58px;
+    padding: 0 16px;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--bg-raised);
     color: var(--text-secondary);
     font-family: var(--font-display);
-    font-size: 1.6rem;
+    font-size: 1.2rem;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.1s ease;
-    line-height: 1;
+    line-height: 1.1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
-.count-btn .vs-cpu {
+.option-btn .option-hint {
     display: block;
     font-size: 0.55rem;
     letter-spacing: 0.1em;
     color: var(--text-dim);
     margin-top: 2px;
+    font-weight: 500;
 }
 
-.count-btn:active { transform: scale(0.95); }
+.option-btn:active { transform: scale(0.95); }
 
-.count-btn.selected {
+.option-btn.selected {
     border-color: var(--accent);
     color: var(--accent);
     background: var(--accent-glow);
     box-shadow: 0 0 12px var(--accent-glow);
 }
+
+.option-btn.selected .option-hint { color: var(--accent-dim); }
+
+.option-btn.disabled,
+.option-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Keep count-btn as an alias — just uses option-btn now */
+.count-btn { min-width: 70px; }
 
 #setup-names-section {
     margin-bottom: 28px;
@@ -540,6 +555,64 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     flex-direction: column;
     gap: 6px;
 }
+
+/* Toggle row: NEW / EXISTING */
+.slot-toggle-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 2px;
+}
+
+.slot-toggle-btn {
+    flex: 1;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-primary);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.slot-toggle-btn.active {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.slot-toggle-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Existing player dropdown */
+.name-select {
+    height: 52px;
+    padding: 0 14px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 500;
+    outline: none;
+    width: 100%;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    /* Dropdown arrow */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888880' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+}
+
+.name-select:focus  { border-color: var(--accent); }
+.name-select.error  { border-color: var(--danger); }
 
 .name-label {
     font-family: var(--font-mono);

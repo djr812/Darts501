@@ -61,7 +61,7 @@ def create_player():
     # Check for duplicate name
     cursor.execute("SELECT id FROM players WHERE name = %s", (name,))
     if cursor.fetchone():
-        return jsonify({"error": f"A player named '{name}' already exists"}), 409
+        return jsonify({"error": f"Player With That Name Already Exists"}), 409
 
     cursor.execute(
         "INSERT INTO players (name, nickname) VALUES (%s, %s)",

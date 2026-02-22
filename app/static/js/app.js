@@ -4,10 +4,11 @@
  * Main game controller.
  *
  * Flow:
- *   1. Page loads → setup screen shown
- *   2. User selects player count and enters names → onStartGame()
- *   3. Players created/fetched via API → match + leg created
- *   4. Game board rendered → throw loop begins
+ *   1. Page loads → fetch existing players → show setup screen
+ *   2. User selects game type, checkout rule, player count and names
+ *   3. onStartGame({ players, gameType, doubleOut }) called
+ *   4. Players resolved → match created → leg created with config
+ *   5. Game board rendered
  */
 
 (() => {
@@ -19,117 +20,93 @@
     const state = {
         matchId:          null,
         legId:            null,
-        players:          [],      // [{ id, name, score }]
+        gameType:         '501',
+        doubleOut:        true,
+        startingScore:    501,
+        players:          [],
         currentIndex:     0,
         activeMultiplier: 1,
         activeTurnId:     null,
         dartsThisTurn:    0,
-        turnScoreBefore:  null,    // score at start of current turn (for bust revert)
+        turnScoreBefore:  null,
         turnComplete:     false,
         legOver:          false,
     };
 
     // ------------------------------------------------------------------
-    // Setup — called when user taps START MATCH
+    // Setup
     // ------------------------------------------------------------------
 
-    /**
-     * Resolve player names to player IDs.
-     * Creates a new player if the name doesn't already exist.
-     *
-     * @param {string[]} names
-     * @returns {Promise<Array>} Array of { id, name, score: 501 }
-     */
-    async function resolvePlayers(names) {
-        // Fetch existing players
-        let existing = [];
-        try {
-            existing = await API.getPlayers();
-        } catch (err) {
-            console.warn('[app] Could not fetch players list:', err.message);
-        }
-
+    async function resolvePlayers(selections) {
         const players = [];
-
-        for (const name of names) {
-            // Case-insensitive match against existing players
-            const match = existing.find(
-                p => p.name.toLowerCase() === name.toLowerCase()
-            );
-
-            if (match) {
-                players.push({ id: match.id, name: match.name, score: 501 });
+        for (const sel of selections) {
+            if (sel.mode === 'existing') {
+                players.push({ id: sel.id, name: sel.name, score: state.startingScore });
             } else {
-                // Create a new player
                 try {
-                    const created = await API.createPlayer(name);
-                    players.push({ id: created.id, name: created.name, score: 501 });
+                    const created = await API.createPlayer(sel.name);
+                    players.push({ id: created.id, name: created.name, score: state.startingScore });
                 } catch (err) {
-                    // If creation fails (e.g. duplicate from a race), try fetching again
-                    const retry = existing.find(
-                        p => p.name.toLowerCase() === name.toLowerCase()
-                    );
-                    if (retry) {
-                        players.push({ id: retry.id, name: retry.name, score: 501 });
-                    } else {
-                        throw new Error(`Could not create player '${name}': ${err.message}`);
-                    }
+                    throw new Error(err.message);
                 }
             }
         }
-
         return players;
     }
 
     /**
-     * Called by UI when the user confirms the setup screen.
-     * Creates players, starts a match and leg, then launches the game.
-     *
-     * @param {string[]} names  - Player names from the setup form
+     * @param {object} config
+     * @param {Array}   config.players   - [{ mode, name, id? }]
+     * @param {string}  config.gameType  - '501' | '201' | 'Cricket'
+     * @param {boolean} config.doubleOut - true = double out required
      */
-    async function onStartGame(names) {
+    async function onStartGame(config) {
         UI.setLoading(true);
 
-        try {
-            // 1. Resolve names to player records (create if needed)
-            const players = await resolvePlayers(names);
+        // Set starting score based on game type before resolving players
+        // so player objects get the correct score
+        const STARTING_SCORES = { '501': 501, '201': 201, 'Cricket': 0 };
+        state.startingScore = STARTING_SCORES[config.gameType] || 501;
+        state.gameType      = config.gameType;
+        state.doubleOut     = config.doubleOut;
 
-            // 2. Start a match
+        try {
+            const players = await resolvePlayers(config.players);
+
             const match = await API.startMatch({
                 player_ids:  players.map(p => p.id),
                 legs_to_win: 1,
             });
 
-            // 3. Start the first leg
-            const leg = await API.startLeg(match.id);
+            const leg = await API.startLeg({
+                match_id:   match.id,
+                game_type:  config.gameType,
+                double_out: config.doubleOut,
+            });
 
-            // 4. Populate state
-            state.matchId      = match.id;
-            state.legId        = leg.id;
-            state.players      = players;
-            state.currentIndex = 0;
+            state.matchId        = match.id;
+            state.legId          = leg.id;
+            state.players        = players;
+            state.currentIndex   = 0;
             state.dartsThisTurn  = 0;
             state.turnComplete   = false;
             state.legOver        = false;
             state.activeTurnId   = null;
             state.turnScoreBefore = null;
+            state.activeMultiplier = 1;
 
-            // 5. Build the game board
-            UI.buildShell(players, {
-                onMultiplier,
-                onSegment,
-                onUndo,
-                onNextPlayer,
-            });
+            UI.buildShell(players, { onMultiplier, onSegment, onUndo, onNextPlayer });
 
             const player = currentPlayer();
             UI.setActivePlayer(player.id);
-            UI.setMultiplierTab(state.activeMultiplier);
+            UI.setMultiplierTab(1);
+
+            const ruleLabel = config.doubleOut ? 'DOUBLE OUT' : 'SINGLE OUT';
             UI.setStatus(`${player.name.toUpperCase()}'S TURN — SELECT MULTIPLIER`);
-            UI.setMatchInfo(`MATCH ${state.matchId} · LEG 1`);
+            UI.setMatchInfo(`${config.gameType} · ${ruleLabel} · MATCH ${state.matchId}`);
 
         } catch (err) {
-            UI.showToast(`SETUP FAILED: ${err.message}`, 'bust', 4000);
+            UI.showToast(err.message.toUpperCase(), 'bust', 4000);
             console.error('[app] Setup error:', err);
         } finally {
             UI.setLoading(false);
@@ -171,29 +148,23 @@
         UI.setLoading(true);
 
         try {
-            const payload = {
+            const result = await API.recordThrow({
                 leg_id:       state.legId,
                 player_id:    player.id,
                 segment,
                 multiplier,
                 score_before: player.score,
-            };
+            });
 
-            const result = await API.recordThrow(payload);
-
-            // Capture pre-turn score on first dart of turn
             if (state.dartsThisTurn === 0) {
                 state.activeTurnId    = result.turn_id;
                 state.turnScoreBefore = result.score_before;
             }
 
             state.dartsThisTurn++;
-
-            // Update UI dart pill regardless of bust/checkout
             UI.addDartPill(player.id, result.points, multiplier, segment);
 
             if (result.is_bust) {
-                // Revert to score at the START of this turn
                 player.score = state.turnScoreBefore;
                 UI.setScore(player.id, player.score);
                 UI.flashCard(player.id, 'bust');
@@ -213,7 +184,6 @@
                 UI.setNextPlayerEnabled(false);
 
             } else {
-                // Normal dart — update score
                 player.score = result.score_after;
                 UI.setScore(player.id, player.score);
 
@@ -268,9 +238,7 @@
             UI.setNextPlayerEnabled(false);
             UI.setCheckoutHint(player.id, null);
 
-            if (state.dartsThisTurn === 0) {
-                state.turnScoreBefore = null;
-            }
+            if (state.dartsThisTurn === 0) state.turnScoreBefore = null;
 
             const dartsLeft = 3 - state.dartsThisTurn;
             UI.setStatus(
@@ -297,16 +265,14 @@
         state.turnComplete    = false;
         state.activeTurnId    = null;
         state.turnScoreBefore = null;
+        state.activeMultiplier = 1;
 
         const newPlayer = currentPlayer();
         UI.setActivePlayer(newPlayer.id);
         UI.setNextPlayerEnabled(false);
-
-        state.activeMultiplier = 1;
         UI.setMultiplierTab(1);
 
         UI.setStatus(`${newPlayer.name.toUpperCase()}'S TURN — SELECT MULTIPLIER`);
-        UI.setMatchInfo(`MATCH ${state.matchId} · LEG ${state.legId}`);
     }
 
     // ------------------------------------------------------------------
@@ -318,11 +284,17 @@
     }
 
     // ------------------------------------------------------------------
-    // Initialise — show setup screen on load
+    // Initialise
     // ------------------------------------------------------------------
 
-    function init() {
-        UI.buildSetupScreen(onStartGame);
+    async function init() {
+        let existingPlayers = [];
+        try {
+            existingPlayers = await API.getPlayers();
+        } catch (err) {
+            console.warn('[app] Could not load existing players:', err.message);
+        }
+        UI.buildSetupScreen(existingPlayers, onStartGame);
     }
 
     if (document.readyState === 'loading') {

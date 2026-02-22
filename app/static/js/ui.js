@@ -2,14 +2,6 @@
  * ui.js
  * -----
  * DOM construction and manipulation helpers.
- *
- * Responsibilities:
- *   - Build the setup screen (player count + name entry)
- *   - Build the game UI shell
- *   - Render the segment tap grid
- *   - Update scoreboard cards
- *   - Show/hide toast messages
- *   - All DOM queries isolated here so app.js stays logic-focused
  */
 
 const UI = (() => {
@@ -19,15 +11,20 @@ const UI = (() => {
     // ------------------------------------------------------------------
 
     /**
-     * Render the player setup screen inside #app.
+     * Render the player setup screen.
      *
-     * @param {Function} onStartGame  - Called with array of name strings when
-     *                                  the user confirms. e.g. ["Dave", "Sue"]
+     * @param {Array}    existingPlayers  - [{ id, name }] from GET /api/players
+     * @param {Function} onStartGame      - Called with:
+     *                                      {
+     *                                        players:   [{ mode, name, id? }],
+     *                                        gameType:  '501' | '201' | 'Cricket',
+     *                                        doubleOut: true | false
+     *                                      }
      */
-    function buildSetupScreen(onStartGame) {
+    function buildSetupScreen(existingPlayers, onStartGame) {
         const app = document.getElementById('app');
         app.innerHTML = '';
-        app.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center;';
+        app.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; overflow-y:auto; padding: 16px 0;';
 
         if (!document.getElementById('toast'))   document.body.appendChild(_buildToast());
         if (!document.getElementById('loading')) document.body.appendChild(_buildLoading());
@@ -41,19 +38,94 @@ const UI = (() => {
         `;
         app.appendChild(title);
 
-        // Player count selector
+        // ---- Game Type ----
+        const gameTypeSection = document.createElement('div');
+        gameTypeSection.className = 'setup-section';
+        gameTypeSection.innerHTML = '<div class="setup-label">GAME TYPE</div>';
+
+        const gameTypeRow = document.createElement('div');
+        gameTypeRow.id = 'setup-gametype-row';
+        gameTypeRow.className = 'setup-option-row';
+
+        const gameTypes = [
+            { value: '501',     label: '501' },
+            { value: '201',     label: '201' },
+            { value: 'Cricket', label: 'Cricket', disabled: true, hint: 'COMING SOON' },
+        ];
+
+        gameTypes.forEach(gt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.dataset.value = gt.value;
+            btn.type = 'button';
+
+            if (gt.hint) {
+                btn.innerHTML = `${gt.label}<span class="option-hint">${gt.hint}</span>`;
+            } else {
+                btn.textContent = gt.label;
+            }
+
+            if (gt.disabled) {
+                btn.disabled = true;
+                btn.classList.add('disabled');
+            } else {
+                btn.addEventListener('click', () => {
+                    gameTypeRow.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    // Show/hide checkout rule section based on game type
+                    checkoutSection.style.display = gt.value === 'Cricket' ? 'none' : '';
+                });
+            }
+
+            gameTypeRow.appendChild(btn);
+        });
+
+        gameTypeSection.appendChild(gameTypeRow);
+        app.appendChild(gameTypeSection);
+
+        // ---- Checkout Rule ----
+        const checkoutSection = document.createElement('div');
+        checkoutSection.className = 'setup-section';
+        checkoutSection.id = 'setup-checkout-section';
+        checkoutSection.innerHTML = '<div class="setup-label">CHECKOUT RULE</div>';
+
+        const checkoutRow = document.createElement('div');
+        checkoutRow.id = 'setup-checkout-row';
+        checkoutRow.className = 'setup-option-row';
+
+        const checkoutOptions = [
+            { value: 'double', label: 'DOUBLE OUT', hint: 'Standard' },
+            { value: 'single', label: 'SINGLE OUT', hint: 'Casual' },
+        ];
+
+        checkoutOptions.forEach(co => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.dataset.value = co.value;
+            btn.type = 'button';
+            btn.innerHTML = `${co.label}<span class="option-hint">${co.hint}</span>`;
+            btn.addEventListener('click', () => {
+                checkoutRow.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+            });
+            checkoutRow.appendChild(btn);
+        });
+
+        checkoutSection.appendChild(checkoutRow);
+        app.appendChild(checkoutSection);
+
+        // ---- Player Count ----
         const countSection = document.createElement('div');
-        countSection.id = 'setup-count-section';
+        countSection.className = 'setup-section';
         countSection.innerHTML = '<div class="setup-label">NUMBER OF PLAYERS</div>';
 
         const countRow = document.createElement('div');
         countRow.id = 'setup-count-row';
+        countRow.className = 'setup-option-row';
 
-        // Names section declared here so count buttons can reference it
         const namesSection = document.createElement('div');
         namesSection.id = 'setup-names-section';
 
-        // Start button declared here so _renderNameInputs can reference it
         const startBtn = document.createElement('button');
         startBtn.id = 'setup-start-btn';
         startBtn.className = 'start-btn';
@@ -62,19 +134,20 @@ const UI = (() => {
 
         [1, 2, 3, 4].forEach(n => {
             const btn = document.createElement('button');
-            btn.className = 'count-btn';
+            btn.className = 'option-btn count-btn';
             btn.dataset.count = n;
+            btn.type = 'button';
 
             if (n === 1) {
-                btn.innerHTML = `1<span class="vs-cpu"> vs CPU</span>`;
+                btn.innerHTML = `1<span class="option-hint">vs CPU</span>`;
             } else {
                 btn.textContent = n;
             }
 
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.count-btn').forEach(b => b.classList.remove('selected'));
+                countRow.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
-                _renderNameInputs(n, namesSection, startBtn, onStartGame);
+                _renderPlayerSlots(n, existingPlayers, namesSection, startBtn, onStartGame);
                 startBtn.disabled = false;
             });
 
@@ -86,17 +159,42 @@ const UI = (() => {
         app.appendChild(namesSection);
 
         startBtn.addEventListener('click', () => {
-            const names = _collectNames(namesSection);
-            if (!names) return;
-            onStartGame(names);
+            // Collect game config
+            const gameTypeSelected = gameTypeRow.querySelector('.option-btn.selected');
+            const checkoutSelected  = checkoutRow.querySelector('.option-btn.selected');
+
+            if (!gameTypeSelected) {
+                showToast('SELECT A GAME TYPE', 'bust', 2000);
+                return;
+            }
+            if (!checkoutSelected) {
+                showToast('SELECT A CHECKOUT RULE', 'bust', 2000);
+                return;
+            }
+
+            const players = _collectPlayerSelections(namesSection);
+            if (!players) return;
+
+            onStartGame({
+                players,
+                gameType:  gameTypeSelected.dataset.value,
+                doubleOut: checkoutSelected.dataset.value === 'double',
+            });
         });
+
         app.appendChild(startBtn);
 
-        // Default to 2 players on load
+        // ---- Set defaults ----
+        gameTypeRow.querySelector('[data-value="501"]').click();
+        checkoutRow.querySelector('[data-value="double"]').click();
         countRow.querySelector('[data-count="2"]').click();
     }
 
-    function _renderNameInputs(count, container, startBtn, onStartGame) {
+    // ------------------------------------------------------------------
+    // Player slots
+    // ------------------------------------------------------------------
+
+    function _renderPlayerSlots(count, existingPlayers, container, startBtn, onStartGame) {
         container.innerHTML = '';
 
         const grid = document.createElement('div');
@@ -104,70 +202,156 @@ const UI = (() => {
         grid.style.gridTemplateColumns = count <= 2 ? '1fr 1fr' : 'repeat(4, 1fr)';
 
         for (let i = 0; i < count; i++) {
-            const slot = document.createElement('div');
-            slot.className = 'name-slot';
-
-            const label = document.createElement('label');
-            label.textContent = count === 1 ? 'YOUR NAME' : `PLAYER ${i + 1}`;
-            label.className = 'name-label';
-
-            const input = document.createElement('input');
-            input.type        = 'text';
-            input.className   = 'name-input';
-            input.placeholder = count === 1 ? 'Enter your name' : `Player ${i + 1}`;
-            input.maxLength   = 20;
-            input.dataset.index   = i;
-            input.autocomplete    = 'off';
-            input.autocorrect     = 'off';
-            input.autocapitalize  = 'words';
-            input.spellcheck      = false;
-
-            // Return key: advance to next input or trigger start
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    const inputs = container.querySelectorAll('.name-input');
-                    const next = inputs[i + 1];
-                    if (next) {
-                        next.focus();
-                    } else {
-                        startBtn.click();
-                    }
-                }
-            });
-
-            input.addEventListener('input', () => input.classList.remove('error'));
-
-            slot.appendChild(label);
-            slot.appendChild(input);
-            grid.appendChild(slot);
+            grid.appendChild(_buildPlayerSlot(i, count, existingPlayers));
         }
 
         container.appendChild(grid);
 
-        // Focus first input after brief delay (iOS keyboard timing)
-        setTimeout(() => container.querySelector('.name-input')?.focus(), 150);
+        setTimeout(() => {
+            const first = container.querySelector('.name-input');
+            if (first) first.focus();
+        }, 150);
     }
 
-    function _collectNames(container) {
-        const inputs = container.querySelectorAll('.name-input');
-        const names  = [];
+    function _buildPlayerSlot(index, totalCount, existingPlayers) {
+        const slot = document.createElement('div');
+        slot.className = 'name-slot';
+        slot.dataset.index = index;
+
+        const label = document.createElement('div');
+        label.className = 'name-label';
+        label.textContent = totalCount === 1 ? 'YOUR NAME' : `PLAYER ${index + 1}`;
+        slot.appendChild(label);
+
+        // Toggle row
+        const toggleRow = document.createElement('div');
+        toggleRow.className = 'slot-toggle-row';
+
+        const newBtn = document.createElement('button');
+        newBtn.className = 'slot-toggle-btn active';
+        newBtn.textContent = '+ NEW';
+        newBtn.type = 'button';
+
+        const existingBtn = document.createElement('button');
+        existingBtn.className = 'slot-toggle-btn';
+        existingBtn.textContent = 'EXISTING';
+        existingBtn.type = 'button';
+
+        if (existingPlayers.length === 0) {
+            existingBtn.disabled = true;
+            existingBtn.title = 'No existing players';
+        }
+
+        toggleRow.appendChild(newBtn);
+        toggleRow.appendChild(existingBtn);
+        slot.appendChild(toggleRow);
+
+        // New name input
+        const newInput = document.createElement('input');
+        newInput.type          = 'text';
+        newInput.className     = 'name-input';
+        newInput.placeholder   = `Player ${index + 1} name`;
+        newInput.maxLength     = 20;
+        newInput.autocomplete  = 'off';
+        newInput.autocorrect   = 'off';
+        newInput.autocapitalize = 'words';
+        newInput.spellcheck    = false;
+        newInput.dataset.slotIndex = index;
+        newInput.addEventListener('input', () => newInput.classList.remove('error'));
+        slot.appendChild(newInput);
+
+        // Existing player dropdown
+        const existingSelect = document.createElement('select');
+        existingSelect.className = 'name-select';
+        existingSelect.dataset.slotIndex = index;
+        existingSelect.style.display = 'none';
+
+        const placeholder = document.createElement('option');
+        placeholder.value       = '';
+        placeholder.textContent = '— Select player —';
+        placeholder.disabled    = true;
+        placeholder.selected    = true;
+        existingSelect.appendChild(placeholder);
+
+        existingPlayers.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value       = p.id;
+            opt.textContent = p.name;
+            existingSelect.appendChild(opt);
+        });
+
+        existingSelect.addEventListener('change', () => existingSelect.classList.remove('error'));
+        slot.appendChild(existingSelect);
+
+        // Toggle mode
+        function activateMode(mode) {
+            if (mode === 'new') {
+                newBtn.classList.add('active');
+                existingBtn.classList.remove('active');
+                newInput.style.display      = '';
+                existingSelect.style.display = 'none';
+                slot.dataset.mode = 'new';
+                newInput.focus();
+            } else {
+                existingBtn.classList.add('active');
+                newBtn.classList.remove('active');
+                newInput.style.display      = 'none';
+                existingSelect.style.display = '';
+                slot.dataset.mode = 'existing';
+                existingSelect.focus();
+            }
+        }
+
+        newBtn.addEventListener('click',      () => activateMode('new'));
+        existingBtn.addEventListener('click', () => activateMode('existing'));
+        slot.dataset.mode = 'new';
+
+        return slot;
+    }
+
+    function _collectPlayerSelections(container) {
+        const slots  = container.querySelectorAll('.name-slot');
+        const result = [];
         let valid    = true;
         let firstErr = null;
 
-        inputs.forEach(input => {
-            const val = input.value.trim();
-            if (!val) {
-                input.classList.add('error');
-                if (!firstErr) firstErr = input;
-                valid = false;
+        slots.forEach(slot => {
+            const mode = slot.dataset.mode;
+            if (mode === 'new') {
+                const input = slot.querySelector('.name-input');
+                const name  = input.value.trim();
+                if (!name) {
+                    input.classList.add('error');
+                    if (!firstErr) firstErr = input;
+                    valid = false;
+                } else {
+                    result.push({ mode: 'new', name });
+                }
             } else {
-                input.classList.remove('error');
-                names.push(val);
+                const select = slot.querySelector('.name-select');
+                if (!select.value) {
+                    select.classList.add('error');
+                    if (!firstErr) firstErr = select;
+                    valid = false;
+                } else {
+                    result.push({
+                        mode: 'existing',
+                        id:   parseInt(select.value, 10),
+                        name: select.options[select.selectedIndex].textContent,
+                    });
+                }
             }
         });
 
+        const names    = result.map(r => r.name.toLowerCase());
+        const hasDupes = names.some((n, i) => names.indexOf(n) !== i);
+        if (hasDupes) {
+            showToast('EACH PLAYER MUST BE UNIQUE', 'bust', 3000);
+            valid = false;
+        }
+
         if (!valid && firstErr) firstErr.focus();
-        return valid ? names : null;
+        return valid ? result : null;
     }
 
     // ------------------------------------------------------------------
@@ -177,7 +361,7 @@ const UI = (() => {
     function buildShell(players, callbacks) {
         const app = document.getElementById('app');
         app.innerHTML = '';
-        app.style.cssText = '';   // reset inline styles from setup screen
+        app.style.cssText = '';
 
         app.appendChild(_buildHeader());
         app.appendChild(_buildSidebar(players));
@@ -227,7 +411,6 @@ const UI = (() => {
     function _buildMultiplierTabs(onMultiplier) {
         const row = document.createElement('div');
         row.id = 'multiplier-tabs';
-
         [
             { label: 'Single', multiplier: 1, cls: 'active-single' },
             { label: 'Double', multiplier: 2, cls: 'active-double' },
@@ -241,16 +424,13 @@ const UI = (() => {
             btn.addEventListener('click', () => onMultiplier(tab.multiplier, btn));
             row.appendChild(btn);
         });
-
         return row;
     }
 
     function _buildSegmentGrid(onSegment) {
         const grid = document.createElement('div');
         grid.id = 'segment-grid';
-
         const BOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
-
         BOARD_ORDER.forEach(segment => {
             const btn = document.createElement('button');
             btn.className = 'seg-btn';
@@ -259,7 +439,6 @@ const UI = (() => {
             btn.addEventListener('click', () => onSegment(segment));
             grid.appendChild(btn);
         });
-
         return grid;
     }
 
@@ -285,7 +464,7 @@ const UI = (() => {
         bull.addEventListener('click', () => onSegment(25, 2));
         row.appendChild(bull);
 
-        row.appendChild(document.createElement('div'));   // layout spacer
+        row.appendChild(document.createElement('div'));
         return row;
     }
 
@@ -348,7 +527,7 @@ const UI = (() => {
         if (!row) return;
         const pill = document.createElement('span');
         pill.className = 'dart-pill';
-        if (segment === 25)     pill.classList.add('bull');
+        if (segment === 25)        pill.classList.add('bull');
         else if (multiplier === 3) pill.classList.add('treble');
         else if (multiplier === 2) pill.classList.add('double');
         pill.textContent = points;

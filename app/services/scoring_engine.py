@@ -1,4 +1,3 @@
-
 """
 scoring_engine.py
 -----------------
@@ -13,6 +12,7 @@ state to the database.
 """
 
 import json
+import os
 
 # ---------------------------------------------------------------------------
 # Result container
@@ -53,12 +53,36 @@ class ThrowResult:
             f"turn_complete={self.turn_complete}, error='{self.error}')"
         )
 
-def load_checkouts() -> dict:
-    with open('app/data/checkouts.json', 'r') as f:
-        checkouts = json.load(f)
-    return checkouts
 
-CHECKOUTS = load_checkouts()
+# ---------------------------------------------------------------------------
+# Checkout table — loaded once at module import time
+# ---------------------------------------------------------------------------
+
+def _load_checkouts() -> dict:
+    """
+    Load checkout suggestions from checkouts.json.
+
+    Searches for the file relative to this module's location so the path
+    works regardless of where the application is launched from.
+    """
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # Module lives at app/services/scoring_engine.py
+    # checkouts.json lives at app/data/checkouts.json
+    path = os.path.join(base_dir, '..', 'data', 'checkouts.json')
+    path = os.path.normpath(path)
+
+    try:
+        with open(path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        # Non-fatal — suggestions will simply be unavailable
+        import warnings
+        warnings.warn(f"checkouts.json not found at {path}. Checkout suggestions disabled.")
+        return {}
+
+
+CHECKOUTS = _load_checkouts()
+
 
 # ---------------------------------------------------------------------------
 # Validation
@@ -85,7 +109,7 @@ def validate_throw(segment: int, multiplier: int) -> tuple:
         return (True, "")
 
     if not (0 <= segment <= 20):
-        return (False, f"Invalid segment: {segment}. Must be 0–20 or 25 (bull)")
+        return (False, f"Invalid segment: {segment}. Must be 0-20 or 25 (bull)")
 
     if not (1 <= multiplier <= 3):
         return (False, f"Invalid multiplier: {multiplier}. Must be 1 (single), 2 (double), or 3 (treble)")
@@ -122,25 +146,34 @@ def calculate_points(segment: int, multiplier: int) -> int:
 # Bust detection
 # ---------------------------------------------------------------------------
 
-def is_bust(score_before: int, points: int, segment: int, multiplier: int) -> bool:
+def is_bust(
+    score_before: int,
+    points: int,
+    segment: int,
+    multiplier: int,
+    double_out: bool = True,
+) -> bool:
     """
-    Determine whether a dart results in a bust under standard 501 rules.
+    Determine whether a dart results in a bust.
 
-    Bust conditions:
+    Bust conditions (double_out=True, standard rules):
         1. score_after < 0  -- went below zero
-        2. score_after == 1 -- impossible to finish (no double scores 1)
+        2. score_after == 1 -- stranded; no double scores 1
         3. score_after == 0 -- reached zero but NOT on a double
-                               (D-Bull counts as a valid double finish)
 
-    Note: dart_number is intentionally NOT a parameter here. Bust logic is
-    purely a function of the resulting score and the finishing dart type.
-    The caller (process_throw) handles turn completion based on dart_number.
+    Bust conditions (double_out=False, single out):
+        1. score_after < 0  -- went below zero only
+           Any dart reaching exactly zero wins regardless of multiplier.
+           Note: score_after == 1 is still reachable and NOT a bust in
+           single-out mode (player can hit S1 next dart to win).
 
     Args:
         score_before -- player's score before this dart
         points       -- points scored by this dart
-        segment      -- segment hit (used to distinguish D-Bull from S-Bull)
-        multiplier   -- multiplier of the dart (2 = double required to finish)
+        segment      -- segment hit
+        multiplier   -- multiplier of the dart
+        double_out   -- True  = must finish on a double (standard 501/201)
+                        False = any dart reaching zero wins (single out)
 
     Returns:
         True if the throw is a bust, False otherwise
@@ -148,15 +181,14 @@ def is_bust(score_before: int, points: int, segment: int, multiplier: int) -> bo
     score_after = score_before - points
 
     if score_after < 0:
-        return True  # Overshot — bust
+        return True  # Overshot — always a bust regardless of mode
 
-    if score_after == 1:
-        return True  # Stranded on 1 — no double exists to finish from here
+    if double_out:
+        if score_after == 1:
+            return True  # Stranded — no double scores 1
 
-    if score_after == 0 and multiplier != 2:
-        # Reached zero but not on a double — bust
-        # multiplier == 2 covers both D1–D20 and D-Bull (segment=25, multiplier=2)
-        return True
+        if score_after == 0 and multiplier != 2:
+            return True  # Must finish on a double
 
     return False
 
@@ -165,33 +197,52 @@ def is_bust(score_before: int, points: int, segment: int, multiplier: int) -> bo
 # Checkout detection
 # ---------------------------------------------------------------------------
 
-def is_checkout(score_before: int, segment: int, multiplier: int) -> bool:
+def is_checkout(
+    score_before: int,
+    segment: int,
+    multiplier: int,
+    double_out: bool = True,
+) -> bool:
     """
     Determine whether a dart completes the leg (checkout).
 
-    A valid checkout requires:
-        - score_after == 0
-        - The finishing dart is a double (multiplier == 2)
-        - D-Bull (segment=25, multiplier=2) is a valid checkout
+    double_out=True  (standard): score_after must be 0 AND multiplier must be 2.
+    double_out=False (single out): score_after must be 0, any multiplier valid.
+
+    D-Bull (segment=25, multiplier=2) is always a valid checkout in both modes.
 
     Args:
         score_before -- player's score before this dart
         segment      -- segment hit
         multiplier   -- multiplier of the dart
+        double_out   -- True  = double required to finish
+                        False = any dart can finish
 
     Returns:
         True if this dart wins the leg, False otherwise
     """
     points = calculate_points(segment, multiplier)
     score_after = score_before - points
-    return score_after == 0 and multiplier == 2
+
+    if score_after != 0:
+        return False
+
+    if double_out:
+        return multiplier == 2  # must be a double
+
+    return True  # single-out: any dart reaching zero wins
 
 
 # ---------------------------------------------------------------------------
 # Primary interface
 # ---------------------------------------------------------------------------
 
-def process_throw(state: dict, segment: int, multiplier: int) -> ThrowResult:
+def process_throw(
+    state: dict,
+    segment: int,
+    multiplier: int,
+    double_out: bool = True,
+) -> ThrowResult:
     """
     Process a single dart throw and return the full outcome.
 
@@ -205,15 +256,17 @@ def process_throw(state: dict, segment: int, multiplier: int) -> ThrowResult:
         state: dict with keys:
             'score'      -- int, player's current remaining score
             'dart_number'-- int, which dart in the turn this is (1, 2, or 3)
-            'turn_darts' -- list of ThrowResult objects thrown so far this turn
-        segment   -- int, board segment hit (0–20 or 25)
-        multiplier-- int, 1=single, 2=double, 3=treble
+            'turn_darts' -- list of throw dicts thrown so far this turn
+        segment    -- int, board segment hit (0-20 or 25)
+        multiplier -- int, 1=single, 2=double, 3=treble
+        double_out -- bool, True = must finish on a double (default, standard rules)
+                            False = any dart reaching zero wins (single out)
 
     Returns:
         ThrowResult describing the full outcome of the dart
     """
     score_before = state['score']
-    dart_number = state['dart_number']
+    dart_number  = state['dart_number']
 
     # --- Validate the throw first ---
     is_valid, error_message = validate_throw(segment, multiplier)
@@ -234,8 +287,10 @@ def process_throw(state: dict, segment: int, multiplier: int) -> ThrowResult:
     # A dart that lands on zero via a double is a checkout, not a bust,
     # even though is_bust() would also return True for score_after == 0
     # without a double. Evaluate checkout first and skip bust if confirmed.
-    is_checkout_flag = is_checkout(score_before, segment, multiplier)
-    is_bust_flag = False if is_checkout_flag else is_bust(score_before, points, segment, multiplier)
+    is_checkout_flag = is_checkout(score_before, segment, multiplier, double_out)
+    is_bust_flag     = False if is_checkout_flag else is_bust(
+        score_before, points, segment, multiplier, double_out
+    )
 
     # Turn ends on: checkout, bust, or using all 3 darts
     turn_complete = is_checkout_flag or is_bust_flag or (dart_number == 3)
@@ -279,6 +334,5 @@ def suggested_checkouts(score: int) -> list:
 
     if score in impossible or score < 2 or score > 170:
         return None
-    
-    checkouts = CHECKOUTS.get(str(score), [])
-    return checkouts
+
+    return CHECKOUTS.get(str(score)) or None

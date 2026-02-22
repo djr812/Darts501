@@ -13,6 +13,13 @@ from app.models.db import get_db
 
 legs_bp = Blueprint("legs", __name__)
 
+# Starting scores by game type
+STARTING_SCORES = {
+    '501': 501,
+    '201': 201,
+    'Cricket': 0,   # Cricket scoring is different — placeholder
+}
+
 
 @legs_bp.route("/legs", methods=["POST"])
 def create_leg():
@@ -21,8 +28,9 @@ def create_leg():
 
     Payload:
     {
-        "match_id":       1,
-        "starting_score": 501   (optional, defaults to 501)
+        "match_id":   1,
+        "game_type":  "501",     (optional, defaults to "501")
+        "double_out": true       (optional, defaults to true)
     }
     """
     data = request.get_json(silent=True)
@@ -30,8 +38,14 @@ def create_leg():
     if not data or "match_id" not in data:
         return jsonify({"error": "match_id is required"}), 400
 
-    match_id       = data["match_id"]
-    starting_score = data.get("starting_score", 501)
+    match_id   = data["match_id"]
+    game_type  = data.get("game_type", "501")
+    double_out = data.get("double_out", True)
+
+    if game_type not in STARTING_SCORES:
+        return jsonify({"error": f"Invalid game_type '{game_type}'. Must be 501, 201, or Cricket"}), 400
+
+    starting_score = STARTING_SCORES[game_type]
 
     db = get_db()
     cursor = db.cursor()
@@ -41,7 +55,7 @@ def create_leg():
     if not cursor.fetchone():
         return jsonify({"error": f"Match {match_id} not found"}), 404
 
-    # Determine next leg number for this match
+    # Determine next leg number
     cursor.execute(
         "SELECT COUNT(*) AS cnt FROM legs WHERE match_id = %s",
         (match_id,)
@@ -50,10 +64,10 @@ def create_leg():
 
     cursor.execute(
         """
-        INSERT INTO legs (match_id, leg_number, starting_score)
-        VALUES (%s, %s, %s)
+        INSERT INTO legs (match_id, game_type, leg_number, starting_score, double_out)
+        VALUES (%s, %s, %s, %s, %s)
         """,
-        (match_id, leg_number, starting_score)
+        (match_id, game_type, leg_number, starting_score, double_out)
     )
     db.commit()
     leg_id = cursor.lastrowid
@@ -61,8 +75,10 @@ def create_leg():
     return jsonify({
         "id":             leg_id,
         "match_id":       match_id,
+        "game_type":      game_type,
         "leg_number":     leg_number,
         "starting_score": starting_score,
+        "double_out":     double_out,
         "status":         "active",
     }), 201
 

@@ -34,6 +34,7 @@ from app.models.turn import (
     decrement_darts_thrown,
 )
 from app.models.throw import insert_throw, get_throws_for_turn, delete_last_throw
+from app.models.db import get_db
 from app.services.scoring_engine import process_throw, suggested_checkouts
 
 throws_bp = Blueprint("throws", __name__)
@@ -118,6 +119,19 @@ def record_throw():
     # --- Load or create the active turn ---
     turn = get_active_turn(leg_id, player_id)
 
+    # --- Load leg config (game_type, double_out) ---
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id, starting_score, double_out FROM legs WHERE id = %s",
+        (leg_id,)
+    )
+    leg = cursor.fetchone()
+    if not leg:
+        return jsonify({"error": f"Leg {leg_id} not found"}), 404
+
+    double_out = bool(leg.get("double_out", True))
+
     if turn is None:
         # No open turn — this is the player's first dart of a new visit.
         # The caller must have set up the score via a prior turn or leg record.
@@ -131,8 +145,8 @@ def record_throw():
             }), 400
 
         score_before = data["score_before"]
-        if not isinstance(score_before, int) or score_before < 2:
-            return jsonify({"error": "'score_before' must be an integer >= 2"}), 400
+        if not isinstance(score_before, int) or score_before < 1:
+            return jsonify({"error": "'score_before' must be an integer >= 1"}), 400
 
         turn_id = open_turn(leg_id, player_id, score_before)
         turn = get_turn_by_id(turn_id)
@@ -156,7 +170,7 @@ def record_throw():
     }
 
     # --- Delegate to the scoring engine ---
-    result = process_throw(state, segment, multiplier)
+    result = process_throw(state, segment, multiplier, double_out)
 
     if result.error:
         # Invalid throw (e.g. treble bull) — return 400, do not persist anything

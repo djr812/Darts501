@@ -191,11 +191,11 @@ const API = (() => {
     /**
      * Start a new leg within a match.
      *
-     * @param {number} matchId
+     * @param {object} legData - { match_id, game_type, double_out }
      * @returns {Promise<object>} New leg record
      */
-    async function startLeg(matchId) {
-        return request('POST', '/api/legs', { match_id: matchId });
+    async function startLeg(legData) {
+        return request('POST', '/api/legs', legData);
     }
 
     // Expose public interface
