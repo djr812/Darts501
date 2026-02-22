@@ -1,30 +1,85 @@
+"""
+app/__init__.py
+---------------
+Flask application factory.
+
+Usage:
+    from app import create_app
+    app = create_app()
+
+Keeping app creation inside a factory function (rather than at module
+level) makes it easy to:
+    - Swap configs between dev, test, and production
+    - Avoid circular imports (blueprints import from `app`, not the other way)
+    - Instantiate multiple app instances in tests
+"""
+
 from flask import Flask
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
-import os
+from config import DevelopmentConfig, ProductionConfig
 
-load_dotenv()
 
-# Flask app
-app = Flask(__name__)
+def create_app(config_object=None):
+    """
+    Create and configure the Flask application.
 
-# Database config
-db_host = os.getenv("DB_HOST")
-db_port = os.getenv("DB_PORT")
-db_name = os.getenv("DB_NAME")
-db_user = os.getenv("DB_USER")
-db_password = os.getenv("DB_PASSWORD", "")
+    Args:
+        config_object -- a config class from config.py, or None to
+                         auto-select based on FLASK_ENV environment variable.
 
-DATABASE_URI = f"mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    Returns:
+        A configured Flask app instance.
+    """
+    # app = Flask(__name__, instance_relative_config=False)
+    app = Flask(__name__, template_folder="templates")
 
-app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # --- Load configuration ---
+    if config_object is None:
+        import os
+        env = os.getenv("FLASK_ENV", "development")
+        config_object = ProductionConfig if env == "production" else DevelopmentConfig
 
-# SQLAlchemy engine and session
-engine = create_engine(DATABASE_URI)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    app.config.from_object(config_object)
 
-# Import models and routes
-from app.models import *
-from app.routes import *
+    # --- Initialise extensions ---
+    _init_db(app)
+
+    # --- Register blueprints ---
+    _register_blueprints(app)
+
+    return app
+
+
+def _init_db(app: Flask) -> None:
+    """
+    Set up the database connection teardown.
+
+    The actual connection is created lazily per-request inside get_db().
+    Here we only register the teardown hook that closes it afterwards.
+    """
+    from app.models.db import close_db
+    app.teardown_appcontext(close_db)
+
+
+def _register_blueprints(app: Flask) -> None:
+    from app.routes.api.throws  import throws_bp
+    from app.routes.api.players import players_bp
+    from app.routes.api.matches import matches_bp
+    from app.routes.api.legs    import legs_bp
+    from app.routes.api.turns   import turns_bp
+    from app.routes.api.stats   import stats_bp
+    from app.routes.views       import views_bp
+
+    api_blueprints = [
+        throws_bp,
+        players_bp,
+        matches_bp,
+        legs_bp,
+        turns_bp,
+        stats_bp,
+    ]
+
+    for bp in api_blueprints:
+        app.register_blueprint(bp, url_prefix="/api")
+
+    app.register_blueprint(views_bp)
+

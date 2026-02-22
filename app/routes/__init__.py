@@ -1,1 +1,1 @@
-from .main import *
+# Routes package
