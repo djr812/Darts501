@@ -4,7 +4,8 @@
  * DOM construction and manipulation helpers.
  *
  * Responsibilities:
- *   - Build the HTML structure inside #app
+ *   - Build the setup screen (player count + name entry)
+ *   - Build the game UI shell
  *   - Render the segment tap grid
  *   - Update scoreboard cards
  *   - Show/hide toast messages
@@ -14,55 +15,190 @@
 const UI = (() => {
 
     // ------------------------------------------------------------------
-    // Build the full app shell inside #app
+    // Setup Screen
     // ------------------------------------------------------------------
 
     /**
-     * Render the complete UI skeleton.
-     * Called once on page load by app.js after game state is initialised.
+     * Render the player setup screen inside #app.
      *
-     * @param {Array}  players    - Array of player objects { id, name, score }
-     * @param {object} callbacks  - { onSegment, onUndo, onNextPlayer }
+     * @param {Function} onStartGame  - Called with array of name strings when
+     *                                  the user confirms. e.g. ["Dave", "Sue"]
      */
+    function buildSetupScreen(onStartGame) {
+        const app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center;';
+
+        if (!document.getElementById('toast'))   document.body.appendChild(_buildToast());
+        if (!document.getElementById('loading')) document.body.appendChild(_buildLoading());
+
+        // Title
+        const title = document.createElement('div');
+        title.id = 'setup-title';
+        title.innerHTML = `
+            <div class="setup-logo">DARTS 501</div>
+            <div class="setup-subtitle">MATCH SETUP</div>
+        `;
+        app.appendChild(title);
+
+        // Player count selector
+        const countSection = document.createElement('div');
+        countSection.id = 'setup-count-section';
+        countSection.innerHTML = '<div class="setup-label">NUMBER OF PLAYERS</div>';
+
+        const countRow = document.createElement('div');
+        countRow.id = 'setup-count-row';
+
+        // Names section declared here so count buttons can reference it
+        const namesSection = document.createElement('div');
+        namesSection.id = 'setup-names-section';
+
+        // Start button declared here so _renderNameInputs can reference it
+        const startBtn = document.createElement('button');
+        startBtn.id = 'setup-start-btn';
+        startBtn.className = 'start-btn';
+        startBtn.textContent = 'START MATCH';
+        startBtn.disabled = true;
+
+        [1, 2, 3, 4].forEach(n => {
+            const btn = document.createElement('button');
+            btn.className = 'count-btn';
+            btn.dataset.count = n;
+
+            if (n === 1) {
+                btn.innerHTML = `1<span class="vs-cpu"> vs CPU</span>`;
+            } else {
+                btn.textContent = n;
+            }
+
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.count-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                _renderNameInputs(n, namesSection, startBtn, onStartGame);
+                startBtn.disabled = false;
+            });
+
+            countRow.appendChild(btn);
+        });
+
+        countSection.appendChild(countRow);
+        app.appendChild(countSection);
+        app.appendChild(namesSection);
+
+        startBtn.addEventListener('click', () => {
+            const names = _collectNames(namesSection);
+            if (!names) return;
+            onStartGame(names);
+        });
+        app.appendChild(startBtn);
+
+        // Default to 2 players on load
+        countRow.querySelector('[data-count="2"]').click();
+    }
+
+    function _renderNameInputs(count, container, startBtn, onStartGame) {
+        container.innerHTML = '';
+
+        const grid = document.createElement('div');
+        grid.id = 'setup-names-grid';
+        grid.style.gridTemplateColumns = count <= 2 ? '1fr 1fr' : 'repeat(4, 1fr)';
+
+        for (let i = 0; i < count; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'name-slot';
+
+            const label = document.createElement('label');
+            label.textContent = count === 1 ? 'YOUR NAME' : `PLAYER ${i + 1}`;
+            label.className = 'name-label';
+
+            const input = document.createElement('input');
+            input.type        = 'text';
+            input.className   = 'name-input';
+            input.placeholder = count === 1 ? 'Enter your name' : `Player ${i + 1}`;
+            input.maxLength   = 20;
+            input.dataset.index   = i;
+            input.autocomplete    = 'off';
+            input.autocorrect     = 'off';
+            input.autocapitalize  = 'words';
+            input.spellcheck      = false;
+
+            // Return key: advance to next input or trigger start
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const inputs = container.querySelectorAll('.name-input');
+                    const next = inputs[i + 1];
+                    if (next) {
+                        next.focus();
+                    } else {
+                        startBtn.click();
+                    }
+                }
+            });
+
+            input.addEventListener('input', () => input.classList.remove('error'));
+
+            slot.appendChild(label);
+            slot.appendChild(input);
+            grid.appendChild(slot);
+        }
+
+        container.appendChild(grid);
+
+        // Focus first input after brief delay (iOS keyboard timing)
+        setTimeout(() => container.querySelector('.name-input')?.focus(), 150);
+    }
+
+    function _collectNames(container) {
+        const inputs = container.querySelectorAll('.name-input');
+        const names  = [];
+        let valid    = true;
+        let firstErr = null;
+
+        inputs.forEach(input => {
+            const val = input.value.trim();
+            if (!val) {
+                input.classList.add('error');
+                if (!firstErr) firstErr = input;
+                valid = false;
+            } else {
+                input.classList.remove('error');
+                names.push(val);
+            }
+        });
+
+        if (!valid && firstErr) firstErr.focus();
+        return valid ? names : null;
+    }
+
+    // ------------------------------------------------------------------
+    // Game Shell
+    // ------------------------------------------------------------------
+
     function buildShell(players, callbacks) {
         const app = document.getElementById('app');
         app.innerHTML = '';
+        app.style.cssText = '';   // reset inline styles from setup screen
 
         app.appendChild(_buildHeader());
         app.appendChild(_buildSidebar(players));
         app.appendChild(_buildBoard(callbacks));
         app.appendChild(_buildStatusBar(callbacks));
 
-        document.body.appendChild(_buildToast());
-        document.body.appendChild(_buildLoading());
+        if (!document.getElementById('toast'))   document.body.appendChild(_buildToast());
+        if (!document.getElementById('loading')) document.body.appendChild(_buildLoading());
     }
-
-    // ------------------------------------------------------------------
-    // Header
-    // ------------------------------------------------------------------
 
     function _buildHeader() {
         const el = document.createElement('header');
         el.id = 'header';
-        el.innerHTML = `
-            <h1>DARTS 501</h1>
-            <span id="match-info"></span>
-        `;
+        el.innerHTML = `<h1>DARTS 501</h1><span id="match-info"></span>`;
         return el;
     }
-
-    // ------------------------------------------------------------------
-    // Sidebar: player score cards
-    // ------------------------------------------------------------------
 
     function _buildSidebar(players) {
         const el = document.createElement('aside');
         el.id = 'sidebar';
-
-        players.forEach(player => {
-            el.appendChild(_buildPlayerCard(player));
-        });
-
+        players.forEach(player => el.appendChild(_buildPlayerCard(player)));
         return el;
     }
 
@@ -79,36 +215,24 @@ const UI = (() => {
         return card;
     }
 
-    // ------------------------------------------------------------------
-    // Board: multiplier tabs + segment grid + bull row
-    // ------------------------------------------------------------------
-
     function _buildBoard(callbacks) {
         const el = document.createElement('main');
         el.id = 'board';
-
         el.appendChild(_buildMultiplierTabs(callbacks.onMultiplier));
         el.appendChild(_buildSegmentGrid(callbacks.onSegment));
         el.appendChild(_buildBullRow(callbacks.onSegment));
-
         return el;
     }
 
-    /**
-     * Multiplier selector tabs: SINGLE / DOUBLE / TREBLE
-     * Selecting a tab sets the active multiplier for subsequent segment taps.
-     */
     function _buildMultiplierTabs(onMultiplier) {
         const row = document.createElement('div');
         row.id = 'multiplier-tabs';
 
-        const tabs = [
+        [
             { label: 'Single', multiplier: 1, cls: 'active-single' },
             { label: 'Double', multiplier: 2, cls: 'active-double' },
             { label: 'Treble', multiplier: 3, cls: 'active-treble' },
-        ];
-
-        tabs.forEach(tab => {
+        ].forEach(tab => {
             const btn = document.createElement('button');
             btn.className = 'tab-btn';
             btn.textContent = tab.label;
@@ -121,16 +245,10 @@ const UI = (() => {
         return row;
     }
 
-    /**
-     * 4×5 grid of segment buttons (1–20).
-     * Layout order matches a dartboard's clockwise layout starting from 20:
-     * 20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5
-     */
     function _buildSegmentGrid(onSegment) {
         const grid = document.createElement('div');
         grid.id = 'segment-grid';
 
-        // Dartboard order (clockwise from top)
         const BOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
 
         BOARD_ORDER.forEach(segment => {
@@ -145,44 +263,31 @@ const UI = (() => {
         return grid;
     }
 
-    /**
-     * Bottom row: Miss | Outer Bull | Bull | (spacer for next player later)
-     */
     function _buildBullRow(onSegment) {
         const row = document.createElement('div');
         row.id = 'bull-row';
 
-        // Miss (segment 0, multiplier 1 always)
         const miss = document.createElement('button');
         miss.className = 'bull-btn miss-btn';
         miss.textContent = 'MISS';
-        miss.addEventListener('click', () => onSegment(0, 1));  // force multiplier 1
+        miss.addEventListener('click', () => onSegment(0, 1));
         row.appendChild(miss);
 
-        // Outer Bull (25pts — single only)
         const outer = document.createElement('button');
         outer.className = 'bull-btn';
         outer.innerHTML = 'OUTER<br><small>25</small>';
-        outer.addEventListener('click', () => onSegment(25, 1));  // force multiplier 1
+        outer.addEventListener('click', () => onSegment(25, 1));
         row.appendChild(outer);
 
-        // Bull (50pts — double bull)
         const bull = document.createElement('button');
         bull.className = 'bull-btn';
         bull.innerHTML = 'BULL<br><small>50</small>';
-        bull.addEventListener('click', () => onSegment(25, 2));   // force multiplier 2
+        bull.addEventListener('click', () => onSegment(25, 2));
         row.appendChild(bull);
 
-        // Spacer (used for Next Player button in status bar — kept here for layout balance)
-        const spacer = document.createElement('div');
-        row.appendChild(spacer);
-
+        row.appendChild(document.createElement('div'));   // layout spacer
         return row;
     }
-
-    // ------------------------------------------------------------------
-    // Status bar
-    // ------------------------------------------------------------------
 
     function _buildStatusBar(callbacks) {
         const el = document.createElement('footer');
@@ -208,13 +313,8 @@ const UI = (() => {
         el.appendChild(msg);
         el.appendChild(undoBtn);
         el.appendChild(nextBtn);
-
         return el;
     }
-
-    // ------------------------------------------------------------------
-    // Toast
-    // ------------------------------------------------------------------
 
     function _buildToast() {
         const el = document.createElement('div');
@@ -230,88 +330,41 @@ const UI = (() => {
     }
 
     // ------------------------------------------------------------------
-    // Update functions — called by app.js after state changes
+    // Update helpers
     // ------------------------------------------------------------------
 
-    /**
-     * Set which player card is highlighted as active.
-     *
-     * @param {number} playerId
-     */
     function setActivePlayer(playerId) {
-        document.querySelectorAll('.player-card').forEach(card => {
-            card.classList.remove('active');
-        });
-        const card = document.getElementById(`player-card-${playerId}`);
-        if (card) card.classList.add('active');
+        document.querySelectorAll('.player-card').forEach(c => c.classList.remove('active'));
+        document.getElementById(`player-card-${playerId}`)?.classList.add('active');
     }
 
-    /**
-     * Update a player's displayed score.
-     *
-     * @param {number} playerId
-     * @param {number} score
-     */
     function setScore(playerId, score) {
         const el = document.getElementById(`score-${playerId}`);
         if (el) el.textContent = score;
     }
 
-    /**
-     * Add a dart pill to a player's dart display row.
-     *
-     * @param {number} playerId
-     * @param {number} points       - Points scored (shown in pill)
-     * @param {number} multiplier   - Used to colour the pill
-     * @param {number} segment      - Used to colour bull pills
-     */
     function addDartPill(playerId, points, multiplier, segment) {
         const row = document.getElementById(`darts-${playerId}`);
         if (!row) return;
-
         const pill = document.createElement('span');
         pill.className = 'dart-pill';
-
-        if (segment === 25) {
-            pill.classList.add('bull');
-        } else if (multiplier === 3) {
-            pill.classList.add('treble');
-        } else if (multiplier === 2) {
-            pill.classList.add('double');
-        }
-
+        if (segment === 25)     pill.classList.add('bull');
+        else if (multiplier === 3) pill.classList.add('treble');
+        else if (multiplier === 2) pill.classList.add('double');
         pill.textContent = points;
         row.appendChild(pill);
     }
 
-    /**
-     * Clear the dart pills from a player's card (start of new turn).
-     *
-     * @param {number} playerId
-     */
     function clearDartPills(playerId) {
         const row = document.getElementById(`darts-${playerId}`);
         if (row) row.innerHTML = '';
     }
 
-    /**
-     * Show or clear the checkout hint on a player's card.
-     *
-     * @param {number} playerId
-     * @param {Array|null} suggestion  - e.g. ["T20", "T20", "DB"] or null
-     */
     function setCheckoutHint(playerId, suggestion) {
         const el = document.getElementById(`hint-${playerId}`);
-        if (!el) return;
-        el.textContent = suggestion ? suggestion.join(' → ') : '';
+        if (el) el.textContent = suggestion ? suggestion.join(' → ') : '';
     }
 
-    /**
-     * Flash a player's card for a bust or checkout event.
-     *
-     * @param {number} playerId
-     * @param {'bust'|'checkout'} type
-     */
     function flashCard(playerId, type) {
         const card = document.getElementById(`player-card-${playerId}`);
         if (!card) return;
@@ -319,41 +372,20 @@ const UI = (() => {
         setTimeout(() => card.classList.remove(type), 1200);
     }
 
-    /**
-     * Set the active multiplier tab highlight.
-     *
-     * @param {number} multiplier  - 1, 2, or 3
-     */
     function setMultiplierTab(multiplier) {
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.remove('active-single', 'active-double', 'active-treble');
         });
-
-        const activeTab = document.querySelector(`.tab-btn[data-multiplier="${multiplier}"]`);
-        if (activeTab) {
-            activeTab.classList.add(activeTab.dataset.activeClass);
-        }
-
-        // Set body attribute so CSS can tint segment buttons
+        const tab = document.querySelector(`.tab-btn[data-multiplier="${multiplier}"]`);
+        if (tab) tab.classList.add(tab.dataset.activeClass);
         document.body.dataset.multiplier = multiplier;
     }
 
-    /**
-     * Enable or disable the Next Player button.
-     *
-     * @param {boolean} enabled
-     */
     function setNextPlayerEnabled(enabled) {
         const btn = document.getElementById('btn-next');
         if (btn) btn.disabled = !enabled;
     }
 
-    /**
-     * Set the status bar message.
-     *
-     * @param {string} text
-     * @param {'normal'|'bust'|'success'} [type='normal']
-     */
     function setStatus(text, type = 'normal') {
         const el = document.getElementById('status-message');
         if (!el) return;
@@ -361,66 +393,33 @@ const UI = (() => {
         el.className = type === 'normal' ? '' : type;
     }
 
-    /**
-     * Show a toast notification that auto-dismisses.
-     *
-     * @param {string} text
-     * @param {'info'|'bust'|'success'} [type='info']
-     * @param {number} [duration=2000]  - ms before auto-hide
-     */
     let _toastTimer = null;
-
     function showToast(text, type = 'info', duration = 2000) {
         const toast = document.getElementById('toast');
         if (!toast) return;
-
         toast.textContent = text;
         toast.className = `visible ${type}`;
-
         clearTimeout(_toastTimer);
-        _toastTimer = setTimeout(() => {
-            toast.className = '';
-        }, duration);
+        _toastTimer = setTimeout(() => { toast.className = ''; }, duration);
     }
 
-    /**
-     * Show or hide the loading overlay.
-     *
-     * @param {boolean} visible
-     */
     function setLoading(visible) {
-        const el = document.getElementById('loading');
-        if (el) el.classList.toggle('visible', visible);
+        document.getElementById('loading')?.classList.toggle('visible', visible);
     }
 
-    /**
-     * Update the header match info string.
-     *
-     * @param {string} text
-     */
     function setMatchInfo(text) {
         const el = document.getElementById('match-info');
         if (el) el.textContent = text;
     }
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
-
-    /** Escape HTML to prevent XSS in player names */
     function _esc(str) {
         return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    // ------------------------------------------------------------------
-    // Public interface
-    // ------------------------------------------------------------------
-
     return {
+        buildSetupScreen,
         buildShell,
         setActivePlayer,
         setScore,

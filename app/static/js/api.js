@@ -169,6 +169,16 @@ const API = (() => {
     }
 
     /**
+     * Create a new player.
+     *
+     * @param {string} name
+     * @returns {Promise<object>} { id, name, nickname }
+     */
+    async function createPlayer(name) {
+        return request('POST', '/api/players', { name });
+    }
+
+    /**
      * Start a new match.
      *
      * @param {object} matchData - { player_ids: [], legs_to_win: 1 }
@@ -193,6 +203,7 @@ const API = (() => {
         recordThrow,
         undoLastThrow,
         getPlayers,
+        createPlayer,
         startMatch,
         startLeg,
         flushQueue,
