@@ -34,7 +34,7 @@ def list_players():
     db = get_db()
     cursor = db.cursor()
     cursor.execute(
-        "SELECT id, name, nickname FROM players WHERE is_active = TRUE ORDER BY name ASC"
+        "SELECT id, name, nickname FROM players WHERE is_active = TRUE AND name != 'CPU' ORDER BY name ASC"
     )
     players = cursor.fetchall()
     return jsonify(players), 200

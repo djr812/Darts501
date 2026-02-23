@@ -394,7 +394,7 @@ const UI = (() => {
         const ph = document.createElement('option');
         ph.value = ''; ph.textContent = '— Select player —'; ph.disabled = true; ph.selected = true;
         existingSelect.appendChild(ph);
-        existingPlayers.forEach(p => {
+        existingPlayers.filter(function(p) { return p.name !== 'CPU'; }).forEach(p => {
             const opt = document.createElement('option');
             opt.value = p.id; opt.textContent = p.name;
             existingSelect.appendChild(opt);
