@@ -127,13 +127,49 @@ body.mode-stats #app {
 /* --- Header --- */
 #header {
     grid-area: header;
+    display: -webkit-box;
+    display: -webkit-flex;
     display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
     align-items: center;
+    -webkit-box-pack: justify;
+    -webkit-justify-content: space-between;
     justify-content: space-between;
     padding: 8px 16px;
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
     height: 52px;
+}
+
+/* Speech toggle button in header */
+.speech-toggle {
+    height: 32px;
+    padding: 0 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    white-space: nowrap;
+    -webkit-transition: all 0.15s ease;
+    transition: all 0.15s ease;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.speech-toggle.speech-on {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.speech-toggle:active {
+    -webkit-transform: scale(0.96);
+    transform: scale(0.96);
 }
 
 #header h1 {
@@ -362,13 +398,21 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 /* --- Status Bar --- */
 #status-bar {
     grid-area: status;
+    display: -webkit-box;
+    display: -webkit-flex;
     display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
     align-items: center;
+    -webkit-box-pack: justify;
+    -webkit-justify-content: space-between;
     justify-content: space-between;
-    padding: 6px 12px;
+    padding: 4px 10px;
     background: var(--bg-surface);
     border-top: 1px solid var(--border);
-    height: 48px;
+    height: 52px;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 #status-message {
@@ -385,17 +429,19 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 /* Action buttons in status bar */
 .action-btn {
     height: 36px;
-    padding: 0 18px;
+    padding: 0 12px;
     border-radius: var(--radius);
     border: 1px solid var(--border);
     background: var(--bg-raised);
     color: var(--text-primary);
     font-family: var(--font-display);
-    font-size: 0.9rem;
+    font-size: 0.78rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     cursor: pointer;
+    white-space: nowrap;
+    -webkit-transition: all 0.1s ease;
     transition: all 0.1s ease;
 }
 
@@ -420,6 +466,90 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     color: var(--text-dim);
     cursor: not-allowed;
 }
+
+.action-btn.match-cancel {
+    border-color: #6a2a2a;
+    color: #c0392b;
+}
+.action-btn.match-cancel:active { background: rgba(192,57,43,0.12); }
+
+.action-btn.match-restart {
+    border-color: #4a3a1a;
+    color: #e67e22;
+}
+.action-btn.match-restart:active { background: rgba(230,126,34,0.12); }
+
+/* Group wrapping Cancel + Restart — spaced from the Next button */
+.match-mgmt-group {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+}
+
+/* --- Confirm modal --- */
+.confirm-box {
+    max-width: 420px;
+}
+
+.confirm-title {
+    font-size: 1.3rem;
+    margin-bottom: 10px;
+}
+
+.confirm-message {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.confirm-btn-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+}
+
+.confirm-btn {
+    height: 48px;
+    padding: 0 24px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-transition: all 0.1s ease;
+    transition: all 0.1s ease;
+}
+
+.confirm-btn-cancel {
+    color: var(--text-secondary);
+}
+.confirm-btn-cancel:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+.confirm-btn-danger {
+    color: #c0392b;
+    border-color: #6a2a2a;
+}
+.confirm-btn-danger:hover { background: rgba(192,57,43,0.12); }
+
+.confirm-btn-ok {
+    color: var(--accent);
+    border-color: var(--accent-dim);
+}
+.confirm-btn-ok:hover { background: var(--accent-glow); }
 
 /* --- Toast notifications --- */
 #toast {
@@ -1305,3 +1435,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 .stats-content > * + * {
     margin-top: 12px;
 }
+/* iOS 12 flex gap polyfill for new groups */
+.match-mgmt-group > * + * { margin-left: 6px; }
+.confirm-btn-row > * + * { margin-left: 12px; }

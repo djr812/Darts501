@@ -226,3 +226,137 @@ def record_leg_checkout(match_id):
         "sets_score":      sets_score,
         "legs_score":      legs_score,
     }), 200
+
+
+@matches_bp.route("/matches/<int:match_id>/cancel", methods=["POST"])
+def cancel_match(match_id):
+    """
+    Cancel an active match.
+
+    Marks the match status = 'cancelled' and cancels any active legs.
+    All recorded throws/turns/legs are preserved in the database — they
+    are simply excluded from stats queries which filter on status = 'complete'.
+
+    Response: { "match_id": <int>, "status": "cancelled" }
+    """
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id, status FROM matches WHERE id = %s", (match_id,))
+    match = cursor.fetchone()
+    if not match:
+        return jsonify({"error": "Match not found"}), 404
+    if match["status"] not in ("active",):
+        return jsonify({"error": f"Match is already {match['status']}"}), 400
+
+    # Cancel any legs that are still active
+    cursor.execute(
+        "UPDATE legs SET status = 'cancelled' WHERE match_id = %s AND status = 'active'",
+        (match_id,)
+    )
+
+    # Cancel the match itself
+    cursor.execute(
+        "UPDATE matches SET status = 'cancelled', ended_at = NOW() WHERE id = %s",
+        (match_id,)
+    )
+
+    db.commit()
+    return jsonify({"match_id": match_id, "status": "cancelled"}), 200
+
+
+@matches_bp.route("/matches/<int:match_id>/restart", methods=["POST"])
+def restart_match(match_id):
+    """
+    Restart an active match from scratch.
+
+    Deletes all throws, turns, and legs for this match, resets player
+    tallies to zero, and creates a fresh first leg.
+
+    This is a hard reset — all scoring history for this match is wiped.
+    Stats are unaffected since no legs were status='complete' after the reset.
+
+    Response:
+    {
+        "match_id":    <int>,
+        "new_leg_id":  <int>,
+        "player_ids":  [<int>, ...]
+    }
+    """
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute(
+        "SELECT id, status, game_type, sets_to_win, legs_per_set FROM matches WHERE id = %s",
+        (match_id,)
+    )
+    match = cursor.fetchone()
+    if not match:
+        return jsonify({"error": "Match not found"}), 404
+    if match["status"] not in ("active", "cancelled"):
+        return jsonify({"error": "Cannot restart a completed match"}), 400
+
+    # Load leg config from the first leg so we can recreate it
+    cursor.execute(
+        "SELECT double_out FROM legs WHERE match_id = %s ORDER BY id ASC LIMIT 1",
+        (match_id,)
+    )
+    first_leg = cursor.fetchone()
+    double_out = bool(first_leg["double_out"]) if first_leg else True
+
+    # Get player list in turn order
+    cursor.execute(
+        "SELECT player_id FROM match_players WHERE match_id = %s ORDER BY turn_order ASC",
+        (match_id,)
+    )
+    player_ids = [r["player_id"] for r in cursor.fetchall()]
+
+    # --- Wipe all existing leg data ---
+    # Get all leg IDs for this match
+    cursor.execute("SELECT id FROM legs WHERE match_id = %s", (match_id,))
+    leg_ids = [r["id"] for r in cursor.fetchall()]
+
+    if leg_ids:
+        # Delete throws for all turns in those legs
+        placeholders = ",".join(["%s"] * len(leg_ids))
+        cursor.execute(
+            f"DELETE th FROM throws th JOIN turns t ON t.id = th.turn_id WHERE t.leg_id IN ({placeholders})",
+            leg_ids
+        )
+        # Delete turns
+        cursor.execute(f"DELETE FROM turns WHERE leg_id IN ({placeholders})", leg_ids)
+        # Delete legs
+        cursor.execute(f"DELETE FROM legs WHERE id IN ({placeholders})", leg_ids)
+
+    # Reset match_players tallies
+    cursor.execute(
+        "UPDATE match_players SET legs_won = 0, sets_won = 0 WHERE match_id = %s",
+        (match_id,)
+    )
+
+    # Reactivate the match
+    cursor.execute(
+        "UPDATE matches SET status = 'active', winner_id = NULL, ended_at = NULL WHERE id = %s",
+        (match_id,)
+    )
+
+    # Create a fresh first leg
+    starting_scores = {"501": 501, "201": 201}
+    starting_score  = starting_scores.get(match["game_type"], 501)
+
+    cursor.execute(
+        """
+        INSERT INTO legs (match_id, game_type, leg_number, starting_score, double_out)
+        VALUES (%s, %s, 1, %s, %s)
+        """,
+        (match_id, match["game_type"], starting_score, double_out)
+    )
+    new_leg_id = cursor.lastrowid
+    db.commit()
+
+    return jsonify({
+        "match_id":   match_id,
+        "new_leg_id": new_leg_id,
+        "player_ids": player_ids,
+        "status":     "active",
+    }), 200

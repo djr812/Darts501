@@ -213,6 +213,22 @@ const API = (() => {
         return request('GET', `/api/players/${playerId}/stats${qs}`);
     }
 
+    /**
+     * Cancel an active match (preserves data, marks status=cancelled).
+     * @param {number} matchId
+     */
+    async function cancelMatch(matchId) {
+        return request('POST', '/api/matches/' + matchId + '/cancel', {});
+    }
+
+    /**
+     * Restart a match from scratch (deletes all throws/turns/legs, resets tallies).
+     * @param {number} matchId
+     */
+    async function restartMatch(matchId) {
+        return request('POST', '/api/matches/' + matchId + '/restart', {});
+    }
+
     // Expose public interface
     return {
         recordThrow,
@@ -222,6 +238,8 @@ const API = (() => {
         startMatch,
         startLeg,
         getPlayerStats,
+        cancelMatch,
+        restartMatch,
         flushQueue,
     };
 

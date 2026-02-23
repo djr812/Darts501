@@ -91,7 +91,7 @@
             state.legId   = leg.id;
             state.players = players;
 
-            UI.buildShell(players, { onMultiplier, onSegment, onUndo, onNextPlayer });
+            UI.buildShell(players, { onMultiplier, onSegment, onUndo, onNextPlayer, onCancel, onRestart });
             _startLeg(leg.id);
 
         } catch (err) {
@@ -181,6 +181,11 @@
         // Update UI
         UI.addDartPill(player.id, result.points, multiplier, segment);
 
+        // Announce each dart score immediately as it lands
+        if (!result.is_bust) {
+            SPEECH.announceDartScore(result.points);
+        }
+
         if (result.is_bust) {
             player.score = state.turnScoreBefore;
             UI.setScore(player.id, player.score);
@@ -251,6 +256,7 @@
                     setTimeout(() => _handleLegWin(lastResult, cpuPlayer), 900);
 
                 } else if (lastResult && lastResult.is_bust) {
+                    SPEECH.announceBust();
                     UI.showToast('CPU BUST!', 'bust', 1800);
                     UI.setStatus('CPU BUST!', 'bust');
                     state.turnComplete = true;
@@ -363,12 +369,14 @@
             const result = await _recordDart(segment, multiplier);
 
             if (result.is_bust) {
+                SPEECH.announceBust();
                 UI.showToast('BUST!', 'bust', 2500);
                 UI.setStatus('BUST — TAP NEXT ▶', 'bust');
                 state.turnComplete = true;
                 UI.setNextPlayerEnabled(true);
 
             } else if (result.is_checkout) {
+                SPEECH.announceCheckout(state.turnScoreBefore);
                 state.legOver      = true;
                 state.turnComplete = true;
                 UI.setNextPlayerEnabled(false);
@@ -376,6 +384,8 @@
                 setTimeout(() => _handleLegWin(result, currentPlayer()), 800);
 
             } else if (result.turn_complete) {
+                var _turnScored = state.turnScoreBefore - currentPlayer().score;
+                SPEECH.announceTurnEnd(_turnScored, currentPlayer().score);
                 UI.setStatus('END OF TURN — TAP NEXT ▶');
                 state.turnComplete = true;
                 UI.setNextPlayerEnabled(true);
@@ -437,6 +447,68 @@
 
     function currentPlayer()     { return state.players[state.currentIndex]; }
     function _multiplierLabel(m) { return m === 1 ? 'SINGLE' : m === 2 ? 'DOUBLE' : 'TREBLE'; }
+
+    // ------------------------------------------------------------------
+    // Match management — Cancel and Restart
+    // ------------------------------------------------------------------
+
+    function onCancel() {
+        UI.showConfirmModal({
+            title:        'CANCEL MATCH?',
+            message:      'The match will be abandoned. Scores are kept in the database but excluded from stats. This cannot be undone.',
+            confirmLabel: 'YES, CANCEL',
+            confirmClass: 'confirm-btn-danger',
+            onConfirm:    _doCancel,
+        });
+    }
+
+    async function _doCancel() {
+        UI.setLoading(true);
+        try {
+            await API.cancelMatch(state.matchId);
+            var existing = await API.getPlayers().catch(function() { return []; });
+            UI.buildSetupScreen(existing, onStartGame, _onViewStats);
+        } catch (err) {
+            UI.showToast('CANCEL FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
+        } finally {
+            UI.setLoading(false);
+        }
+    }
+
+    function onRestart() {
+        UI.showConfirmModal({
+            title:        'RESTART MATCH?',
+            message:      'All scores for this match will be permanently deleted and the match will restart from zero. This cannot be undone.',
+            confirmLabel: 'YES, RESTART',
+            confirmClass: 'confirm-btn-danger',
+            onConfirm:    _doRestart,
+        });
+    }
+
+    async function _doRestart() {
+        UI.setLoading(true);
+        try {
+            const result = await API.restartMatch(state.matchId);
+
+            // Reset all player scores locally
+            state.players.forEach(function(p) {
+                p.score = state.startingScore;
+            });
+            state.setsScore = {};
+            state.legsScore = {};
+            state.players.forEach(function(p) {
+                state.setsScore[p.id] = 0;
+                state.legsScore[p.id] = 0;
+            });
+
+            _startLeg(result.new_leg_id);
+            UI.showToast('MATCH RESTARTED', 'info', 2000);
+        } catch (err) {
+            UI.showToast('RESTART FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
+        } finally {
+            UI.setLoading(false);
+        }
+    }
 
     // ------------------------------------------------------------------
     // Stats

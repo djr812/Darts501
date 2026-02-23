@@ -596,8 +596,40 @@ const UI = (() => {
     function _buildHeader() {
         const el = document.createElement('header');
         el.id = 'header';
-        el.innerHTML = `<h1>DARTS 501</h1><span id="match-info"></span>`;
+
+        const title = document.createElement('h1');
+        title.textContent = 'DARTS 501';
+
+        const matchInfo = document.createElement('span');
+        matchInfo.id = 'match-info';
+
+        const speechBtn = document.createElement('button');
+        speechBtn.id    = 'btn-speech';
+        speechBtn.type  = 'button';
+        speechBtn.title = 'Toggle caller voice';
+        speechBtn.className = 'speech-toggle';
+        speechBtn.setAttribute('aria-pressed', 'false');
+        _updateSpeechBtn(speechBtn, false);
+
+        speechBtn.addEventListener('click', function() {
+            if (!SPEECH.isSupported()) {
+                return;
+            }
+            var nowEnabled = !SPEECH.isEnabled();
+            SPEECH.setEnabled(nowEnabled);
+            _updateSpeechBtn(speechBtn, nowEnabled);
+        });
+
+        el.appendChild(title);
+        el.appendChild(matchInfo);
+        el.appendChild(speechBtn);
         return el;
+    }
+
+    function _updateSpeechBtn(btn, enabled) {
+        btn.textContent = enabled ? '🔊 CALLER' : '🔇 CALLER';
+        btn.className   = 'speech-toggle' + (enabled ? ' speech-on' : '');
+        btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
     }
 
     function _buildSidebar(players) {
@@ -684,18 +716,42 @@ const UI = (() => {
     function _buildStatusBar(callbacks) {
         const el = document.createElement('footer');
         el.id = 'status-bar';
+
         const msg = document.createElement('span');
         msg.id = 'status-message';
         msg.textContent = 'SELECT MULTIPLIER THEN SEGMENT';
+
         const undoBtn = document.createElement('button');
         undoBtn.className = 'action-btn undo'; undoBtn.id = 'btn-undo';
         undoBtn.textContent = '⟵ UNDO';
         undoBtn.addEventListener('click', callbacks.onUndo);
+
         const nextBtn = document.createElement('button');
         nextBtn.className = 'action-btn next-player'; nextBtn.id = 'btn-next';
         nextBtn.textContent = 'NEXT ▶'; nextBtn.disabled = true;
         nextBtn.addEventListener('click', callbacks.onNextPlayer);
-        el.appendChild(msg); el.appendChild(undoBtn); el.appendChild(nextBtn);
+
+        // Match management buttons — grouped on the right
+        const mgmtGroup = document.createElement('div');
+        mgmtGroup.className = 'match-mgmt-group';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'action-btn match-cancel'; cancelBtn.id = 'btn-cancel';
+        cancelBtn.textContent = '✕ CANCEL';
+        cancelBtn.addEventListener('click', callbacks.onCancel);
+
+        const restartBtn = document.createElement('button');
+        restartBtn.className = 'action-btn match-restart'; restartBtn.id = 'btn-restart';
+        restartBtn.textContent = '↺ RESTART';
+        restartBtn.addEventListener('click', callbacks.onRestart);
+
+        mgmtGroup.appendChild(cancelBtn);
+        mgmtGroup.appendChild(restartBtn);
+
+        el.appendChild(msg);
+        el.appendChild(undoBtn);
+        el.appendChild(nextBtn);
+        el.appendChild(mgmtGroup);
         return el;
     }
 
@@ -788,11 +844,69 @@ const UI = (() => {
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    /**
+     * Show a confirmation modal with a title, message, and confirm/cancel buttons.
+     *
+     * @param {object}   opts
+     * @param {string}   opts.title        - Short heading e.g. "CANCEL MATCH?"
+     * @param {string}   opts.message      - Explanatory sentence
+     * @param {string}   opts.confirmLabel - Text on the confirm button e.g. "YES, CANCEL"
+     * @param {string}   opts.confirmClass - Extra CSS class for confirm button e.g. "btn-danger"
+     * @param {Function} opts.onConfirm    - Called if user confirms
+     */
+    function showConfirmModal(opts) {
+        var existing = document.getElementById('confirm-modal');
+        if (existing) existing.remove();
+
+        var overlay = document.createElement('div');
+        overlay.id = 'confirm-modal';
+        overlay.className = 'modal-overlay';
+
+        var box = document.createElement('div');
+        box.className = 'modal-box confirm-box';
+
+        var titleEl = document.createElement('div');
+        titleEl.className = 'modal-title confirm-title';
+        titleEl.textContent = opts.title;
+
+        var msgEl = document.createElement('div');
+        msgEl.className = 'confirm-message';
+        msgEl.textContent = opts.message;
+
+        var btnRow = document.createElement('div');
+        btnRow.className = 'confirm-btn-row';
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'confirm-btn confirm-btn-cancel';
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = 'NO, GO BACK';
+        cancelBtn.addEventListener('click', function() { overlay.remove(); });
+
+        var confirmBtn = document.createElement('button');
+        confirmBtn.className = 'confirm-btn ' + (opts.confirmClass || 'confirm-btn-ok');
+        confirmBtn.type = 'button';
+        confirmBtn.textContent = opts.confirmLabel || 'CONFIRM';
+        confirmBtn.addEventListener('click', function() {
+            overlay.remove();
+            opts.onConfirm();
+        });
+
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(confirmBtn);
+        box.appendChild(titleEl);
+        box.appendChild(msgEl);
+        box.appendChild(btnRow);
+        overlay.appendChild(box);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
     return {
         buildSetupScreen,
         buildShell,
         showCongratsModal,
         showLegEndModal,
+        showConfirmModal,
         setActivePlayer,
         setScore,
         addDartPill,
