@@ -691,3 +691,167 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
         z-index: 999;
     }
 }
+
+/* =============================================================
+   Modal overlay — used for leg-end interstitial and congrats
+   ============================================================= */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    animation: modal-fade-in 0.2s ease;
+}
+
+@keyframes modal-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.modal-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-lg);
+    padding: 32px 40px;
+    text-align: center;
+    box-shadow: 0 0 40px var(--accent-glow), 0 8px 32px rgba(0,0,0,0.6);
+    animation: modal-slide-in 0.25s ease;
+    min-width: 320px;
+    max-width: 480px;
+    width: 90vw;
+}
+
+@keyframes modal-slide-in {
+    from { transform: translateY(20px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+
+.modal-trophy {
+    font-size: 3rem;
+    margin-bottom: 8px;
+    animation: trophy-pop 0.4s ease 0.2s both;
+}
+
+@keyframes trophy-pop {
+    from { transform: scale(0.5); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+
+.modal-title {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.25em;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.modal-winner {
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.modal-subtitle {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+}
+
+.modal-score-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+}
+
+.modal-score-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: center;
+}
+
+.modal-score-name {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.05em;
+    min-width: 100px;
+    text-align: right;
+}
+
+.modal-score-sets {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    min-width: 60px;
+    text-align: left;
+}
+
+.modal-score-legs {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    min-width: 70px;
+    text-align: left;
+}
+
+/* Sets / legs tally on player cards during the game */
+.player-tally {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+}
+
+.player-card.active .player-tally {
+    color: var(--accent-dim);
+}
+
+/* =============================================================
+   CPU slot on setup screen
+   ============================================================= */
+
+.cpu-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    padding: 16px;
+    min-height: 110px;
+}
+
+.cpu-badge {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+}
+
+.cpu-desc {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    text-align: center;
+}

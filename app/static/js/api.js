@@ -181,7 +181,7 @@ const API = (() => {
     /**
      * Start a new match.
      *
-     * @param {object} matchData - { player_ids: [], legs_to_win: 1 }
+     * @param {object} matchData - { player_ids, sets_to_win, legs_per_set }
      * @returns {Promise<object>} New match record
      */
     async function startMatch(matchData) {
