@@ -222,7 +222,7 @@ const UI = (() => {
             grid.appendChild(_buildPlayerSlot(i, count, existingPlayers, isCpuSlot));
         }
         container.appendChild(grid);
-        setTimeout(() => container.querySelector('.name-input')?.focus(), 150);
+        setTimeout(function() { var fi = container.querySelector('.name-input'); if (fi) fi.focus(); }, 150);
     }
 
     function _renderSinglePlayerSlots(existingPlayers, container, difficulty) {
@@ -257,7 +257,7 @@ const UI = (() => {
 
         grid.appendChild(cpuSlot);
         container.appendChild(grid);
-        setTimeout(() => container.querySelector('.name-input')?.focus(), 150);
+        setTimeout(function() { var fi = container.querySelector('.name-input'); if (fi) fi.focus(); }, 150);
     }
 
     /**
@@ -265,7 +265,7 @@ const UI = (() => {
      * Calls onSelect(difficulty) when the user picks a level.
      */
     function _showDifficultyModal(onSelect) {
-        document.getElementById('difficulty-modal')?.remove();
+        var _dm = document.getElementById('difficulty-modal'); if (_dm) _dm.remove();
 
         const overlay = document.createElement('div');
         overlay.id = 'difficulty-modal';
@@ -444,7 +444,7 @@ const UI = (() => {
      */
     function showCongratsModal(winnerName, players, setsScore, onNewMatch) {
         // Remove any existing modal
-        document.getElementById('congrats-modal')?.remove();
+        var _cm = document.getElementById('congrats-modal'); if (_cm) _cm.remove();
 
         const overlay = document.createElement('div');
         overlay.id = 'congrats-modal';
@@ -469,7 +469,7 @@ const UI = (() => {
             row.className = 'modal-score-row';
             row.innerHTML = `
                 <span class="modal-score-name">${_esc(p.name)}</span>
-                <span class="modal-score-sets">${setsScore[String(p.id)] ?? 0} SET${(setsScore[String(p.id)] ?? 0) !== 1 ? 'S' : ''}</span>
+                <span class="modal-score-sets">${setsScore[String(p.id)] != null ? setsScore[String(p.id)] : 0} SET${((setsScore[String(p.id)] != null ? setsScore[String(p.id)] : 0)) !== 1 ? 'S' : ''}</span>
             `;
             scoreGrid.appendChild(row);
         });
@@ -497,7 +497,7 @@ const UI = (() => {
      * @param {Function} onNextLeg      - called when user taps Continue
      */
     function showLegEndModal(info, players, onNextLeg) {
-        document.getElementById('leg-end-modal')?.remove();
+        var _lem = document.getElementById('leg-end-modal'); if (_lem) _lem.remove();
 
         const overlay = document.createElement('div');
         overlay.id = 'leg-end-modal';
@@ -529,8 +529,8 @@ const UI = (() => {
         scoreGrid.className = 'modal-score-grid';
         players.forEach(p => {
             const pid   = String(p.id);
-            const sets  = info.setsScore[pid] ?? 0;
-            const legs  = info.legsScore[pid] ?? 0;
+            var sets  = info.setsScore[pid] != null ? info.setsScore[pid] : 0;
+            var legs  = info.legsScore[pid] != null ? info.legsScore[pid] : 0;
             const row   = document.createElement('div');
             row.className = 'modal-score-row';
             row.innerHTML = `
@@ -686,7 +686,7 @@ const UI = (() => {
 
     function setActivePlayer(playerId) {
         document.querySelectorAll('.player-card').forEach(c => c.classList.remove('active'));
-        document.getElementById(`player-card-${playerId}`)?.classList.add('active');
+        var _pc = document.getElementById('player-card-' + playerId); if (_pc) _pc.classList.add('active');
     }
     function setScore(playerId, score) {
         const el = document.getElementById(`score-${playerId}`);
@@ -742,7 +742,7 @@ const UI = (() => {
         clearTimeout(_toastTimer);
         _toastTimer = setTimeout(() => { toast.className = ''; }, duration);
     }
-    function setLoading(visible) { document.getElementById('loading')?.classList.toggle('visible', visible); }
+    function setLoading(visible) { var _ld = document.getElementById('loading'); if (_ld) _ld.classList.toggle('visible', visible); }
     function setMatchInfo(text) { const el = document.getElementById('match-info'); if (el) el.textContent = text; }
 
     function setUndoEnabled(enabled) {

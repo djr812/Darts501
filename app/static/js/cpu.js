@@ -252,9 +252,10 @@ const CPU = (() => {
     }
 
     // Expose difficulty labels so UI can display them
-    const LABELS = Object.fromEntries(
-        Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.label])
-    );
+    var LABELS = {};
+    Object.keys(DIFFICULTY_PROFILES).forEach(function(k) {
+        LABELS[k] = DIFFICULTY_PROFILES[k].label;
+    });
 
     return { playTurn, LABELS };
 

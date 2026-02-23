@@ -127,7 +127,6 @@ body {
     background: var(--bg-surface);
     border-right: 1px solid var(--border);
     padding: var(--gap);
-    gap: var(--gap);
     overflow-y: auto;
 }
 
@@ -181,7 +180,6 @@ body {
 
 .player-darts {
     display: flex;
-    gap: 6px;
     margin-top: 8px;
     min-height: 28px;
     align-items: center;
@@ -217,14 +215,12 @@ body {
     display: flex;
     flex-direction: column;
     padding: var(--gap);
-    gap: var(--gap);
     overflow: hidden;
 }
 
 /* Multiplier tabs */
 #multiplier-tabs {
     display: flex;
-    gap: var(--gap);
 }
 
 .tab-btn {
@@ -340,7 +336,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     background: var(--bg-surface);
     border-top: 1px solid var(--border);
     height: 48px;
-    gap: var(--gap);
 }
 
 #status-message {
@@ -425,7 +420,10 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 /* --- Loading overlay --- */
 #loading {
     position: fixed;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     background: rgba(13, 13, 13, 0.85);
     display: flex;
     align-items: center;
@@ -484,7 +482,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 /* Generic option button used for game type, checkout rule, player count */
 .setup-option-row {
     display: flex;
-    gap: var(--gap);
     justify-content: center;
     flex-wrap: wrap;
 }
@@ -553,13 +550,11 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 .name-slot {
     display: flex;
     flex-direction: column;
-    gap: 6px;
 }
 
 /* Toggle row: NEW / EXISTING */
 .slot-toggle-row {
     display: flex;
-    gap: 4px;
     margin-bottom: 2px;
 }
 
@@ -679,7 +674,10 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     #app::before {
         content: "ROTATE TO LANDSCAPE";
         position: fixed;
-        inset: 0;
+        top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -698,7 +696,10 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 
 .modal-overlay {
     position: fixed;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     background: rgba(0, 0, 0, 0.82);
     display: flex;
     align-items: center;
@@ -771,7 +772,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 .modal-score-grid {
     display: flex;
     flex-direction: column;
-    gap: 8px;
     margin-bottom: 24px;
     border-top: 1px solid var(--border);
     padding-top: 16px;
@@ -780,7 +780,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 .modal-score-row {
     display: flex;
     align-items: center;
-    gap: 12px;
     justify-content: center;
 }
 
@@ -832,7 +831,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--bg-raised);
@@ -867,7 +865,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 .difficulty-grid {
     display: flex;
     flex-direction: column;
-    gap: 10px;
     margin-top: 16px;
 }
 
@@ -977,7 +974,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 .stats-picker-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
     margin: 16px 0 12px;
     max-height: 55vh;
     overflow-y: auto;
@@ -1019,7 +1015,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 .stats-header {
     display: flex;
     align-items: center;
-    gap: 16px;
     padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-surface);
@@ -1053,7 +1048,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 .stats-filter-bar {
     display: flex;
     flex-direction: column;
-    gap: 6px;
     padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-raised);
@@ -1062,7 +1056,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 
 .filter-group {
     display: flex;
-    gap: 6px;
 }
 
 .filter-btn {
@@ -1092,7 +1085,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     padding: 12px 16px 32px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
 }
 
 .stats-loading,
@@ -1152,4 +1144,58 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     font-size: 0.65rem;
     color: var(--text-dim);
     font-weight: 400;
+}
+
+
+/* iOS 12 flex gap polyfill (gap replaced with > * + * margins) */
+#sidebar > * + * {
+    margin-top: 8px;
+}
+.player-darts > * + * {
+    margin-left: 6px;
+}
+#board > * + * {
+    margin-top: 8px;
+}
+#multiplier-tabs > * + * {
+    margin-left: 8px;
+}
+#status-bar > * + * {
+    margin-left: 8px;
+}
+.setup-option-row > * + * {
+    margin-left: 8px;
+}
+.name-slot > * + * {
+    margin-top: 6px;
+}
+.slot-toggle-row > * + * {
+    margin-left: 4px;
+}
+.modal-score-grid > * + * {
+    margin-top: 8px;
+}
+.modal-score-row > * + * {
+    margin-left: 12px;
+}
+.cpu-slot > * + * {
+    margin-top: 6px;
+}
+.difficulty-grid > * + * {
+    margin-top: 10px;
+}
+.stats-picker-list > * + * {
+    margin-top: 8px;
+}
+.stats-header > * + * {
+    margin-left: 16px;
+}
+.stats-filter-bar > * + * {
+    margin-top: 6px;
+}
+.filter-group > * + * {
+    margin-left: 6px;
+}
+.stats-content > * + * {
+    margin-top: 12px;
 }

@@ -294,13 +294,13 @@
 
     function _handleLegWin(result, winnerPlayer) {
         if (result.sets_score) {
-            Object.entries(result.sets_score).forEach(([pid, sets]) => {
-                state.setsScore[parseInt(pid)] = sets;
+            Object.keys(result.sets_score).forEach(function(pid) {
+                state.setsScore[parseInt(pid)] = result.sets_score[pid];
             });
         }
         if (result.legs_score) {
-            Object.entries(result.legs_score).forEach(([pid, legs]) => {
-                state.legsScore[parseInt(pid)] = legs;
+            Object.keys(result.legs_score).forEach(function(pid) {
+                state.legsScore[parseInt(pid)] = result.legs_score[pid];
             });
         }
 
@@ -313,7 +313,7 @@
             );
         } else {
             const setWinnerName = result.set_winner_id
-                ? (state.players.find(p => p.id === result.set_winner_id)?.name || '')
+                ? (function(){ var pw = state.players.find(function(p){ return p.id === result.set_winner_id; }); return pw ? pw.name : ''; }())
                 : null;
 
             UI.showLegEndModal(
@@ -410,7 +410,7 @@
             player.score = result.score_reverted_to;
             UI.setScore(player.id, player.score);
             const dartsRow = document.getElementById(`darts-${player.id}`);
-            if (dartsRow?.lastChild) dartsRow.removeChild(dartsRow.lastChild);
+            if (dartsRow && dartsRow.lastChild) dartsRow.removeChild(dartsRow.lastChild);
             state.dartsThisTurn--;
             state.turnComplete = false;
             UI.setNextPlayerEnabled(false);

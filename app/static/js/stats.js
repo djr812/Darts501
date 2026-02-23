@@ -21,7 +21,7 @@ const STATS = (() => {
     // ------------------------------------------------------------------
 
     function showPlayerPicker(players, onSelect) {
-        document.getElementById('stats-picker-modal')?.remove();
+        var _spm = document.getElementById('stats-picker-modal'); if (_spm) _spm.remove();
 
         const humanPlayers = players.filter(p => p.name !== 'CPU');
         if (humanPlayers.length === 0) {
@@ -170,8 +170,8 @@ const STATS = (() => {
         const activeGameType  = filterBar.querySelector('.filter-group:first-child .filter-btn.active');
         const activeDoubleOut = filterBar.querySelector('.filter-group:last-child  .filter-btn.active');
         return {
-            gameType:  activeGameType?.dataset.gameType  || 'all',
-            doubleOut: activeDoubleOut?.dataset.doubleOut || 'all',
+            gameType:  (activeGameType && activeGameType.dataset.gameType)  || 'all',
+            doubleOut: (activeDoubleOut && activeDoubleOut.dataset.doubleOut) || 'all',
         };
     }
 
