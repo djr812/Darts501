@@ -1467,3 +1467,255 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 /* iOS 12 flex gap polyfill for new groups */
 .status-slot-centre > * + * { margin-left: 8px; }
 .confirm-btn-row > * + * { margin-left: 12px; }
+
+/* =============================================================
+   Stats screen — AI Analysis button
+   ============================================================= */
+
+.stats-ai-btn {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: var(--radius);
+    border: 1px solid #4a3a6a;
+    background: var(--bg-raised);
+    color: #a78bfa;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    white-space: nowrap;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    -webkit-transition: all 0.15s ease;
+    transition: all 0.15s ease;
+}
+.stats-ai-btn:hover {
+    border-color: #a78bfa;
+    background: rgba(167,139,250,0.1);
+}
+
+/* =============================================================
+   Analysis screen layout
+   ============================================================= */
+
+.analysis-content {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 16px 32px;
+}
+
+.analysis-loading,
+.analysis-error {
+    text-align: center;
+    padding: 48px 0;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+}
+
+/* Two-column grid: metrics left, AI right */
+.analysis-grid {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: horizontal;
+    -webkit-box-direction: normal;
+    -webkit-flex-direction: row;
+    flex-direction: row;
+    -webkit-box-align: start;
+    -webkit-align-items: flex-start;
+    align-items: flex-start;
+    min-height: 100%;
+}
+
+.analysis-panel {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    overflow: hidden;
+}
+
+.analysis-panel:first-child {
+    margin-right: 12px;
+}
+
+.analysis-panel-title {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.22em;
+    color: #a78bfa;
+    background: var(--bg-surface);
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* =============================================================
+   Metrics panel
+   ============================================================= */
+
+.metrics-content {
+    overflow-y: auto;
+    max-height: calc(100vh - 160px);
+    -webkit-overflow-scrolling: touch;
+}
+
+.metrics-sample-note {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+}
+
+.metrics-card {
+    border-bottom: 1px solid var(--border);
+}
+
+.metrics-card:last-child {
+    border-bottom: none;
+}
+
+.metrics-card-title {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    padding: 6px 14px 4px;
+    background: rgba(255,255,255,0.02);
+}
+
+.metrics-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-pack: justify;
+    -webkit-justify-content: space-between;
+    justify-content: space-between;
+    padding: 5px 14px;
+    border-top: 1px solid rgba(255,255,255,0.03);
+}
+
+.metrics-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+}
+
+.metrics-value {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* =============================================================
+   AI panel
+   ============================================================= */
+
+.analysis-style-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    padding: 10px 14px 0;
+}
+
+.analysis-style-btn {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    -webkit-transition: all 0.1s ease;
+    transition: all 0.1s ease;
+}
+
+.analysis-style-btn.active {
+    border-color: #a78bfa;
+    color: #a78bfa;
+    background: rgba(167,139,250,0.1);
+}
+
+.analysis-generate-btn {
+    display: block;
+    width: calc(100% - 28px);
+    margin: 10px 14px;
+    height: 42px;
+    border-radius: var(--radius-lg);
+    border: 1px solid #a78bfa;
+    background: rgba(167,139,250,0.12);
+    color: #a78bfa;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    -webkit-transition: all 0.15s ease;
+    transition: all 0.15s ease;
+}
+
+.analysis-generate-btn:hover {
+    background: rgba(167,139,250,0.2);
+}
+
+.analysis-generate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.analysis-response {
+    margin: 0 14px 14px;
+    padding: 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    min-height: 120px;
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.analysis-response.streaming {
+    border-color: #4a3a6a;
+    color: var(--text-primary);
+}
+
+.analysis-response.done {
+    border-color: var(--border);
+    color: var(--text-primary);
+}
+
+.analysis-response.error {
+    border-color: #6a2a2a;
+    color: #c0392b;
+}
+
+.tip-number {
+    color: #a78bfa;
+    font-weight: 700;
+}
+
+/* iOS 12 gap polyfill for analysis panels */
+.analysis-style-row > * + * { margin-left: 8px; }

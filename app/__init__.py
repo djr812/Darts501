@@ -29,8 +29,7 @@ def create_app(config_object=None):
     Returns:
         A configured Flask app instance.
     """
-    # app = Flask(__name__, instance_relative_config=False)
-    app = Flask(__name__, template_folder="templates")
+    app = Flask(__name__, instance_relative_config=False)
 
     # --- Load configuration ---
     if config_object is None:
@@ -61,13 +60,23 @@ def _init_db(app: Flask) -> None:
 
 
 def _register_blueprints(app: Flask) -> None:
+    """
+    Import and register all route blueprints.
+
+    All API endpoints are grouped under the /api prefix. The views
+    blueprint serves the HTML shell at the root.
+
+    Add new blueprints here as the project grows — one import per module.
+    """
+
+    # --- API blueprints ---
     from app.routes.api.throws  import throws_bp
     from app.routes.api.players import players_bp
     from app.routes.api.matches import matches_bp
     from app.routes.api.legs    import legs_bp
     from app.routes.api.turns   import turns_bp
-    from app.routes.api.stats   import stats_bp
-    from app.routes.views       import views_bp
+    from app.routes.api.stats    import stats_bp
+    from app.routes.api.analysis import analysis_bp
 
     api_blueprints = [
         throws_bp,
@@ -76,10 +85,12 @@ def _register_blueprints(app: Flask) -> None:
         legs_bp,
         turns_bp,
         stats_bp,
+        analysis_bp,
     ]
 
     for bp in api_blueprints:
         app.register_blueprint(bp, url_prefix="/api")
 
+    # --- HTML shell (served at /) ---
+    from app.routes.views import views_bp
     app.register_blueprint(views_bp)
-
