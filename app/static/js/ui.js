@@ -8,7 +8,7 @@ const UI = (() => {
     // Setup Screen
     // ------------------------------------------------------------------
 
-    function buildSetupScreen(existingPlayers, onStartGame) {
+    function buildSetupScreen(existingPlayers, onStartGame, onViewStats) {
         const app = document.getElementById('app');
         app.innerHTML = '';
         app.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; overflow-y:auto; padding: 16px 0;';
@@ -187,6 +187,17 @@ const UI = (() => {
             });
         });
         app.appendChild(startBtn);
+
+        // ---- Stats button ----
+        if (onViewStats) {
+            const statsBtn = document.createElement('button');
+            statsBtn.id = 'setup-stats-btn';
+            statsBtn.className = 'stats-entry-btn';
+            statsBtn.type = 'button';
+            statsBtn.innerHTML = '📊  VIEW PLAYER STATS';
+            statsBtn.addEventListener('click', onViewStats);
+            app.appendChild(statsBtn);
+        }
 
         // Defaults
         gameTypeRow.querySelector('[data-value="501"]').click();

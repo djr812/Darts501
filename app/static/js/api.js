@@ -198,6 +198,21 @@ const API = (() => {
         return request('POST', '/api/legs', legData);
     }
 
+    /**
+     * Fetch computed stats for a player.
+     *
+     * @param {number} playerId
+     * @param {object} scope - { gameType: 'all'|'501'|'201', doubleOut: 'all'|'1'|'0' }
+     * @returns {Promise<object>}
+     */
+    async function getPlayerStats(playerId, scope = {}) {
+        const params = new URLSearchParams();
+        if (scope.gameType  && scope.gameType  !== 'all') params.set('game_type',  scope.gameType);
+        if (scope.doubleOut && scope.doubleOut !== 'all') params.set('double_out', scope.doubleOut);
+        const qs = params.toString() ? '?' + params.toString() : '';
+        return request('GET', `/api/players/${playerId}/stats${qs}`);
+    }
+
     // Expose public interface
     return {
         recordThrow,
@@ -206,6 +221,7 @@ const API = (() => {
         createPlayer,
         startMatch,
         startLeg,
+        getPlayerStats,
         flushQueue,
     };
 

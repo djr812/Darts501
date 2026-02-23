@@ -333,7 +333,7 @@
 
     async function _returnToSetup() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats);
     }
 
     // ------------------------------------------------------------------
@@ -439,12 +439,32 @@
     function _multiplierLabel(m) { return m === 1 ? 'SINGLE' : m === 2 ? 'DOUBLE' : 'TREBLE'; }
 
     // ------------------------------------------------------------------
+    // Stats
+    // ------------------------------------------------------------------
+
+    async function _onViewStats() {
+        const allPlayers = await API.getPlayers().catch(() => []);
+        const humans = allPlayers.filter(p => p.name !== 'CPU');
+        if (humans.length === 0) {
+            UI.showToast('NO PLAYERS YET — PLAY A MATCH FIRST', 'info', 3000);
+            return;
+        }
+        STATS.showPlayerPicker(humans, (player) => {
+            STATS.showStatsScreen(player, async () => {
+                // Back button → return to setup screen
+                const existing = await API.getPlayers().catch(() => []);
+                UI.buildSetupScreen(existing, onStartGame, _onViewStats);
+            });
+        });
+    }
+
+    // ------------------------------------------------------------------
     // Init
     // ------------------------------------------------------------------
 
     async function init() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats);
     }
 
     if (document.readyState === 'loading') {
