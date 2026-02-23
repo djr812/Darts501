@@ -10,7 +10,9 @@ class DevelopmentConfig:
     DB_PASSWORD = os.getenv("DB_PASSWORD")
     DB_NAME     = os.getenv("DB_NAME", "darts")
     OLLAMA_URL   = "http://10.1.1.126:11434"   
-    OLLAMA_MODEL = "llama3.1:8b"
+    OLLAMA_MODEL            = "mistral-nemo:12b"
+    OLLAMA_NUM_PREDICT_FULL = 1200   # mistral-nemo is more verbose
+    OLLAMA_NUM_PREDICT_TIPS = 600
 
 class ProductionConfig(DevelopmentConfig):
     DEBUG = False

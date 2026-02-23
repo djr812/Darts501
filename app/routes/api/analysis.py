@@ -16,8 +16,10 @@ Endpoints:
         tokens as they arrive.
 
 Ollama config (in Flask app.config):
-    OLLAMA_URL   -- base URL, default http://10.1.1.126:11434
-    OLLAMA_MODEL -- model name, default llama3.1:8b
+    OLLAMA_URL        -- base URL, default http://localhost:11434
+    OLLAMA_MODEL      -- model name, default llama3
+    OLLAMA_NUM_PREDICT_FULL -- token budget for full analysis, default 1000
+    OLLAMA_NUM_PREDICT_TIPS -- token budget for quick tips,    default 500
 """
 
 import json
@@ -514,8 +516,11 @@ def generate_analysis(player_id):
 
     prompt = _build_prompt(player["name"], metrics, style)
 
-    ollama_url   = current_app.config.get("OLLAMA_URL",   "http://10.1.1.126:11434")
-    ollama_model = current_app.config.get("OLLAMA_MODEL", "llama3.1:8b")
+    ollama_url        = current_app.config.get("OLLAMA_URL",              "http://localhost:11434")
+    ollama_model      = current_app.config.get("OLLAMA_MODEL",            "mistral-nemo:12b")
+    num_predict_full  = current_app.config.get("OLLAMA_NUM_PREDICT_FULL", 1000)
+    num_predict_tips  = current_app.config.get("OLLAMA_NUM_PREDICT_TIPS", 500)
+    num_predict       = num_predict_full if style == "full" else num_predict_tips
 
     def generate():
         payload = json.dumps({
@@ -524,7 +529,12 @@ def generate_analysis(player_id):
             "stream": True,
             "options": {
                 "temperature": 0.7,
-                "num_predict": 600 if style == "full" else 300,
+                # Generous token budget — avoids mid-sentence truncation.
+                # Tune OLLAMA_NUM_PREDICT_FULL / _TIPS in config.py per model.
+                "num_predict": num_predict,
+                # Stop at sentence-ending punctuation so if the budget IS hit,
+                # the response ends at a clean boundary rather than mid-word.
+                "stop": ["\n\n\n"],
             }
         }).encode("utf-8")
 
@@ -662,18 +672,21 @@ BY GAME TYPE
     if style == "full":
         instruction = (
             "You are an expert darts coach. Using the performance metrics below, "
-            "write a thorough coaching analysis for this player. Structure your response with "
-            "clear sections: Scoring Power, Consistency, Segment Accuracy, Double/Checkout Game, "
-            "and Key Recommendations. Be specific — reference the actual numbers. "
-            "Be encouraging but honest. Write approximately 400-500 words."
+            "write a coaching analysis for this player. "
+            "Use these exact sections with markdown headings: "
+            "### Scoring Power, ### Consistency, ### Segment Accuracy, ### Doubles & Checkout, ### Key Recommendations. "
+            "Write 2-3 complete sentences per section. Reference specific numbers. "
+            "Be encouraging but honest. "
+            "IMPORTANT: Complete every sentence fully. Do not trail off or stop mid-thought. "
+            "Finish with a complete sentence in Key Recommendations."
         )
     else:
         instruction = (
             "You are an expert darts coach. Using the performance metrics below, "
             "give this player exactly 5 concise, actionable coaching tips. "
-            "Format as a numbered list. Each tip should be one or two sentences, "
-            "reference a specific metric, and give a concrete practice suggestion. "
-            "Be direct and practical."
+            "Format as a numbered list (1. 2. 3. 4. 5.). "
+            "Each tip: one sentence referencing a specific metric, then one sentence with a concrete drill or practice suggestion. "
+            "IMPORTANT: Write all 5 tips in full. Complete every sentence. Do not stop before tip 5 is finished."
         )
 
     return f"{instruction}\n\n{metrics_summary}"

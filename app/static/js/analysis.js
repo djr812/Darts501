@@ -100,7 +100,7 @@ var ANALYSIS = (function() {
 
         var aiTitle = document.createElement('div');
         aiTitle.className = 'analysis-panel-title';
-        aiTitle.textContent = 'LLAMA 3 COACHING';
+        aiTitle.textContent = 'AI COACHING';
         aiPanel.appendChild(aiTitle);
 
         // Style selector
@@ -143,7 +143,7 @@ var ANALYSIS = (function() {
         // Response display area
         var responseArea = document.createElement('div');
         responseArea.className = 'analysis-response';
-        responseArea.textContent = 'Press Generate to get coaching feedback from Llama 3.';
+        responseArea.textContent = 'Press Generate to get coaching feedback from AI.';
 
         genBtn.addEventListener('click', function() {
             _streamAnalysis(player.id, selectedStyle, metrics, genBtn, responseArea);
@@ -269,7 +269,7 @@ var ANALYSIS = (function() {
             function readChunk() {
                 reader.read().then(function(result) {
                     if (result.done) {
-                        _finaliseResponse(responseArea, accumulatedText, style);
+                        _finaliseResponse(responseArea, accumulatedText);
                         genBtn.disabled = false;
                         genBtn.textContent = '⚡ REGENERATE';
                         return;
@@ -293,7 +293,8 @@ var ANALYSIS = (function() {
                         // Unescape newlines encoded for SSE transport
                         var token = payload.replace(/\\n/g, '\n');
                         accumulatedText += token;
-                        responseArea.textContent = accumulatedText;
+                        // Render markdown live during streaming
+                        responseArea.innerHTML = _renderMarkdown(accumulatedText);
                         // Auto-scroll to bottom as text streams in
                         responseArea.scrollTop = responseArea.scrollHeight;
                     });
@@ -312,19 +313,95 @@ var ANALYSIS = (function() {
         });
     }
 
-    // After streaming completes, format tips as HTML if style=tips
-    function _finaliseResponse(area, text, style) {
-        area.className = 'analysis-response done';
-        if (style === 'tips') {
-            // Render numbered list items with light formatting
-            var html = text
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-                .replace(/^(\d+)\.\s+/gm, '<span class="tip-number">$1.</span> ');
-            area.innerHTML = html;
+    // ------------------------------------------------------------------
+    // Markdown renderer
+    // Converts the subset of markdown Llama3 commonly produces into HTML.
+    // Runs both during streaming (live) and on final output.
+    // ------------------------------------------------------------------
+
+    function _renderMarkdown(text) {
+        // 1. Escape raw HTML first so model output can't inject tags
+        var s = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        // 2. Convert block-level elements line by line
+        var lines  = s.split('\n');
+        var output = [];
+        var i      = 0;
+
+        while (i < lines.length) {
+            var line = lines[i];
+
+            // Heading: ### ## #
+            var hMatch = line.match(/^(#{1,3})\s+(.+)$/);
+            if (hMatch) {
+                var level = Math.min(hMatch[1].length + 2, 5); // h3-h5 (keep visual hierarchy subtle)
+                output.push('<h' + level + ' class="ai-heading">' + _inlineMarkdown(hMatch[2]) + '</h' + level + '>');
+                i++; continue;
+            }
+
+            // Horizontal rule: --- or ***
+            if (/^(---+|\*\*\*+)$/.test(line.trim())) {
+                output.push('<hr class="ai-hr">');
+                i++; continue;
+            }
+
+            // Unordered list block: collect consecutive bullet lines
+            if (/^[-*+]\s+/.test(line)) {
+                output.push('<ul class="ai-list">');
+                while (i < lines.length && /^[-*+]\s+/.test(lines[i])) {
+                    output.push('<li>' + _inlineMarkdown(lines[i].replace(/^[-*+]\s+/, '')) + '</li>');
+                    i++;
+                }
+                output.push('</ul>');
+                continue;
+            }
+
+            // Ordered list block: collect consecutive numbered lines
+            if (/^\d+\.\s+/.test(line)) {
+                output.push('<ol class="ai-list">');
+                while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
+                    output.push('<li>' + _inlineMarkdown(lines[i].replace(/^\d+\.\s+/, '')) + '</li>');
+                    i++;
+                }
+                output.push('</ol>');
+                continue;
+            }
+
+            // Blank line — paragraph break
+            if (line.trim() === '') {
+                output.push('<div class="ai-spacer"></div>');
+                i++; continue;
+            }
+
+            // Normal paragraph line
+            output.push('<p class="ai-para">' + _inlineMarkdown(line) + '</p>');
+            i++;
         }
+
+        return output.join('');
+    }
+
+    // Inline markdown: bold, italic, inline code
+    function _inlineMarkdown(s) {
+        return s
+            // Bold+italic: ***text***
+            .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
+            // Bold: **text** or __text__
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+            // Italic: *text* or _text_
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            .replace(/_([^_]+)_/g, '<em>$1</em>')
+            // Inline code: `code`
+            .replace(/`([^`]+)`/g, '<code class="ai-code">$1</code>');
+    }
+
+    function _finaliseResponse(area, text) {
+        area.className = 'analysis-response done';
+        area.innerHTML = _renderMarkdown(text);
     }
 
     // ------------------------------------------------------------------

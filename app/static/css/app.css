@@ -1705,11 +1705,68 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 .analysis-response.done {
     border-color: var(--border);
     color: var(--text-primary);
+    /* Switch from pre-wrap to normal flow once markdown is rendered */
+    white-space: normal;
 }
 
 .analysis-response.error {
     border-color: #6a2a2a;
     color: #c0392b;
+}
+
+/* Markdown rendered elements inside .analysis-response */
+.analysis-response .ai-heading {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: #a78bfa;
+    letter-spacing: 0.06em;
+    margin: 10px 0 4px;
+    line-height: 1.2;
+}
+.analysis-response h3.ai-heading { font-size: 0.95rem; }
+.analysis-response h4.ai-heading { font-size: 0.85rem; }
+.analysis-response h5.ai-heading { font-size: 0.78rem; }
+
+.analysis-response .ai-para {
+    margin: 0 0 6px;
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: var(--text-primary);
+}
+
+.analysis-response .ai-list {
+    margin: 4px 0 8px 16px;
+    padding: 0;
+}
+
+.analysis-response .ai-list li {
+    font-size: 0.72rem;
+    line-height: 1.65;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+}
+
+.analysis-response .ai-list li strong {
+    color: #a78bfa;
+}
+
+.analysis-response .ai-spacer {
+    height: 6px;
+}
+
+.analysis-response .ai-hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 10px 0;
+}
+
+.analysis-response .ai-code {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    background: rgba(167,139,250,0.1);
+    color: #a78bfa;
+    padding: 1px 5px;
+    border-radius: 3px;
 }
 
 .tip-number {
