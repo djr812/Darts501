@@ -588,6 +588,60 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 /* Keep count-btn as an alias — just uses option-btn now */
 .count-btn { min-width: 70px; }
 
+/* Paired Sets + Legs section — two columns side by side */
+.setup-section-paired {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: horizontal;
+    -webkit-box-direction: normal;
+    -webkit-flex-direction: row;
+    flex-direction: row;
+    -webkit-box-align: start;
+    -webkit-align-items: flex-start;
+    align-items: flex-start;
+    width: 100%;
+    max-width: 640px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.paired-col {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Left col gets a right margin to space it from the right col */
+.paired-col:first-child {
+    margin-right: 10px;
+}
+
+/* Compact option buttons for the paired layout — narrower/shorter */
+.option-btn-compact {
+    min-width: 0;
+    height: 48px;
+    font-size: 1rem;
+    padding: 0 8px;
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+}
+
+/* Stack option buttons vertically within each column */
+.setup-option-col {
+    -webkit-box-orient: horizontal;
+    -webkit-box-direction: normal;
+    -webkit-flex-direction: row;
+    flex-direction: row;
+    -webkit-flex-wrap: wrap;
+    flex-wrap: wrap;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+}
+
 #setup-names-section {
     margin-bottom: 28px;
     width: 100%;

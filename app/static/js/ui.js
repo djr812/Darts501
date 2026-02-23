@@ -90,47 +90,59 @@ const UI = (() => {
         checkoutSection.appendChild(checkoutRow);
         _appTarget.appendChild(checkoutSection);
 
-        // ---- Sets ----
-        const setsSection = document.createElement('div');
-        setsSection.className = 'setup-section';
-        setsSection.innerHTML = '<div class="setup-label">SETS TO WIN</div>';
+        // ---- Sets + Legs (combined row) ----
+        const setsLegsSection = document.createElement('div');
+        setsLegsSection.className = 'setup-section setup-section-paired';
+
+        // Left column: Sets to Win
+        const setsCol = document.createElement('div');
+        setsCol.className = 'paired-col';
+        const setsLabel = document.createElement('div');
+        setsLabel.className = 'setup-label';
+        setsLabel.textContent = 'SETS TO WIN';
         const setsRow = document.createElement('div');
-        setsRow.className = 'setup-option-row';
-        [1, 2, 3, 4, 5].forEach(n => {
+        setsRow.className = 'setup-option-row setup-option-col';
+        [1, 2, 3, 4, 5].forEach(function(n) {
             const btn = document.createElement('button');
-            btn.className = 'option-btn';
+            btn.className = 'option-btn option-btn-compact';
             btn.dataset.value = n;
             btn.type = 'button';
             btn.textContent = n;
-            btn.addEventListener('click', () => {
-                setsRow.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+            btn.addEventListener('click', function() {
+                setsRow.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
                 btn.classList.add('selected');
             });
             setsRow.appendChild(btn);
         });
-        setsSection.appendChild(setsRow);
-        _appTarget.appendChild(setsSection);
+        setsCol.appendChild(setsLabel);
+        setsCol.appendChild(setsRow);
 
-        // ---- Legs per Set ----
-        const legsSection = document.createElement('div');
-        legsSection.className = 'setup-section';
-        legsSection.innerHTML = '<div class="setup-label">LEGS PER SET (BEST OF)</div>';
+        // Right column: Legs per Set
+        const legsCol = document.createElement('div');
+        legsCol.className = 'paired-col';
+        const legsLabel = document.createElement('div');
+        legsLabel.className = 'setup-label';
+        legsLabel.textContent = 'LEGS PER SET';
         const legsRow = document.createElement('div');
-        legsRow.className = 'setup-option-row';
-        [1, 3, 5, 7].forEach(n => {
+        legsRow.className = 'setup-option-row setup-option-col';
+        [1, 3, 5, 7].forEach(function(n) {
             const btn = document.createElement('button');
-            btn.className = 'option-btn';
+            btn.className = 'option-btn option-btn-compact';
             btn.dataset.value = n;
             btn.type = 'button';
-            btn.innerHTML = `${n}<span class="option-hint">${n === 1 ? 'Single' : `First to ${Math.ceil(n/2)}`}</span>`;
-            btn.addEventListener('click', () => {
-                legsRow.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+            btn.innerHTML = n + '<span class="option-hint">' + (n === 1 ? 'Single' : 'First to ' + Math.ceil(n/2)) + '</span>';
+            btn.addEventListener('click', function() {
+                legsRow.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
                 btn.classList.add('selected');
             });
             legsRow.appendChild(btn);
         });
-        legsSection.appendChild(legsRow);
-        _appTarget.appendChild(legsSection);
+        legsCol.appendChild(legsLabel);
+        legsCol.appendChild(legsRow);
+
+        setsLegsSection.appendChild(setsCol);
+        setsLegsSection.appendChild(legsCol);
+        _appTarget.appendChild(setsLegsSection);
 
         // ---- Player Count ----
         const countSection = document.createElement('div');
