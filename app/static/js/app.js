@@ -27,6 +27,7 @@
         turnComplete:     false,
         legOver:          false,
         cpuTurnRunning:   false,
+        cpuDifficulty:    'medium',   // 'easy' | 'medium' | 'hard'
         setsScore:        {},
         legsScore:        {},
     };
@@ -42,6 +43,7 @@
                 // Reuse existing CPU player record if present, otherwise create
                 const all = await API.getPlayers().catch(() => []);
                 const existing = all.find(p => p.name === 'CPU');
+                state.cpuDifficulty = sel.difficulty || 'medium';
                 if (existing) {
                     players.push({ id: existing.id, name: 'CPU', score: state.startingScore, isCpu: true });
                 } else {
@@ -213,7 +215,7 @@
 
         CPU.playTurn(
             cpuPlayer,
-            { legId: state.legId, doubleOut: state.doubleOut },
+            { legId: state.legId, doubleOut: state.doubleOut, difficulty: state.cpuDifficulty },
             suggestions,
             // onDart — CPU calls this for each throw
             async (segment, multiplier, currentScore) => {

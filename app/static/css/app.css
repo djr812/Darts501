@@ -855,3 +855,94 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     letter-spacing: 0.12em;
     text-align: center;
 }
+
+/* =============================================================
+   Difficulty picker modal
+   ============================================================= */
+
+.difficulty-box {
+    max-width: 560px;
+}
+
+.difficulty-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.difficulty-card {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 12px;
+    align-items: start;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.difficulty-card:hover,
+.difficulty-card:active {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.diff-icon {
+    grid-row: 1 / 3;
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+}
+
+.diff-label {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1.2;
+}
+
+.diff-desc {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+    line-height: 1.4;
+    margin-top: 2px;
+}
+
+/* Updated CPU slot showing difficulty name */
+.cpu-difficulty {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+.cpu-change-btn {
+    margin-top: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: color 0.1s, border-color 0.1s;
+}
+
+.cpu-change-btn:hover { color: var(--accent); border-color: var(--accent); }

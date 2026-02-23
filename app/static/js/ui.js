@@ -148,11 +148,15 @@ const UI = (() => {
                 countRow.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
                 if (n === 1) {
-                    _renderSinglePlayerSlots(existingPlayers, namesSection);
+                    // Show difficulty picker before rendering slots
+                    _showDifficultyModal((difficulty) => {
+                        _renderSinglePlayerSlots(existingPlayers, namesSection, difficulty);
+                        startBtn.disabled = false;
+                    });
                 } else {
                     _renderPlayerSlots(n, existingPlayers, namesSection);
+                    startBtn.disabled = false;
                 }
-                startBtn.disabled = false;
             });
             countRow.appendChild(btn);
         });
@@ -210,8 +214,7 @@ const UI = (() => {
         setTimeout(() => container.querySelector('.name-input')?.focus(), 150);
     }
 
-    function _renderSinglePlayerSlots(existingPlayers, container) {
-        // 1-player mode: one human slot + one fixed CPU slot
+    function _renderSinglePlayerSlots(existingPlayers, container, difficulty) {
         container.innerHTML = '';
         const grid = document.createElement('div');
         grid.id = 'setup-names-grid';
@@ -220,20 +223,104 @@ const UI = (() => {
         // Human slot
         grid.appendChild(_buildPlayerSlot(0, 1, existingPlayers, false));
 
-        // CPU slot — fixed, not editable
+        // CPU slot — fixed, displays chosen difficulty
+        const label = CPU.LABELS[difficulty] || difficulty;
         const cpuSlot = document.createElement('div');
         cpuSlot.className = 'name-slot cpu-slot';
-        cpuSlot.dataset.mode  = 'cpu';
-        cpuSlot.dataset.isCpu = 'true';
+        cpuSlot.dataset.mode       = 'cpu';
+        cpuSlot.dataset.isCpu      = 'true';
+        cpuSlot.dataset.difficulty = difficulty;
         cpuSlot.innerHTML = `
             <div class="name-label">OPPONENT</div>
             <div class="cpu-badge">🤖 CPU</div>
-            <div class="cpu-desc">Pub player difficulty</div>
+            <div class="cpu-difficulty">${_esc(label)}</div>
+            <button class="cpu-change-btn" type="button">CHANGE</button>
         `;
-        grid.appendChild(cpuSlot);
 
+        // Allow re-picking difficulty
+        cpuSlot.querySelector('.cpu-change-btn').addEventListener('click', () => {
+            _showDifficultyModal((newDifficulty) => {
+                _renderSinglePlayerSlots(existingPlayers, container, newDifficulty);
+            });
+        });
+
+        grid.appendChild(cpuSlot);
         container.appendChild(grid);
         setTimeout(() => container.querySelector('.name-input')?.focus(), 150);
+    }
+
+    /**
+     * Show the CPU difficulty picker modal.
+     * Calls onSelect(difficulty) when the user picks a level.
+     */
+    function _showDifficultyModal(onSelect) {
+        document.getElementById('difficulty-modal')?.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'difficulty-modal';
+        overlay.className = 'modal-overlay';
+
+        const box = document.createElement('div');
+        box.className = 'modal-box difficulty-box';
+
+        box.innerHTML = `
+            <div class="modal-title">SELECT CPU DIFFICULTY</div>
+            <div class="modal-subtitle">HOW HARD DO YOU WANT IT?</div>
+        `;
+
+        const levels = [
+            {
+                key:   'easy',
+                icon:  '🍺',
+                label: CPU.LABELS.easy,
+                desc:  'A gentle introduction. Will occasionally aim at the wrong bit of the board entirely.',
+            },
+            {
+                key:   'medium',
+                icon:  '🎯',
+                label: CPU.LABELS.medium,
+                desc:  'A steady club player. Knows the checkout routes, misses under pressure.',
+            },
+            {
+                key:   'hard',
+                icon:  '🏆',
+                label: CPU.LABELS.hard,
+                desc:  'Precise, methodical, merciless. Hits trebles, closes out doubles, rarely loses.',
+            },
+        ];
+
+        const grid = document.createElement('div');
+        grid.className = 'difficulty-grid';
+
+        levels.forEach(lvl => {
+            const card = document.createElement('button');
+            card.className = 'difficulty-card';
+            card.dataset.difficulty = lvl.key;
+            card.type = 'button';
+            card.innerHTML = `
+                <span class="diff-icon">${lvl.icon}</span>
+                <span class="diff-label">${_esc(lvl.label)}</span>
+                <span class="diff-desc">${_esc(lvl.desc)}</span>
+            `;
+            card.addEventListener('click', () => {
+                overlay.remove();
+                onSelect(lvl.key);
+            });
+            grid.appendChild(card);
+        });
+
+        box.appendChild(grid);
+        overlay.appendChild(box);
+
+        // Tap outside to dismiss (re-shows modal since a difficulty must be picked)
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.remove();
+        });
+
+        document.body.appendChild(overlay);
+
+        // Animate in
+        requestAnimationFrame(() => overlay.classList.add('visible'));
     }
 
     function _buildPlayerSlot(index, totalCount, existingPlayers) {
@@ -308,7 +395,7 @@ const UI = (() => {
 
             // CPU slot — fixed, no validation needed
             if (mode === 'cpu') {
-                result.push({ isCpu: true, name: 'CPU' });
+                result.push({ isCpu: true, name: 'CPU', difficulty: slot.dataset.difficulty || 'medium' });
                 return;
             }
 
