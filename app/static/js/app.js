@@ -137,6 +137,7 @@
     function _beginTurn() {
         const player = currentPlayer();
         UI.setActivePlayer(player.id);
+        SPEECH.announcePlayer(player.name);
         if (player.isCpu) {
             UI.setStatus('CPU IS THINKING...');
             UI.setUndoEnabled(false);
@@ -183,7 +184,7 @@
 
         // Announce each dart score immediately as it lands
         if (!result.is_bust) {
-            SPEECH.announceDartScore(result.points);
+            SPEECH.announceDartScore(segment, multiplier, result.points);
         }
 
         if (result.is_bust) {

@@ -10,7 +10,8 @@
  *   SPEECH.isSupported()               → bool
  *   SPEECH.isEnabled()                 → bool
  *   SPEECH.setEnabled(bool)            → void
- *   SPEECH.announceTurnScore(points)   → void  — called after each dart
+ *   SPEECH.announceDartScore(seg,mul,pts) → void — called after each dart
+ *   SPEECH.announcePlayer(name)         → void — called at start of each turn
  *   SPEECH.announceRemaining(score)    → void  — called after turn ends (score ≤ 170)
  *   SPEECH.announceBust()              → void
  *   SPEECH.announceCheckout(points)    → void
@@ -142,21 +143,59 @@ var SPEECH = (function() {
     // Public announcement methods
     // ------------------------------------------------------------------
 
+    // Segment names for caller phrasing
+    var SEGMENT_NAMES = {
+        25: 'bull',
+        20: 'twenty',  19: 'nineteen', 18: 'eighteen', 17: 'seventeen',
+        16: 'sixteen', 15: 'fifteen',  14: 'fourteen',  13: 'thirteen',
+        12: 'twelve',  11: 'eleven',   10: 'ten',        9: 'nine',
+         8: 'eight',    7: 'seven',     6: 'six',         5: 'five',
+         4: 'four',     3: 'three',     2: 'two',          1: 'one',
+    };
+
+    /**
+     * Build a caller phrase for a single dart using segment + multiplier.
+     * e.g. segment=20, multiplier=3 → "Treble twenty"
+     *      segment=20, multiplier=2 → "Double twenty"
+     *      segment=20, multiplier=1 → "Twenty"
+     *      segment=25, multiplier=2 → "Bull"   (double bull = bullseye)
+     *      segment=25, multiplier=1 → "Twenty five"
+     */
+    function _phraseDart(segment, multiplier, points) {
+        if (points === 0) return 'Miss';
+
+        var segName = SEGMENT_NAMES[segment] || _numberToWords(segment);
+
+        // Bull / Bullseye
+        if (segment === 25) {
+            return multiplier === 2 ? 'Bullseye' : 'Twenty five';
+        }
+
+        if (multiplier === 3) return 'Treble ' + segName;
+        if (multiplier === 2) return 'Double ' + segName;
+        return segName.charAt(0).toUpperCase() + segName.slice(1);
+    }
+
     /**
      * Speak the score of a single dart throw.
      * Called immediately after each dart is recorded.
-     * Only speaks the dart's point value — the remaining announcement
-     * happens separately after the turn ends.
      *
-     * @param {number} points  — raw points for this dart (0–60)
+     * @param {number} segment    — board segment hit (0-25)
+     * @param {number} multiplier — 1=single, 2=double, 3=treble
+     * @param {number} points     — calculated points (used as fallback)
      */
-    function announceDartScore(points) {
+    function announceDartScore(segment, multiplier, points) {
         if (!_enabled) return;
-        if (points === 0) {
-            _speak('Miss', true);
-            return;
-        }
-        _speak(_phraseScore(points), true);
+        _speak(_phraseDart(segment, multiplier, points), true);
+    }
+
+    /**
+     * Announce whose turn it is to throw.
+     * @param {string} playerName
+     */
+    function announcePlayer(playerName) {
+        if (!_enabled) return;
+        _speak(playerName + "'s turn to throw", false);
     }
 
     /**
@@ -197,13 +236,14 @@ var SPEECH = (function() {
     // ------------------------------------------------------------------
 
     return {
-        isSupported:      isSupported,
-        isEnabled:        isEnabled,
-        setEnabled:       setEnabled,
+        isSupported:       isSupported,
+        isEnabled:         isEnabled,
+        setEnabled:        setEnabled,
         announceDartScore: announceDartScore,
-        announceTurnEnd:  announceTurnEnd,
-        announceBust:     announceBust,
-        announceCheckout: announceCheckout,
+        announcePlayer:    announcePlayer,
+        announceTurnEnd:   announceTurnEnd,
+        announceBust:      announceBust,
+        announceCheckout:  announceCheckout,
     };
 
 }());
