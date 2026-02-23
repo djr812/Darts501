@@ -404,9 +404,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     -webkit-box-align: center;
     -webkit-align-items: center;
     align-items: center;
-    -webkit-box-pack: justify;
-    -webkit-justify-content: space-between;
-    justify-content: space-between;
     padding: 4px 10px;
     background: var(--bg-surface);
     border-top: 1px solid var(--border);
@@ -415,12 +412,52 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     box-sizing: border-box;
 }
 
+/* Three-slot layout: left and right are equal flex:1 wings,
+   centre is fixed and truly centred in the bar */
+.status-slot {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+}
+
+.status-slot-left {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    -webkit-box-pack: start;
+    -webkit-justify-content: flex-start;
+    justify-content: flex-start;
+}
+
+.status-slot-centre {
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.status-slot-right {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    -webkit-box-pack: end;
+    -webkit-justify-content: flex-end;
+    justify-content: flex-end;
+}
+
 #status-message {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     letter-spacing: 0.06em;
-    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
 }
 
 #status-message.bust    { color: var(--bust-color); font-weight: bold; }
@@ -479,15 +516,7 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 }
 .action-btn.match-restart:active { background: rgba(230,126,34,0.12); }
 
-/* Group wrapping Cancel + Restart — spaced from the Next button */
-.match-mgmt-group {
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    -webkit-box-align: center;
-    -webkit-align-items: center;
-    align-items: center;
-}
+/* Cancel + Restart live inside .status-slot-centre — no wrapper needed */
 
 /* --- Confirm modal --- */
 .confirm-box {
@@ -1436,5 +1465,5 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     margin-top: 12px;
 }
 /* iOS 12 flex gap polyfill for new groups */
-.match-mgmt-group > * + * { margin-left: 6px; }
+.status-slot-centre > * + * { margin-left: 8px; }
 .confirm-btn-row > * + * { margin-left: 12px; }

@@ -717,23 +717,19 @@ const UI = (() => {
         const el = document.createElement('footer');
         el.id = 'status-bar';
 
-        const msg = document.createElement('span');
-        msg.id = 'status-message';
-        msg.textContent = 'SELECT MULTIPLIER THEN SEGMENT';
+        // Left slot (flex:1) — UNDO, left-aligned
+        const leftSlot = document.createElement('div');
+        leftSlot.className = 'status-slot status-slot-left';
 
         const undoBtn = document.createElement('button');
         undoBtn.className = 'action-btn undo'; undoBtn.id = 'btn-undo';
         undoBtn.textContent = '⟵ UNDO';
         undoBtn.addEventListener('click', callbacks.onUndo);
+        leftSlot.appendChild(undoBtn);
 
-        const nextBtn = document.createElement('button');
-        nextBtn.className = 'action-btn next-player'; nextBtn.id = 'btn-next';
-        nextBtn.textContent = 'NEXT ▶'; nextBtn.disabled = true;
-        nextBtn.addEventListener('click', callbacks.onNextPlayer);
-
-        // Match management buttons — grouped on the right
-        const mgmtGroup = document.createElement('div');
-        mgmtGroup.className = 'match-mgmt-group';
+        // Centre slot — Cancel / Restart / status message stacked
+        const centreSlot = document.createElement('div');
+        centreSlot.className = 'status-slot status-slot-centre';
 
         const cancelBtn = document.createElement('button');
         cancelBtn.className = 'action-btn match-cancel'; cancelBtn.id = 'btn-cancel';
@@ -745,13 +741,27 @@ const UI = (() => {
         restartBtn.textContent = '↺ RESTART';
         restartBtn.addEventListener('click', callbacks.onRestart);
 
-        mgmtGroup.appendChild(cancelBtn);
-        mgmtGroup.appendChild(restartBtn);
+        const msg = document.createElement('span');
+        msg.id = 'status-message';
+        msg.textContent = 'SELECT MULTIPLIER THEN SEGMENT';
 
-        el.appendChild(msg);
-        el.appendChild(undoBtn);
-        el.appendChild(nextBtn);
-        el.appendChild(mgmtGroup);
+        centreSlot.appendChild(cancelBtn);
+        centreSlot.appendChild(restartBtn);
+        centreSlot.appendChild(msg);
+
+        // Right slot (flex:1) — NEXT, right-aligned
+        const rightSlot = document.createElement('div');
+        rightSlot.className = 'status-slot status-slot-right';
+
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'action-btn next-player'; nextBtn.id = 'btn-next';
+        nextBtn.textContent = 'NEXT ▶'; nextBtn.disabled = true;
+        nextBtn.addEventListener('click', callbacks.onNextPlayer);
+        rightSlot.appendChild(nextBtn);
+
+        el.appendChild(leftSlot);
+        el.appendChild(centreSlot);
+        el.appendChild(rightSlot);
         return el;
     }
 
