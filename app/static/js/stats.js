@@ -81,7 +81,8 @@ const STATS = (() => {
     function showStatsScreen(player, onBack) {
         const app = document.getElementById('app');
         app.innerHTML = '';
-        app.style.cssText = 'display:flex; flex-direction:column; overflow:hidden;';
+        app.style.cssText = '';
+        document.body.className = 'mode-stats';
 
         // ---- Header bar ----
         const header = document.createElement('div');

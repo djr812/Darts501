@@ -11,16 +11,25 @@ const UI = (() => {
     function buildSetupScreen(existingPlayers, onStartGame, onViewStats) {
         const app = document.getElementById('app');
         app.innerHTML = '';
-        app.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; overflow-y:auto; padding: 16px 0;';
+        app.style.cssText = '';
+        document.body.className = 'mode-setup';
 
         if (!document.getElementById('toast'))   document.body.appendChild(_buildToast());
         if (!document.getElementById('loading')) document.body.appendChild(_buildLoading());
+
+        // Inner wrapper handles centring and padding
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        // From here, append everything to inner instead of app
+        var _appTarget = inner;
 
         // Title
         const title = document.createElement('div');
         title.id = 'setup-title';
         title.innerHTML = `<div class="setup-logo">DARTS 501</div><div class="setup-subtitle">MATCH SETUP</div>`;
-        app.appendChild(title);
+        _appTarget.appendChild(title);
 
         // ---- Game Type ----
         const gameTypeSection = document.createElement('div');
@@ -55,7 +64,7 @@ const UI = (() => {
             gameTypeRow.appendChild(btn);
         });
         gameTypeSection.appendChild(gameTypeRow);
-        app.appendChild(gameTypeSection);
+        _appTarget.appendChild(gameTypeSection);
 
         // ---- Checkout Rule ----
         const checkoutSection = document.createElement('div');
@@ -79,7 +88,7 @@ const UI = (() => {
             checkoutRow.appendChild(btn);
         });
         checkoutSection.appendChild(checkoutRow);
-        app.appendChild(checkoutSection);
+        _appTarget.appendChild(checkoutSection);
 
         // ---- Sets ----
         const setsSection = document.createElement('div');
@@ -100,7 +109,7 @@ const UI = (() => {
             setsRow.appendChild(btn);
         });
         setsSection.appendChild(setsRow);
-        app.appendChild(setsSection);
+        _appTarget.appendChild(setsSection);
 
         // ---- Legs per Set ----
         const legsSection = document.createElement('div');
@@ -121,7 +130,7 @@ const UI = (() => {
             legsRow.appendChild(btn);
         });
         legsSection.appendChild(legsRow);
-        app.appendChild(legsSection);
+        _appTarget.appendChild(legsSection);
 
         // ---- Player Count ----
         const countSection = document.createElement('div');
@@ -161,8 +170,8 @@ const UI = (() => {
             countRow.appendChild(btn);
         });
         countSection.appendChild(countRow);
-        app.appendChild(countSection);
-        app.appendChild(namesSection);
+        _appTarget.appendChild(countSection);
+        _appTarget.appendChild(namesSection);
 
         startBtn.addEventListener('click', () => {
             const gameTypeSel  = gameTypeRow.querySelector('.option-btn.selected');
@@ -186,7 +195,7 @@ const UI = (() => {
                 legsPerSet:  parseInt(legsSel.dataset.value, 10),
             });
         });
-        app.appendChild(startBtn);
+        _appTarget.appendChild(startBtn);
 
         // ---- Stats button ----
         if (onViewStats) {
@@ -196,7 +205,7 @@ const UI = (() => {
             statsBtn.type = 'button';
             statsBtn.innerHTML = '📊  VIEW PLAYER STATS';
             statsBtn.addEventListener('click', onViewStats);
-            app.appendChild(statsBtn);
+            _appTarget.appendChild(statsBtn);
         }
 
         // Defaults
@@ -563,6 +572,7 @@ const UI = (() => {
         const app = document.getElementById('app');
         app.innerHTML = '';
         app.style.cssText = '';
+        document.body.className = 'mode-game';
         app.appendChild(_buildHeader());
         app.appendChild(_buildSidebar(players));
         app.appendChild(_buildBoard(callbacks));
