@@ -508,16 +508,17 @@ def generate_analysis(player_id):
         return jsonify({"error": "Player not found"}), 404
 
     body = request.get_json(silent=True) or {}
-    style   = body.get("style", "tips")
-    metrics = body.get("metrics", {})
+    style       = body.get("style",       "tips")
+    skill_level = body.get("skill_level", "beginner")   # beginner | intermediate | advanced
+    metrics     = body.get("metrics",     {})
 
     if not metrics:
         return jsonify({"error": "metrics payload required"}), 400
 
-    prompt = _build_prompt(player["name"], metrics, style)
+    prompt = _build_prompt(player["name"], metrics, style, skill_level)
 
     ollama_url        = current_app.config.get("OLLAMA_URL",              "http://localhost:11434")
-    ollama_model      = current_app.config.get("OLLAMA_MODEL",            "mistral-nemo:12b")
+    ollama_model      = current_app.config.get("OLLAMA_MODEL",            "llama3")
     num_predict_full  = current_app.config.get("OLLAMA_NUM_PREDICT_FULL", 1000)
     num_predict_tips  = current_app.config.get("OLLAMA_NUM_PREDICT_TIPS", 500)
     num_predict       = num_predict_full if style == "full" else num_predict_tips
@@ -587,10 +588,11 @@ def generate_analysis(player_id):
 # Prompt builder
 # ======================================================================
 
-def _build_prompt(name: str, m: dict, style: str) -> str:
+def _build_prompt(name: str, m: dict, style: str, skill_level: str = "beginner") -> str:
     """
     Build a focused, data-rich prompt from the metrics dict.
-    style: 'full' = narrative analysis, 'tips' = concise bullet coaching
+    style:       'full' = narrative analysis, 'tips' = concise bullet coaching
+    skill_level: 'beginner' | 'intermediate' | 'advanced'
     """
 
     scoring   = m.get("scoring",  {})
@@ -669,23 +671,54 @@ BY GAME TYPE
 {gt_text}
 """.strip()
 
+    # Skill-level context injected into every prompt
+    skill_context = {
+        "beginner": (
+            "The player is a **beginner**. "
+            "Use simple, jargon-free language. "
+            "Focus on the absolute fundamentals: consistent stance, a smooth and repeatable throwing action, "
+            "and building confidence on the 20-bed before worrying about doubles. "
+            "Avoid overwhelming them — prioritise the 2-3 most impactful changes they can make right now. "
+            "Suggest simple, fun practice routines they can do alone (e.g. Shanghai, Around the Clock, "
+            "hitting the same number 9 times). Reassure them that the numbers will improve with repetition."
+        ),
+        "intermediate": (
+            "The player is at an **intermediate** level. "
+            "They understand the basics and are looking to build consistency and improve their average. "
+            "Focus on scoring efficiency (maximising T20/T19 visits), reducing busts through better "
+            "checkout awareness, and developing a reliable doubles game. "
+            "Suggest structured practice routines such as doubles practice on a clock pattern, "
+            "or focused T20/T19 sessions tracking hit rate."
+        ),
+        "advanced": (
+            "The player is an **advanced** player. "
+            "Assume familiarity with all standard checkouts and game strategy. "
+            "Focus on marginal gains: consistency under pressure, strategic target selection "
+            "(e.g. when to switch from T20 to T19 based on grouping), optimising checkout routes, "
+            "and mental game. Suggest competitive practice formats and match simulation drills."
+        ),
+    }.get(skill_level, "")
+
     if style == "full":
         instruction = (
             "You are an expert darts coach. Using the performance metrics below, "
             "write a coaching analysis for this player. "
+            f"{skill_context} "
             "Use these exact sections with markdown headings: "
             "### Scoring Power, ### Consistency, ### Segment Accuracy, ### Doubles & Checkout, ### Key Recommendations. "
-            "Write 2-3 complete sentences per section. Reference specific numbers. "
-            "Be encouraging but honest. "
+            "Write 2-3 complete sentences per section. Reference specific numbers from the metrics. "
+            "End with a ### Practice Routine section suggesting 2-3 specific drills appropriate to the player's level. "
             "IMPORTANT: Complete every sentence fully. Do not trail off or stop mid-thought. "
-            "Finish with a complete sentence in Key Recommendations."
+            "Finish with a complete sentence in Practice Routine."
         )
     else:
         instruction = (
             "You are an expert darts coach. Using the performance metrics below, "
-            "give this player exactly 5 concise, actionable coaching tips. "
+            f"{skill_context} "
+            "Give this player exactly 5 concise, actionable coaching tips. "
             "Format as a numbered list (1. 2. 3. 4. 5.). "
-            "Each tip: one sentence referencing a specific metric, then one sentence with a concrete drill or practice suggestion. "
+            "Each tip: one sentence referencing a specific metric, then one sentence with a concrete "
+            "drill or practice routine appropriate to the player's skill level. "
             "IMPORTANT: Write all 5 tips in full. Complete every sentence. Do not stop before tip 5 is finished."
         )
 

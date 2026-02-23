@@ -100,7 +100,7 @@ var ANALYSIS = (function() {
 
         var aiTitle = document.createElement('div');
         aiTitle.className = 'analysis-panel-title';
-        aiTitle.textContent = 'AI COACHING';
+        aiTitle.textContent = 'LLAMA 3 COACHING';
         aiPanel.appendChild(aiTitle);
 
         // Style selector
@@ -134,6 +134,44 @@ var ANALYSIS = (function() {
         styleRow.appendChild(tipsBtn);
         aiPanel.appendChild(styleRow);
 
+        // Skill level selector
+        var skillRow = document.createElement('div');
+        skillRow.className = 'analysis-skill-row';
+
+        var skillLabel = document.createElement('span');
+        skillLabel.className = 'analysis-skill-label';
+        skillLabel.textContent = 'SKILL LEVEL';
+        skillRow.appendChild(skillLabel);
+
+        var skillBtns = document.createElement('div');
+        skillBtns.className = 'analysis-skill-btns';
+
+        var selectedSkill = 'beginner';
+        var skillLevels = [
+            { key: 'beginner',     label: 'BEGINNER' },
+            { key: 'intermediate', label: 'INTERMEDIATE' },
+            { key: 'advanced',     label: 'ADVANCED' },
+        ];
+
+        skillLevels.forEach(function(lvl) {
+            var btn = document.createElement('button');
+            btn.className = 'analysis-skill-btn' + (lvl.key === 'beginner' ? ' active' : '');
+            btn.type = 'button';
+            btn.textContent = lvl.label;
+            btn.dataset.skill = lvl.key;
+            btn.addEventListener('click', function() {
+                skillBtns.querySelectorAll('.analysis-skill-btn').forEach(function(b) {
+                    b.classList.remove('active');
+                });
+                btn.classList.add('active');
+                selectedSkill = lvl.key;
+            });
+            skillBtns.appendChild(btn);
+        });
+
+        skillRow.appendChild(skillBtns);
+        aiPanel.appendChild(skillRow);
+
         // Generate button
         var genBtn = document.createElement('button');
         genBtn.className = 'analysis-generate-btn';
@@ -143,10 +181,10 @@ var ANALYSIS = (function() {
         // Response display area
         var responseArea = document.createElement('div');
         responseArea.className = 'analysis-response';
-        responseArea.textContent = 'Press Generate to get coaching feedback from AI.';
+        responseArea.textContent = 'Press Generate to get coaching feedback from Llama 3.';
 
         genBtn.addEventListener('click', function() {
-            _streamAnalysis(player.id, selectedStyle, metrics, genBtn, responseArea);
+            _streamAnalysis(player.id, selectedStyle, selectedSkill, metrics, genBtn, responseArea);
         });
 
         aiPanel.appendChild(genBtn);
@@ -247,7 +285,7 @@ var ANALYSIS = (function() {
     // Stream analysis from Ollama
     // ------------------------------------------------------------------
 
-    function _streamAnalysis(playerId, style, metrics, genBtn, responseArea) {
+    function _streamAnalysis(playerId, style, skillLevel, metrics, genBtn, responseArea) {
         genBtn.disabled = true;
         genBtn.textContent = '⏳ GENERATING...';
         responseArea.textContent = '';
@@ -258,7 +296,7 @@ var ANALYSIS = (function() {
         fetch('/api/players/' + playerId + '/analysis/generate', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ style: style, metrics: metrics }),
+            body:    JSON.stringify({ style: style, skill_level: skillLevel, metrics: metrics }),
         })
         .then(function(resp) {
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
