@@ -19,6 +19,18 @@ import os
 # Add the project root to the Python path so 'app' and 'config' are importable
 sys.path.insert(0, '/var/www/Darts501')
 
+# Load environment variables from .env before the app is created.
+# mod_wsgi daemon processes do NOT inherit the shell environment, so
+# os.getenv() calls in config.py return None unless we load them here.
+_env_path = '/home/dave/ev/Darts501/.env'
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith('#') and '=' in _line:
+                _key, _, _val = _line.partition('=')
+                os.environ.setdefault(_key.strip(), _val.strip())
+
 # Set environment so Flask uses ProductionConfig
 os.environ['FLASK_ENV'] = 'production'
 
@@ -43,3 +55,4 @@ def application(environ, start_response):
     if path_info.startswith('/Darts501'):
         environ['PATH_INFO'] = path_info[len('/Darts501'):]
     return _flask_app(environ, start_response)
+
