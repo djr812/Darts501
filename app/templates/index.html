@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0d0d0d">
     <title>Darts 501</title>
-    <link rel="stylesheet" href="/static/css/app.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body
     data-match-id="1"
@@ -19,14 +19,23 @@
         <!-- Built entirely by ui.js — do not add HTML here -->
     </div>
 
-    <script src="/static/js/checkout.js"></script>
-    <script src="/static/js/speech.js"></script>
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/ui.js"></script>
-    <script src="/static/js/cpu.js"></script>
-    <script src="/static/js/stats.js"></script>
-    <script src="/static/js/analysis.js"></script>
-    <script src="/static/js/app.js"></script>
+    <!--
+        APP_ROOT: the subpath this app is mounted at, e.g. '/Darts501' or ''.
+        Injected by Flask so api.js can prefix all fetch() calls correctly
+        regardless of where the app is deployed.
+    -->
+    <script>
+        var APP_ROOT = {{ request.script_root | tojson }};
+    </script>
+
+    <script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/speech.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cpu.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/stats.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/analysis.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 
 </body>
 </html>

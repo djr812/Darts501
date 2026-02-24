@@ -17,7 +17,10 @@
 
 const API = (() => {
 
-    const BASE = '';   // same origin — Flask serves both API and frontend
+    // APP_ROOT is injected by index.html from Flask's request.script_root.
+    // It will be '' in development and '/Darts501' (or similar) in production.
+    // This makes all fetch() calls work correctly regardless of subpath deployment.
+    var BASE = (typeof APP_ROOT !== 'undefined') ? APP_ROOT : '';
     const QUEUE_KEY = 'darts_offline_queue';
 
     // ------------------------------------------------------------------
