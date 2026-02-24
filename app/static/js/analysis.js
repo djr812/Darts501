@@ -63,7 +63,7 @@ var ANALYSIS = (function() {
     // ------------------------------------------------------------------
 
     function _fetchMetrics(playerId, cb) {
-        fetch('/api/players/' + playerId + '/analysis/metrics')
+        fetch((typeof APP_ROOT !== 'undefined' ? APP_ROOT : '') + '/api/players/' + playerId + '/analysis/metrics')
             .then(function(r) {
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.json();
@@ -293,7 +293,7 @@ var ANALYSIS = (function() {
 
         var accumulatedText = '';
 
-        fetch('/api/players/' + playerId + '/analysis/generate', {
+        fetch((typeof APP_ROOT !== 'undefined' ? APP_ROOT : '') + '/api/players/' + playerId + '/analysis/generate', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ style: style, skill_level: skillLevel, metrics: metrics }),
