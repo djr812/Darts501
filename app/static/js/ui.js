@@ -608,8 +608,8 @@ const UI = (() => {
         speechBtn.type  = 'button';
         speechBtn.title = 'Toggle caller voice';
         speechBtn.className = 'speech-toggle';
-        speechBtn.setAttribute('aria-pressed', 'false');
-        _updateSpeechBtn(speechBtn, false);
+        speechBtn.setAttribute('aria-pressed', 'true');
+        _updateSpeechBtn(speechBtn, true);
 
         speechBtn.addEventListener('click', function() {
             if (!SPEECH.isSupported()) {

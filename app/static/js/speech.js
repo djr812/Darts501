@@ -19,7 +19,7 @@
 
 var SPEECH = (function() {
 
-    var _enabled = false;
+    var _enabled = true;
 
     // ------------------------------------------------------------------
     // Support check
