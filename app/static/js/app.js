@@ -40,16 +40,15 @@
         const players = [];
         for (const sel of selections) {
             if (sel.isCpu) {
-                // Reuse existing CPU player record if present, otherwise create
-                const all = await API.getPlayers().catch(() => []);
-                const existing = all.find(p => p.name === 'CPU');
+                // Resolve CPU player: try to fetch the existing record first,
+                // create it if it doesn't exist yet. This avoids the 409 conflict
+                // that occurs because GET /api/players excludes the CPU name.
                 state.cpuDifficulty = sel.difficulty || 'medium';
-                if (existing) {
-                    players.push({ id: existing.id, name: 'CPU', score: state.startingScore, isCpu: true });
-                } else {
-                    const created = await API.createPlayer('CPU');
-                    players.push({ id: created.id, name: 'CPU', score: state.startingScore, isCpu: true });
+                let cpuRecord = await API.getCpuPlayer().catch(() => null);
+                if (!cpuRecord) {
+                    cpuRecord = await API.createPlayer('CPU');
                 }
+                players.push({ id: cpuRecord.id, name: 'CPU', score: state.startingScore, isCpu: true });
             } else if (sel.mode === 'existing') {
                 players.push({ id: sel.id, name: sel.name, score: state.startingScore, isCpu: false });
             } else {

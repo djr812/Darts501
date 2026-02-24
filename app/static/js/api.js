@@ -178,6 +178,10 @@ const API = (() => {
         return request('POST', '/api/players', { name });
     }
 
+    async function getCpuPlayer() {
+        return request('GET', '/api/players/cpu');
+    }
+
     /**
      * Start a new match.
      *
@@ -235,6 +239,7 @@ const API = (() => {
         undoLastThrow,
         getPlayers,
         createPlayer,
+        getCpuPlayer,
         startMatch,
         startLeg,
         getPlayerStats,

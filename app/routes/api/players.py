@@ -26,6 +26,21 @@ def _get_player_by_id(player_id: int) -> dict | None:
     return cursor.fetchone()
 
 
+@players_bp.route("/players/cpu", methods=["GET"])
+def get_cpu_player():
+    """
+    Return the CPU player record, regardless of the name exclusion on list_players.
+    Used by the frontend to resolve the CPU player ID when starting a 1vsCPU match.
+    """
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT id, name, nickname FROM players WHERE name = 'CPU' LIMIT 1")
+    player = cursor.fetchone()
+    if not player:
+        return jsonify({"error": "CPU player not found"}), 404
+    return jsonify(player), 200
+
+
 @players_bp.route("/players", methods=["GET"])
 def list_players():
     """
