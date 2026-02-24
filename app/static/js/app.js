@@ -60,6 +60,9 @@
     }
 
     async function onStartGame(config) {
+        // Unlock iOS speech engine inside this user gesture (tap on Start Match)
+        // so the first programmatic utterance is not silently swallowed by Safari.
+        SPEECH.unlock();
         UI.setLoading(true);
         const SCORES = { '501': 501, '201': 201, 'Cricket': 0 };
         state.startingScore = SCORES[config.gameType] || 501;

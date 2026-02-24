@@ -235,10 +235,27 @@ var SPEECH = (function() {
 
     // ------------------------------------------------------------------
 
+    /**
+     * Unlock the iOS speech engine by firing a silent utterance inside a
+     * user gesture handler. Must be called directly within a tap/click event
+     * (e.g. the Start Match button) before any programmatic speech is needed.
+     * Safe to call on non-iOS platforms — it's a no-op if already unlocked.
+     */
+    function unlock() {
+        if (!isSupported()) return;
+        var u = new SpeechSynthesisUtterance('');
+        u.volume = 0;
+        u.rate   = 10;   // finish instantly
+        window.speechSynthesis.speak(u);
+    }
+
+    // ------------------------------------------------------------------
+
     return {
         isSupported:       isSupported,
         isEnabled:         isEnabled,
         setEnabled:        setEnabled,
+        unlock:            unlock,
         announceDartScore: announceDartScore,
         announcePlayer:    announcePlayer,
         announceTurnEnd:   announceTurnEnd,
