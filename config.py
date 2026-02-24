@@ -4,7 +4,7 @@ import os
 class DevelopmentConfig:
     DEBUG = True
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
-    DB_HOST     = os.getenv("DB_HOST", "localhost")
+    DB_HOST     = os.getenv("DB_HOST", "10.1.1.126")
     DB_PORT     = int(os.getenv("DB_PORT", 3306))
     DB_USER     = os.getenv("DB_USER", "darts_user")
     DB_PASSWORD = os.getenv("DB_PASSWORD")
