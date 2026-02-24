@@ -278,15 +278,15 @@ body.mode-stats #app {
     min-height: 16px;
 }
 
-/* === Checkout suggestion panel (on the board) === */
+/* === Checkout suggestion panel (in sidebar, below player cards) === */
 .checkout-panel {
-    margin: 6px var(--gap) 0;
+    margin-top: var(--gap);
     border: 1px solid var(--accent-dim);
-    border-radius: var(--radius);
+    border-radius: var(--radius-lg);
     background: var(--bg-raised);
     overflow: hidden;
-    -webkit-transition: opacity 0.2s ease;
-    transition: opacity 0.2s ease;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
 }
 
 .checkout-panel.hidden {
@@ -299,7 +299,7 @@ body.mode-stats #app {
     letter-spacing: 0.22em;
     color: var(--accent);
     background: var(--bg-surface);
-    padding: 4px 10px;
+    padding: 6px 12px;
     border-bottom: 1px solid var(--border);
 }
 
@@ -319,9 +319,9 @@ body.mode-stats #app {
     -webkit-box-align: center;
     -webkit-align-items: center;
     align-items: center;
-    padding: 5px 10px;
+    padding: 7px 12px;
     border-bottom: 1px solid var(--border);
-    min-height: 32px;
+    min-height: 36px;
 }
 
 .checkout-route-row:last-child {
@@ -330,11 +330,11 @@ body.mode-stats #app {
 
 /* Active route = the one that applies to the current game mode */
 .checkout-route-row.route-active {
-    background: rgba(var(--accent-rgb, 99,102,241), 0.06);
+    background: rgba(99,102,241,0.06);
 }
 
 .checkout-route-row.route-dim {
-    opacity: 0.5;
+    opacity: 0.45;
 }
 
 .checkout-route-label {
@@ -342,7 +342,7 @@ body.mode-stats #app {
     font-size: 0.58rem;
     letter-spacing: 0.14em;
     color: var(--text-dim);
-    width: 42px;
+    width: 46px;
     -webkit-flex-shrink: 0;
     flex-shrink: 0;
 }
@@ -364,13 +364,13 @@ body.mode-stats #app {
 
 .checkout-dart-chip {
     font-family: var(--font-display);
-    font-size: 0.82rem;
+    font-size: 0.85rem;
     font-weight: 700;
     color: var(--text-primary);
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 2px 7px;
+    padding: 3px 8px;
     letter-spacing: 0.04em;
 }
 
@@ -380,9 +380,9 @@ body.mode-stats #app {
 }
 
 .checkout-arrow {
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     color: var(--text-dim);
-    margin: 0 4px;
+    margin: 0 5px;
 }
 
 .checkout-na {
@@ -391,9 +391,6 @@ body.mode-stats #app {
     color: var(--text-dim);
     letter-spacing: 0.12em;
 }
-
-/* iOS 12 gap polyfill */
-.checkout-route-darts > * + * { margin-left: 0; }
 
 /* --- Board Area: Dart Input Grid --- */
 #board {

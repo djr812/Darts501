@@ -636,6 +636,7 @@ const UI = (() => {
         const el = document.createElement('aside');
         el.id = 'sidebar';
         players.forEach(p => el.appendChild(_buildPlayerCard(p)));
+        el.appendChild(_buildCheckoutPanel());
         return el;
     }
 
@@ -658,7 +659,6 @@ const UI = (() => {
         el.appendChild(_buildMultiplierTabs(callbacks.onMultiplier));
         el.appendChild(_buildSegmentGrid(callbacks.onSegment));
         el.appendChild(_buildBullRow(callbacks.onSegment));
-        el.appendChild(_buildCheckoutPanel());
         return el;
     }
 
