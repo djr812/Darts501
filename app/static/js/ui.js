@@ -658,7 +658,26 @@ const UI = (() => {
         el.appendChild(_buildMultiplierTabs(callbacks.onMultiplier));
         el.appendChild(_buildSegmentGrid(callbacks.onSegment));
         el.appendChild(_buildBullRow(callbacks.onSegment));
+        el.appendChild(_buildCheckoutPanel());
         return el;
+    }
+
+    function _buildCheckoutPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'checkout-panel';
+        panel.className = 'checkout-panel hidden';
+
+        const heading = document.createElement('div');
+        heading.className = 'checkout-panel-heading';
+        heading.textContent = 'CHECKOUT';
+        panel.appendChild(heading);
+
+        const routes = document.createElement('div');
+        routes.id = 'checkout-routes';
+        routes.className = 'checkout-routes';
+        panel.appendChild(routes);
+
+        return panel;
     }
 
     function _buildMultiplierTabs(onMultiplier) {
@@ -799,6 +818,82 @@ const UI = (() => {
         const el = document.getElementById(`hint-${playerId}`);
         if (el) el.textContent = suggestion ? suggestion.join(' → ') : '';
     }
+
+    /**
+     * Update the checkout suggestion panel on the board.
+     * @param {number|null} score     — current player's score (null to hide)
+     * @param {boolean}     doubleOut — true = double-out game rules
+     */
+    function setCheckoutPanel(score, doubleOut) {
+        const panel  = document.getElementById('checkout-panel');
+        const routes = document.getElementById('checkout-routes');
+        if (!panel || !routes) return;
+
+        // Hide if score is out of range or CHECKOUT module not available
+        if (score === null || score > 170 || score < 1 || typeof CHECKOUT === 'undefined') {
+            panel.classList.add('hidden');
+            return;
+        }
+
+        const suggestions = CHECKOUT.suggest(score, doubleOut);
+
+        // In double-out mode only show double route; in single-out show both
+        // Always show both so the player can compare, but label clearly
+        const doubleRoute = suggestions.double;
+        const singleRoute = suggestions.single;
+
+        // If neither route exists, hide the panel
+        if (!doubleRoute && !singleRoute) {
+            panel.classList.add('hidden');
+            return;
+        }
+
+        routes.innerHTML = '';
+
+        function buildRouteRow(label, route, isActive) {
+            const row = document.createElement('div');
+            row.className = 'checkout-route-row' + (isActive ? ' route-active' : ' route-dim');
+
+            const lbl = document.createElement('span');
+            lbl.className = 'checkout-route-label';
+            lbl.textContent = label;
+            row.appendChild(lbl);
+
+            const darts = document.createElement('span');
+            darts.className = 'checkout-route-darts';
+
+            if (route) {
+                route.forEach(function(dart, i) {
+                    const chip = document.createElement('span');
+                    chip.className = 'checkout-dart-chip';
+                    chip.textContent = CHECKOUT.formatDart(dart);
+                    darts.appendChild(chip);
+                    if (i < route.length - 1) {
+                        const arrow = document.createElement('span');
+                        arrow.className = 'checkout-arrow';
+                        arrow.textContent = '→';
+                        darts.appendChild(arrow);
+                    }
+                });
+            } else {
+                const na = document.createElement('span');
+                na.className = 'checkout-na';
+                na.textContent = 'NO ROUTE';
+                darts.appendChild(na);
+            }
+
+            row.appendChild(darts);
+            return row;
+        }
+
+        // Double-out route (active/required in double-out game)
+        routes.appendChild(buildRouteRow('D-OUT', doubleRoute, doubleOut));
+
+        // Single-out route (active/required in single-out game)
+        routes.appendChild(buildRouteRow('S-OUT', singleRoute, !doubleOut));
+
+        panel.classList.remove('hidden');
+    }
     function flashCard(playerId, type) {
         const card = document.getElementById(`player-card-${playerId}`);
         if (!card) return;
@@ -922,6 +1017,7 @@ const UI = (() => {
         addDartPill,
         clearDartPills,
         setCheckoutHint,
+        setCheckoutPanel,
         flashCard,
         setMultiplierTab,
         setNextPlayerEnabled,

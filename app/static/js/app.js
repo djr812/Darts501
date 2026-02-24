@@ -137,6 +137,7 @@
     function _beginTurn() {
         const player = currentPlayer();
         UI.setActivePlayer(player.id);
+        UI.setCheckoutPanel(player.score, state.doubleOut);
         SPEECH.announcePlayer(player.name);
         if (player.isCpu) {
             UI.setStatus('CPU IS THINKING...');
@@ -204,6 +205,9 @@
                 UI.setCheckoutHint(player.id, result.checkout_suggestion);
             }
         }
+
+        // Update checkout panel after every dart
+        UI.setCheckoutPanel(player.score, state.doubleOut);
 
         return result;
     }
@@ -373,6 +377,7 @@
                 SPEECH.announceBust();
                 UI.showToast('BUST!', 'bust', 2500);
                 UI.setStatus('BUST — TAP NEXT ▶', 'bust');
+                UI.setCheckoutPanel(currentPlayer().score, state.doubleOut);
                 state.turnComplete = true;
                 UI.setNextPlayerEnabled(true);
 
@@ -382,6 +387,7 @@
                 state.turnComplete = true;
                 UI.setNextPlayerEnabled(false);
                 UI.setStatus(`${currentPlayer().name.toUpperCase()} CHECKED OUT!`, 'success');
+                UI.setCheckoutPanel(null, state.doubleOut);
                 setTimeout(() => _handleLegWin(result, currentPlayer()), 800);
 
             } else if (result.turn_complete) {
@@ -426,6 +432,7 @@
             state.turnComplete = false;
             UI.setNextPlayerEnabled(false);
             UI.setCheckoutHint(player.id, null);
+            UI.setCheckoutPanel(player.score, state.doubleOut);
             if (state.dartsThisTurn === 0) state.turnScoreBefore = null;
             const dartsLeft = 3 - state.dartsThisTurn;
             UI.setStatus(`UNDONE — ${player.score} REMAINING — ${dartsLeft} DART${dartsLeft !== 1 ? 'S' : ''} LEFT`);
