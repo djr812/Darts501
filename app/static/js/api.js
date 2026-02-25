@@ -224,6 +224,17 @@ const API = (() => {
      * @param {object} scope - { gameType: 'all'|'501'|'201', doubleOut: 'all'|'1'|'0' }
      * @returns {Promise<object>}
      */
+    async function getPlayerTrend(playerId, scope = {}) {
+        const params = new URLSearchParams();
+        if (scope.limit)     params.set('limit',      scope.limit);
+        if (scope.gameType && scope.gameType !== 'all')
+                             params.set('game_type',  scope.gameType);
+        if (scope.doubleOut && scope.doubleOut !== 'all')
+                             params.set('double_out', scope.doubleOut);
+        const qs = params.toString() ? '?' + params.toString() : '';
+        return request('GET', `/api/players/${playerId}/stats/trend${qs}`);
+    }
+
     async function getPlayerStats(playerId, scope = {}) {
         const params = new URLSearchParams();
         if (scope.gameType  && scope.gameType  !== 'all') params.set('game_type',  scope.gameType);
@@ -261,6 +272,7 @@ const API = (() => {
         startMatch,
         startLeg,
         getPlayerStats,
+        getPlayerTrend,
         cancelMatch,
         restartMatch,
         flushQueue,

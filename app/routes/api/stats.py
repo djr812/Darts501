@@ -351,3 +351,91 @@ def get_player_stats(player_id):
             "favourite_double":     fav_double,
         },
     }), 200
+
+
+@stats_bp.route("/players/<int:player_id>/stats/trend", methods=["GET"])
+def get_player_trend(player_id):
+    """
+    Return per-match 3-dart averages for a player, most recent first.
+
+    Query params:
+        limit      -- 10 | 20 | 50  (default: 20)
+        game_type  -- '501' | '201' | 'all'  (default: 'all')
+        double_out -- '1' | '0' | 'all'      (default: 'all')
+
+    Returns:
+        { "matches": [ { "match_id", "date", "avg", "darts", "opponent" }, ... ] }
+        Ordered oldest -> newest so the chart renders left-to-right.
+    """
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id, name FROM players WHERE id = %s AND is_active = TRUE", (player_id,))
+    if not cursor.fetchone():
+        return jsonify({"error": "Player not found"}), 404
+
+    limit      = int(request.args.get("limit", 20))
+    game_type  = request.args.get("game_type",  "all")
+    double_out = request.args.get("double_out", "all")
+
+    if limit not in (10, 20, 50):
+        limit = 20
+
+    scope_sql, scope_params = _scope_clauses(game_type, double_out)
+
+    # Exclude practice sessions
+    practice_clause = " AND m.session_type != 'practice'"
+
+    # Per-match 3-dart average: sum points / sum darts * 3, grouped by match
+    # Build SQL without % formatting to avoid conflicts with %s placeholders
+    trend_sql = (
+        """
+        SELECT
+            m.id                                AS match_id,
+            DATE(m.ended_at)                    AS match_date,
+            SUM(t.score_before - t.score_after) AS total_points,
+            SUM(t.darts_thrown)                 AS total_darts
+        FROM turns t
+        JOIN legs    l  ON l.id  = t.leg_id
+        JOIN matches m  ON m.id  = l.match_id
+        WHERE t.player_id   = %s
+          AND t.score_after IS NOT NULL
+          AND t.is_bust      = 0
+          AND m.status       = 'complete'
+          AND m.session_type != 'practice'
+        """
+        + scope_sql +
+        """
+        GROUP BY m.id, m.ended_at
+        ORDER BY m.ended_at DESC
+        LIMIT """
+        + str(limit)
+    )
+    cursor.execute(trend_sql, [player_id] + scope_params)
+
+    rows = cursor.fetchall()
+
+    matches = []
+    for row in reversed(rows):   # oldest first for chart L->R
+        darts  = int(row["total_darts"] or 0)
+        points = int(row["total_points"] or 0)
+        avg    = round((points / darts) * 3, 2) if darts else 0.0
+
+        # Fetch opponent names for this match
+        cursor.execute("""
+            SELECT GROUP_CONCAT(p.name SEPARATOR ', ') AS opponents
+            FROM match_players mp
+            JOIN players p ON p.id = mp.player_id
+            WHERE mp.match_id = %s AND mp.player_id != %s
+        """, (row["match_id"], player_id))
+        opp_row = cursor.fetchone()
+
+        matches.append({
+            "match_id": row["match_id"],
+            "date":     str(row["match_date"]),
+            "avg":      avg,
+            "darts":    darts,
+            "opponent": (opp_row["opponents"] if opp_row and opp_row["opponents"] else "—"),
+        })
+
+    return jsonify({"matches": matches}), 200

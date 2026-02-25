@@ -1944,6 +1944,16 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 .analysis-style-row > * + * { margin-left: 8px; }
 
 
+/* Trend chart card */
+.trend-card {
+    padding: 12px;
+    overflow: hidden;
+}
+
+.trend-chart-svg {
+    border-radius: 4px;
+}
+
 /* =========================================================
    PRACTICE MODE
    ========================================================= */
