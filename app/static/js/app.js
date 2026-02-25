@@ -346,7 +346,7 @@
 
     async function _returnToSetup() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame, _onViewStats);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice);
     }
 
     // ------------------------------------------------------------------
@@ -477,7 +477,7 @@
         try {
             await API.cancelMatch(state.matchId);
             var existing = await API.getPlayers().catch(function() { return []; });
-            UI.buildSetupScreen(existing, onStartGame, _onViewStats);
+            UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice);
         } catch (err) {
             UI.showToast('CANCEL FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
         } finally {
@@ -524,6 +524,29 @@
     // Stats
     // ------------------------------------------------------------------
 
+    function _onPractice() {
+        API.getPlayers().then(function(existing) {
+            PRACTICE.showSetup(
+                existing,
+                // onBack — return to setup screen
+                function() {
+                    API.getPlayers().then(function(p) {
+                        UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice);
+                    });
+                },
+                // onStart — begin the practice session
+                function(config) {
+                    PRACTICE.start(config, function() {
+                        // onEnd — back to setup after session
+                        API.getPlayers().then(function(p) {
+                            UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice);
+                        });
+                    });
+                }
+            );
+        });
+    }
+
     async function _onViewStats() {
         const allPlayers = await API.getPlayers().catch(() => []);
         const humans = allPlayers.filter(p => p.name !== 'CPU');
@@ -535,7 +558,7 @@
             STATS.showStatsScreen(player, async () => {
                 // Back button → return to setup screen
                 const existing = await API.getPlayers().catch(() => []);
-                UI.buildSetupScreen(existing, onStartGame, _onViewStats);
+                UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice);
             });
         });
     }
@@ -546,7 +569,7 @@
 
     async function init() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame, _onViewStats);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice);
     }
 
     if (document.readyState === 'loading') {

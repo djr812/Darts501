@@ -1,0 +1,891 @@
+/**
+ * practice.js
+ * -----------
+ * Free practice mode — record throws with no game structure.
+ *
+ * Flow:
+ *   1. PRACTICE button on setup screen → PRACTICE.showSetup(existingPlayers, onBack)
+ *   2. Player selects duration and player name → PRACTICE.start(config)
+ *   3. Practice screen: multiplier tabs + dartboard + timer + stats
+ *   4. Timer expires or user taps End → summary shown → back to setup
+ *
+ * All throws are saved to the database via existing /api/throws endpoint
+ * and flow into stats/AI analysis automatically.
+ */
+
+var PRACTICE = (function() {
+
+    // ------------------------------------------------------------------
+    // Practice Setup Screen
+    // ------------------------------------------------------------------
+
+    /**
+     * Show the practice setup screen.
+     * @param {Array}    existingPlayers  — [{ id, name }] from API
+     * @param {Function} onBack           — called when user taps Back
+     * @param {Function} onStart          — called with { player, duration } to begin
+     */
+    function showSetup(existingPlayers, onBack, onStart) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-setup';
+
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        // Title
+        var title = document.createElement('div');
+        title.id = 'setup-title';
+        title.innerHTML = '<div class="setup-logo">DARTS 501</div><div class="setup-subtitle">PRACTICE MODE</div>';
+        inner.appendChild(title);
+
+        // ---- Player selection (reuse same mechanism as match setup) ----
+        var playerSection = document.createElement('div');
+        playerSection.className = 'setup-section';
+        playerSection.innerHTML = '<div class="setup-label">PLAYER</div>';
+
+        var slotContainer = document.createElement('div');
+        slotContainer.id = 'practice-player-slot';
+
+        // Build a single player slot using the shared _buildPlayerSlot mechanism
+        // We replicate the slot inline here since _buildPlayerSlot is private to UI
+        var slot = _buildPracticePlayerSlot(existingPlayers);
+        slotContainer.appendChild(slot);
+        playerSection.appendChild(slotContainer);
+        inner.appendChild(playerSection);
+
+        // ---- Duration ----
+        var durationSection = document.createElement('div');
+        durationSection.className = 'setup-section';
+        durationSection.innerHTML = '<div class="setup-label">PRACTICE DURATION</div>';
+        var durationRow = document.createElement('div');
+        durationRow.className = 'setup-option-row';
+
+        var selectedDuration = 10;
+        [5, 10, 15, 30].forEach(function(mins) {
+            var btn = document.createElement('button');
+            btn.className = 'option-btn' + (mins === 10 ? ' selected' : '');
+            btn.dataset.value = mins;
+            btn.type = 'button';
+            btn.innerHTML = mins + '<span class="option-hint">min</span>';
+            btn.addEventListener('click', function() {
+                durationRow.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
+                btn.classList.add('selected');
+                selectedDuration = mins;
+            });
+            durationRow.appendChild(btn);
+        });
+        durationSection.appendChild(durationRow);
+        inner.appendChild(durationSection);
+
+        // ---- Start button ----
+        var startBtn = document.createElement('button');
+        startBtn.className = 'start-btn';
+        startBtn.textContent = 'START PRACTICE';
+        startBtn.type = 'button';
+
+        startBtn.addEventListener('click', function() {
+            var playerData = _collectPracticePlayer(slot);
+            if (!playerData) return;
+            onStart({ player: playerData, durationMinutes: selectedDuration });
+        });
+        inner.appendChild(startBtn);
+
+        // ---- Back button ----
+        var backBtn = document.createElement('button');
+        backBtn.className = 'practice-back-btn';
+        backBtn.type = 'button';
+        backBtn.textContent = '← BACK TO MATCH SETUP';
+        backBtn.addEventListener('click', onBack);
+        inner.appendChild(backBtn);
+    }
+
+    // ------------------------------------------------------------------
+    // Single player slot (mirrors _buildPlayerSlot in ui.js)
+    // ------------------------------------------------------------------
+
+    function _buildPracticePlayerSlot(existingPlayers) {
+        var slot = document.createElement('div');
+        slot.className = 'name-slot';
+        slot.dataset.index = 0;
+
+        var toggleRow = document.createElement('div');
+        toggleRow.className = 'slot-toggle-row';
+
+        var newBtn = document.createElement('button');
+        newBtn.className = 'slot-toggle-btn active';
+        newBtn.textContent = '+ NEW';
+        newBtn.type = 'button';
+
+        var existingBtn = document.createElement('button');
+        existingBtn.className = 'slot-toggle-btn';
+        existingBtn.textContent = 'EXISTING';
+        existingBtn.type = 'button';
+        if (existingPlayers.length === 0) {
+            existingBtn.disabled = true;
+            existingBtn.title = 'No existing players';
+        }
+        toggleRow.appendChild(newBtn);
+        toggleRow.appendChild(existingBtn);
+        slot.appendChild(toggleRow);
+
+        var newInput = document.createElement('input');
+        newInput.type = 'text';
+        newInput.className = 'name-input';
+        newInput.placeholder = 'Your name';
+        newInput.maxLength = 20;
+        newInput.autocomplete = 'off';
+        newInput.autocorrect = 'off';
+        newInput.autocapitalize = 'words';
+        newInput.spellcheck = false;
+        newInput.addEventListener('input', function() { newInput.classList.remove('error'); });
+        slot.appendChild(newInput);
+
+        var existingSelect = document.createElement('select');
+        existingSelect.className = 'name-select';
+        existingSelect.style.display = 'none';
+        var ph = document.createElement('option');
+        ph.value = ''; ph.textContent = '— Select player —';
+        ph.disabled = true; ph.selected = true;
+        existingSelect.appendChild(ph);
+        existingPlayers.filter(function(p) { return p.name !== 'CPU'; }).forEach(function(p) {
+            var opt = document.createElement('option');
+            opt.value = p.id; opt.textContent = p.name;
+            existingSelect.appendChild(opt);
+        });
+        existingSelect.addEventListener('change', function() { existingSelect.classList.remove('error'); });
+        slot.appendChild(existingSelect);
+
+        function activateMode(mode) {
+            if (mode === 'new') {
+                newBtn.classList.add('active'); existingBtn.classList.remove('active');
+                newInput.style.display = ''; existingSelect.style.display = 'none';
+                slot.dataset.mode = 'new'; newInput.focus();
+            } else {
+                existingBtn.classList.add('active'); newBtn.classList.remove('active');
+                newInput.style.display = 'none'; existingSelect.style.display = '';
+                slot.dataset.mode = 'existing'; existingSelect.focus();
+            }
+        }
+        newBtn.addEventListener('click', function() { activateMode('new'); });
+        existingBtn.addEventListener('click', function() { activateMode('existing'); });
+        slot.dataset.mode = 'new';
+        return slot;
+    }
+
+    function _collectPracticePlayer(slot) {
+        var mode = slot.dataset.mode;
+        if (mode === 'existing') {
+            var sel = slot.querySelector('.name-select');
+            if (!sel.value) { sel.classList.add('error'); sel.focus(); return null; }
+            return { mode: 'existing', id: parseInt(sel.value, 10), name: sel.options[sel.selectedIndex].textContent };
+        } else {
+            var input = slot.querySelector('.name-input');
+            var name = input.value.trim();
+            if (!name) { input.classList.add('error'); input.focus(); return null; }
+            return { mode: 'new', name: name };
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Practice Screen
+    // ------------------------------------------------------------------
+
+    var _state = {
+        matchId:       null,
+        legId:         null,
+        turnId:        null,
+        playerId:      null,
+        playerName:    '',
+        dartsThrown:   0,
+        totalScore:    0,
+        segmentCounts: {},   // { '20': 5, 'T20': 3, ... }
+        timerSeconds:  0,
+        timerInterval: null,
+        multiplier:    1,
+        turnDarts:     0,     // darts in current turn (max 3)
+    };
+
+    /**
+     * Start a practice session.
+     * @param {object} config  — { player: {id?, name, mode}, durationMinutes }
+     * @param {Function} onEnd — called when session ends, returns to setup
+     */
+    function start(config, onEnd) {
+        SPEECH.unlock();
+        UI.setLoading(true);
+
+        _resolvePracticePlayer(config.player)
+            .then(function(player) {
+                _state.playerId   = player.id;
+                _state.playerName = player.name;
+                _state.timerSeconds = config.durationMinutes * 60;
+                _state.dartsThrown  = 0;
+                _state.totalScore   = 0;
+                _state.segmentCounts = {};
+                _state.multiplier    = 1;
+                _state.turnDarts     = 0;
+
+                // Create a practice match + leg + turn in the DB
+                return _createPracticeSession(player.id);
+            })
+            .then(function(session) {
+                _state.matchId = session.matchId;
+                _state.legId   = session.legId;
+                _state.turnId  = session.turnId;
+                UI.setLoading(false);
+                _buildPracticeScreen(onEnd);
+                _startTimer(onEnd);
+                if (SPEECH.isEnabled()) {
+                    SPEECH.announcePlayer(_state.playerName);
+                }
+            })
+            .catch(function(err) {
+                UI.setLoading(false);
+                UI.showToast('ERROR: ' + err.message, 'bust', 3000);
+            });
+    }
+
+    function _resolvePracticePlayer(playerConfig) {
+        if (playerConfig.mode === 'existing') {
+            return Promise.resolve({ id: playerConfig.id, name: playerConfig.name });
+        }
+        return API.createPlayer(playerConfig.name)
+            .catch(function(err) {
+                // 409 = already exists, fetch the existing player
+                if (err.status === 409 || (err.message && err.message.indexOf('409') !== -1)) {
+                    return API.getPlayers().then(function(players) {
+                        var found = players.find(function(p) {
+                            return p.name.toLowerCase() === playerConfig.name.toLowerCase();
+                        });
+                        if (found) return found;
+                        throw new Error('Could not resolve player');
+                    });
+                }
+                throw err;
+            });
+    }
+
+    function _createPracticeSession(playerId) {
+        return API.startPracticeSession({ player_id: playerId })
+            .then(function(session) {
+                return {
+                    matchId: session.match_id,
+                    legId:   session.leg_id,
+                    turnId:  session.turn_id,
+                };
+            });
+    }
+
+    // ------------------------------------------------------------------
+    // Practice Screen UI
+    // ------------------------------------------------------------------
+
+    function _buildPracticeScreen(onEnd) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-practice';
+
+        // Header
+        var header = document.createElement('header');
+        header.id = 'practice-header';
+
+        var titleEl = document.createElement('div');
+        titleEl.className = 'practice-title';
+        titleEl.textContent = _state.playerName.toUpperCase() + ' — PRACTICE';
+        header.appendChild(titleEl);
+
+        var timerEl = document.createElement('div');
+        timerEl.id = 'practice-timer';
+        timerEl.className = 'practice-timer';
+        timerEl.textContent = _formatTime(_state.timerSeconds);
+        header.appendChild(timerEl);
+
+        var endBtn = document.createElement('button');
+        endBtn.className = 'practice-end-btn';
+        endBtn.type = 'button';
+        endBtn.textContent = 'END';
+        endBtn.addEventListener('click', function() {
+            _endSession(onEnd);
+        });
+        header.appendChild(endBtn);
+
+        app.appendChild(header);
+
+        // Stats strip
+        var strip = document.createElement('div');
+        strip.id = 'practice-strip';
+        strip.className = 'practice-strip';
+        strip.innerHTML =
+            '<div class="practice-stat"><div class="practice-stat-value" id="prac-darts">0</div><div class="practice-stat-label">DARTS</div></div>' +
+            '<div class="practice-stat"><div class="practice-stat-value" id="prac-avg">0.0</div><div class="practice-stat-label">AVG / DART</div></div>' +
+            '<div class="practice-stat"><div class="practice-stat-value" id="prac-turn">0.0</div><div class="practice-stat-label">3-DART AVG</div></div>' +
+            '<div class="practice-stat"><div class="practice-stat-value" id="prac-best">—</div><div class="practice-stat-label">BEST SEG</div></div>';
+        app.appendChild(strip);
+
+        // Dart pills for current turn
+        var pillRow = document.createElement('div');
+        pillRow.id = 'practice-pills';
+        pillRow.className = 'practice-pills';
+        app.appendChild(pillRow);
+
+        // Multiplier tabs
+        var tabs = document.createElement('div');
+        tabs.id = 'multiplier-tabs';
+        [
+            { label: 'Single', multiplier: 1, cls: 'active-single' },
+            { label: 'Double', multiplier: 2, cls: 'active-double' },
+            { label: 'Treble', multiplier: 3, cls: 'active-treble' },
+        ].forEach(function(tab) {
+            var btn = document.createElement('button');
+            btn.className = 'tab-btn';
+            btn.textContent = tab.label;
+            btn.dataset.multiplier = tab.multiplier;
+            btn.dataset.activeClass = tab.cls;
+            btn.type = 'button';
+            btn.addEventListener('click', function() {
+                _state.multiplier = tab.multiplier;
+                document.querySelectorAll('.tab-btn').forEach(function(b) {
+                    b.classList.remove('active-single', 'active-double', 'active-treble');
+                });
+                btn.classList.add(tab.cls);
+                document.body.dataset.multiplier = tab.multiplier;
+            });
+            tabs.appendChild(btn);
+        });
+        app.appendChild(tabs);
+        // Set Single as default active
+        tabs.querySelector('[data-multiplier="1"]').classList.add('active-single');
+        document.body.dataset.multiplier = 1;
+
+        // Segment grid (reuse existing structure from game board)
+        var board = document.createElement('main');
+        board.id = 'practice-board';
+        board.appendChild(_buildPracticeSegmentGrid());
+        board.appendChild(_buildPracticeBullRow());
+        app.appendChild(board);
+    }
+
+    function _buildPracticeSegmentGrid() {
+        var grid = document.createElement('div');
+        grid.id = 'segment-grid';
+        grid.className = 'segment-grid';
+        var segments = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+        segments.forEach(function(seg) {
+            var btn = document.createElement('button');
+            btn.className = 'seg-btn';
+            btn.dataset.segment = seg;
+            btn.type = 'button';
+            btn.textContent = seg;
+            btn.addEventListener('click', function() { _recordPracticeDart(seg); });
+            grid.appendChild(btn);
+        });
+        return grid;
+    }
+
+    function _buildPracticeBullRow() {
+        var row = document.createElement('div');
+        row.id = 'bull-row';
+        row.className = 'bull-row';
+
+        var miss = document.createElement('button');
+        miss.className = 'seg-btn bull-btn';
+        miss.type = 'button';
+        miss.textContent = 'MISS';
+        miss.addEventListener('click', function() { _recordPracticeDart(0); });
+        row.appendChild(miss);
+
+        var outer = document.createElement('button');
+        outer.className = 'seg-btn bull-btn';
+        outer.type = 'button';
+        outer.textContent = 'OUTER';
+        outer.dataset.segment = 25;
+        outer.addEventListener('click', function() {
+            _state.multiplier = 1;
+            _recordPracticeDart(25);
+        });
+        row.appendChild(outer);
+
+        var bull = document.createElement('button');
+        bull.className = 'seg-btn bull-btn bull-btn-inner';
+        bull.type = 'button';
+        bull.textContent = 'BULL';
+        bull.dataset.segment = 25;
+        bull.addEventListener('click', function() {
+            _state.multiplier = 2;
+            _recordPracticeDart(25);
+        });
+        row.appendChild(bull);
+
+        return row;
+    }
+
+    // ------------------------------------------------------------------
+    // Dart recording
+    // ------------------------------------------------------------------
+
+    function _recordPracticeDart(segment) {
+        var multiplier = _state.multiplier;
+        var points = segment === 0 ? 0 : segment * multiplier;
+
+        // Passes score_before: 0 every time — the throws endpoint auto-creates/
+        // continues turns. For practice we don't track score countdown, only
+        // accumulate stats, so score_before is always 0.
+        API.recordThrow({
+            leg_id:       _state.legId,
+            player_id:    _state.playerId,
+            segment:      segment,
+            multiplier:   multiplier,
+            score_before: 1,   // practice has no countdown — dummy value to satisfy API validation
+        })
+        .then(function(result) {
+            // Capture turn_id on first dart of each turn
+            if (_state.turnDarts % 3 === 0) {
+                _state.turnId = result.turn_id;
+            }
+
+            _state.dartsThrown++;
+            _state.totalScore += points;
+            _state.turnDarts++;
+
+            // Track segment hits for best segment display
+            if (segment > 0) {
+                var key = (multiplier > 1 ? (multiplier === 2 ? 'D' : 'T') : '') + segment;
+                _state.segmentCounts[key] = (_state.segmentCounts[key] || 0) + 1;
+            }
+
+            if (SPEECH.isEnabled()) {
+                SPEECH.announceDartScore(segment, multiplier, points);
+            }
+
+            // Clear pills at start of each new 3-dart turn (after dart 3 is shown briefly)
+            if (_state.turnDarts % 3 === 1) {
+                var pills = document.getElementById('practice-pills');
+                if (pills) pills.innerHTML = '';
+            }
+
+            _addDartPill(segment, multiplier, points);
+            _updatePracticeStats();
+        })
+        .catch(function() {
+            UI.showToast('ERROR RECORDING DART', 'bust', 2000);
+        });
+    }
+
+    function _addDartPill(segment, multiplier, points) {
+        var pills = document.getElementById('practice-pills');
+        if (!pills) return;
+        var pill = document.createElement('div');
+        pill.className = 'dart-pill' + (points === 0 ? ' pill-miss' : points >= 60 ? ' pill-hot' : '');
+        var label = points === 0 ? 'MISS' : CHECKOUT.formatDart(
+            (multiplier === 3 ? 'T' : multiplier === 2 ? 'D' : 'S') + segment
+        );
+        pill.textContent = label + ' (' + points + ')';
+        pills.appendChild(pill);
+    }
+
+    function _updatePracticeStats() {
+        var dartsEl = document.getElementById('prac-darts');
+        var avgEl   = document.getElementById('prac-avg');
+        var turnEl  = document.getElementById('prac-turn');
+        var bestEl  = document.getElementById('prac-best');
+
+        if (dartsEl) dartsEl.textContent = _state.dartsThrown;
+
+        var avg = _state.dartsThrown > 0
+            ? (_state.totalScore / _state.dartsThrown).toFixed(1)
+            : '0.0';
+        if (avgEl) avgEl.textContent = avg;
+
+        var threeAvg = (_state.totalScore / Math.max(1, _state.dartsThrown) * 3).toFixed(1);
+        if (turnEl) turnEl.textContent = threeAvg;
+
+        // Best segment = most hit single segment key
+        var bestKey = '—';
+        var bestCount = 0;
+        Object.keys(_state.segmentCounts).forEach(function(key) {
+            if (_state.segmentCounts[key] > bestCount) {
+                bestCount = _state.segmentCounts[key];
+                bestKey = key;
+            }
+        });
+        if (bestEl) bestEl.textContent = bestKey;
+    }
+
+    // ------------------------------------------------------------------
+    // Timer
+    // ------------------------------------------------------------------
+
+    function _startTimer(onEnd) {
+        _state.timerInterval = setInterval(function() {
+            _state.timerSeconds--;
+            var timerEl = document.getElementById('practice-timer');
+            if (timerEl) timerEl.textContent = _formatTime(_state.timerSeconds);
+
+            // Warning colour in last 60 seconds
+            if (_state.timerSeconds <= 60 && timerEl) {
+                timerEl.classList.add('timer-warning');
+            }
+
+            if (_state.timerSeconds <= 0) {
+                clearInterval(_state.timerInterval);
+                _endSession(onEnd);
+            }
+        }, 1000);
+    }
+
+    function _formatTime(seconds) {
+        var m = Math.floor(seconds / 60);
+        var s = seconds % 60;
+        return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    // ------------------------------------------------------------------
+    // End session + summary
+    // ------------------------------------------------------------------
+
+    function _endSession(onEnd) {
+        clearInterval(_state.timerInterval);
+
+        // Close the practice match on the server
+        API.endPracticeSession(_state.matchId)
+            .catch(function() {}) // non-fatal
+            .then(function() {
+                _showSummary(onEnd);
+            });
+    }
+
+    function _showSummary(onEnd) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        document.body.className = 'mode-setup';
+
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        var title = document.createElement('div');
+        title.id = 'setup-title';
+        title.innerHTML = '<div class="setup-logo">PRACTICE DONE</div>' +
+            '<div class="setup-subtitle">' + _state.playerName.toUpperCase() + '</div>';
+        inner.appendChild(title);
+
+        // Heatmap
+        var heatmapContainer = document.createElement('div');
+        heatmapContainer.className = 'practice-heatmap';
+        heatmapContainer.appendChild(_buildHeatmap());
+        inner.appendChild(heatmapContainer);
+
+        // Summary stats
+        var summary = document.createElement('div');
+        summary.className = 'practice-summary';
+
+        var avg = _state.dartsThrown > 0
+            ? (_state.totalScore / _state.dartsThrown).toFixed(1) : '0.0';
+        var threeAvg = (parseFloat(avg) * 3).toFixed(1);
+        var bestKey = '—';
+        var bestCount = 0;
+        Object.keys(_state.segmentCounts).forEach(function(key) {
+            if (_state.segmentCounts[key] > bestCount) {
+                bestCount = _state.segmentCounts[key];
+                bestKey = key + ' ×' + bestCount;
+            }
+        });
+
+        [
+            { label: 'DARTS THROWN',  value: _state.dartsThrown },
+            { label: 'TOTAL SCORE',   value: _state.totalScore },
+            { label: 'AVG PER DART',  value: avg },
+            { label: '3-DART AVG',    value: threeAvg },
+            { label: 'MOST HIT',      value: bestKey },
+        ].forEach(function(row) {
+            var item = document.createElement('div');
+            item.className = 'practice-summary-row';
+            item.innerHTML =
+                '<span class="practice-summary-label">' + row.label + '</span>' +
+                '<span class="practice-summary-value">' + row.value + '</span>';
+            summary.appendChild(item);
+        });
+        inner.appendChild(summary);
+
+        var doneBtn = document.createElement('button');
+        doneBtn.className = 'start-btn';
+        doneBtn.textContent = 'BACK TO SETUP';
+        doneBtn.type = 'button';
+        doneBtn.addEventListener('click', onEnd);
+        inner.appendChild(doneBtn);
+    }
+
+
+    // ------------------------------------------------------------------
+    // SVG Dartboard Heatmap
+    // ------------------------------------------------------------------
+
+    /**
+     * Build an SVG dartboard heatmap from _state.segmentCounts.
+     *
+     * Segment ring structure (radii as fractions of board radius):
+     *   Bull       0  -> 0.06
+     *   Outer bull 0.06 -> 0.12
+     *   Single (inner) 0.12 -> 0.47
+     *   Treble     0.47 -> 0.54
+     *   Single (outer) 0.54 -> 0.83
+     *   Double     0.83 -> 0.95
+     *   Wire (outer) 0.95 -> 1.0
+     *
+     * Segment order clockwise from top: 20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5
+     */
+    function _buildHeatmap() {
+        var SEGMENTS = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+        var SIZE     = 320;
+        var CX = SIZE / 2, CY = SIZE / 2;
+        var R  = SIZE / 2 - 4;   // board radius with small margin
+
+        // Radii fractions
+        var rBull     = R * 0.06;
+        var rOuter    = R * 0.13;
+        var rInner1   = R * 0.47;
+        var rTreble1  = R * 0.47;
+        var rTreble2  = R * 0.55;
+        var rInner2   = R * 0.55;
+        var rDouble1  = R * 0.84;
+        var rDouble2  = R * 0.97;
+
+        // Angle per segment (18 degrees each, starting from -99 degrees
+        // so segment 20 is at the top)
+        var SEG_ANGLE = 360 / 20;
+        var START_OFFSET = -90 - SEG_ANGLE / 2;  // top centre of segment 20
+
+        // Collect hit counts per zone for colour scaling
+        var counts = _state.segmentCounts;
+        var maxHits = 1;
+        Object.keys(counts).forEach(function(k) {
+            if (counts[k] > maxHits) maxHits = counts[k];
+        });
+
+        function getHits(seg, prefix) {
+            // prefix: '' = single, 'D' = double, 'T' = treble
+            return counts[prefix + seg] || 0;
+        }
+
+        function heatColour(hits) {
+            if (hits === 0) return null;
+            var t = Math.min(hits / maxHits, 1);
+            // Dark amber at low end, bright amber at high end
+            // 0 hits = no overlay, >0 = amber glow scaling to full
+            var alpha = 0.2 + t * 0.75;
+            return 'rgba(240,165,0,' + alpha.toFixed(2) + ')';
+        }
+
+        function polarToXY(angleDeg, radius) {
+            var rad = (angleDeg - 90) * Math.PI / 180;
+            return {
+                x: CX + radius * Math.cos(rad),
+                y: CY + radius * Math.sin(rad),
+            };
+        }
+
+        function arcPath(r1, r2, startAngle, endAngle) {
+            var p1 = polarToXY(startAngle, r1);
+            var p2 = polarToXY(endAngle,   r1);
+            var p3 = polarToXY(endAngle,   r2);
+            var p4 = polarToXY(startAngle, r2);
+            var large = (endAngle - startAngle) > 180 ? 1 : 0;
+            return [
+                'M', p1.x, p1.y,
+                'A', r1, r1, 0, large, 1, p2.x, p2.y,
+                'L', p3.x, p3.y,
+                'A', r2, r2, 0, large, 0, p4.x, p4.y,
+                'Z'
+            ].join(' ');
+        }
+
+        // SVG namespace helper
+        function el(tag, attrs) {
+            var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+            Object.keys(attrs).forEach(function(k) { e.setAttribute(k, attrs[k]); });
+            return e;
+        }
+
+        function tooltip(svgEl, text) {
+            var t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+            t.textContent = text;
+            svgEl.appendChild(t);
+        }
+
+        var svg = el('svg', {
+            viewBox: '0 0 ' + SIZE + ' ' + SIZE,
+            width:   '100%',
+            style:   'max-width:320px;display:block;margin:0 auto;',
+        });
+
+        // Background circle
+        svg.appendChild(el('circle', { cx: CX, cy: CY, r: R,
+            fill: '#111', stroke: '#333', 'stroke-width': '1' }));
+
+        // Draw each of the 20 segments
+        SEGMENTS.forEach(function(seg, i) {
+            var startAngle = START_OFFSET + i * SEG_ANGLE;
+            var endAngle   = startAngle + SEG_ANGLE;
+
+            var singleHits  = getHits(seg, '');
+            var trebleHits  = getHits(seg, 'T');
+            var doubleHits  = getHits(seg, 'D');
+
+            var zones = [
+                // [r1, r2, hits, zone label]
+                { r1: rOuter,   r2: rInner1,  hits: singleHits, label: 'S' },
+                { r1: rTreble1, r2: rTreble2, hits: trebleHits, label: 'T' },
+                { r1: rInner2,  r2: rDouble1, hits: singleHits, label: 'S' },
+                { r1: rDouble1, r2: rDouble2, hits: doubleHits, label: 'D' },
+            ];
+
+            zones.forEach(function(zone) {
+                var path = el('path', {
+                    d:    arcPath(zone.r1, zone.r2, startAngle, endAngle),
+                    fill: '#1a1a1a',
+                    stroke: '#2a2a2a',
+                    'stroke-width': '0.5',
+                });
+
+                var colour = heatColour(zone.hits);
+                if (colour) {
+                    var overlay = el('path', {
+                        d:    arcPath(zone.r1, zone.r2, startAngle, endAngle),
+                        fill: colour,
+                        stroke: 'none',
+                        'pointer-events': 'none',
+                    });
+                    svg.appendChild(path);
+                    svg.appendChild(overlay);
+                } else {
+                    svg.appendChild(path);
+                }
+
+                // Hit count label in treble ring if >0
+                if (zone.hits > 0 && zone.label !== 'S') {
+                    var midAngle = startAngle + SEG_ANGLE / 2;
+                    var midR = (zone.r1 + zone.r2) / 2;
+                    var mp = polarToXY(midAngle, midR);
+                    var t = el('text', {
+                        x: mp.x, y: mp.y,
+                        'text-anchor': 'middle',
+                        'dominant-baseline': 'central',
+                        fill: '#fff',
+                        'font-size': '7',
+                        'font-family': 'monospace',
+                        'pointer-events': 'none',
+                    });
+                    t.textContent = zone.hits;
+                    svg.appendChild(t);
+                }
+
+                // Invisible touch target with tooltip
+                var hitTotal  = zone.hits * (zone.label === 'T' ? 3 : zone.label === 'D' ? 2 : 1) * seg;
+                var touchTarget = el('path', {
+                    d:    arcPath(zone.r1, zone.r2, startAngle, endAngle),
+                    fill: 'transparent',
+                    stroke: 'none',
+                    cursor: 'pointer',
+                });
+                tooltip(touchTarget,
+                    zone.label + seg +
+                    ' — ' + zone.hits + ' hit' + (zone.hits !== 1 ? 's' : '') +
+                    ' — ' + hitTotal + ' pts'
+                );
+                svg.appendChild(touchTarget);
+            });
+
+            // Segment number label in outer single ring
+            var midAngle = startAngle + SEG_ANGLE / 2;
+            var labelR   = (rDouble2 + R) / 2;
+            var lp = polarToXY(midAngle, labelR);
+            // Rotate label to be readable
+            var rotate = midAngle + 90;
+            var lbl = el('text', {
+                x: lp.x, y: lp.y,
+                'text-anchor': 'middle',
+                'dominant-baseline': 'central',
+                fill: '#666',
+                'font-size': '8',
+                'font-family': 'monospace',
+                transform: 'rotate(' + rotate + ',' + lp.x + ',' + lp.y + ')',
+                'pointer-events': 'none',
+            });
+            lbl.textContent = seg;
+            svg.appendChild(lbl);
+        });
+
+        // Outer bull ring
+        var outerBullHits = getHits(25, '');
+        var outerBullColour = heatColour(outerBullHits);
+        var outerBull = el('circle', { cx: CX, cy: CY, r: rOuter,
+            fill: '#1a1a1a', stroke: '#2a2a2a', 'stroke-width': '0.5' });
+        svg.appendChild(outerBull);
+        if (outerBullColour) {
+            var outerBullOverlay = el('circle', { cx: CX, cy: CY, r: rOuter,
+                fill: outerBullColour, stroke: 'none', 'pointer-events': 'none' });
+            svg.appendChild(outerBullOverlay);
+        }
+        var obTarget = el('circle', { cx: CX, cy: CY, r: rOuter,
+            fill: 'transparent', stroke: 'none', cursor: 'pointer' });
+        var obScore = outerBullHits * 25;
+        tooltip(obTarget, 'Outer Bull — ' + outerBullHits + ' hits — ' + obScore + ' pts');
+        svg.appendChild(obTarget);
+
+        // Bull (double bull)
+        var bullHits = getHits(25, 'D');
+        var bullColour = heatColour(bullHits);
+        var bull = el('circle', { cx: CX, cy: CY, r: rBull,
+            fill: '#1a1a1a', stroke: '#2a2a2a', 'stroke-width': '0.5' });
+        svg.appendChild(bull);
+        if (bullColour) {
+            var bullOverlay = el('circle', { cx: CX, cy: CY, r: rBull,
+                fill: bullColour, stroke: 'none', 'pointer-events': 'none' });
+            svg.appendChild(bullOverlay);
+        }
+        var bullTarget = el('circle', { cx: CX, cy: CY, r: rBull,
+            fill: 'transparent', stroke: 'none', cursor: 'pointer' });
+        var bullScore = bullHits * 50;
+        tooltip(bullTarget, 'Bull — ' + bullHits + ' hits — ' + bullScore + ' pts');
+        svg.appendChild(bullTarget);
+
+        // Bull text
+        if (bullHits > 0) {
+            var bt = el('text', { x: CX, y: CY,
+                'text-anchor': 'middle', 'dominant-baseline': 'central',
+                fill: '#fff', 'font-size': '7', 'font-family': 'monospace',
+                'pointer-events': 'none' });
+            bt.textContent = bullHits;
+            svg.appendChild(bt);
+        }
+
+        // Legend
+        var legendY = SIZE - 10;
+        ['0 hits', '≥1 hit', 'max hits'].forEach(function(label, i) {
+            var lx = 16 + i * 100;
+            var rect = el('rect', { x: lx, y: legendY - 6, width: 10, height: 10,
+                rx: 2, fill: i === 0 ? '#1a1a1a' : i === 1 ? 'rgba(240,165,0,0.25)' : 'rgba(240,165,0,0.95)',
+                stroke: '#333', 'stroke-width': '0.5' });
+            svg.appendChild(rect);
+            var lt = el('text', { x: lx + 13, y: legendY + 1,
+                fill: '#666', 'font-size': '8', 'font-family': 'monospace',
+                'dominant-baseline': 'central' });
+            lt.textContent = label;
+            svg.appendChild(lt);
+        });
+
+        return svg;
+    }
+
+    // ------------------------------------------------------------------
+
+    return {
+        showSetup: showSetup,
+        start:     start,
+    };
+
+}());

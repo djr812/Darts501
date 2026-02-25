@@ -185,6 +185,18 @@ const API = (() => {
         return request('GET', '/api/players/cpu');
     }
 
+    async function startTurn(turnData) {
+        return request('POST', '/api/turns', turnData);
+    }
+
+    async function startPracticeSession(data) {
+        return request('POST', '/api/practice', data);
+    }
+
+    async function endPracticeSession(matchId) {
+        return request('POST', '/api/practice/' + matchId + '/end', {});
+    }
+
     /**
      * Start a new match.
      *
@@ -243,6 +255,9 @@ const API = (() => {
         getPlayers,
         createPlayer,
         getCpuPlayer,
+        startTurn,
+        startPracticeSession,
+        endPracticeSession,
         startMatch,
         startLeg,
         getPlayerStats,

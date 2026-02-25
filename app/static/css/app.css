@@ -256,6 +256,7 @@ body.mode-stats #app {
 
 /* Individual dart score pills shown during a turn */
 .dart-pill {
+    display: inline-block;
     font-family: var(--font-mono);
     font-size: 0.8rem;
     padding: 3px 8px;
@@ -1941,3 +1942,297 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 
 /* iOS 12 gap polyfill for analysis panels */
 .analysis-style-row > * + * { margin-left: 8px; }
+
+
+/* =========================================================
+   PRACTICE MODE
+   ========================================================= */
+
+/* Practice entry button on setup screen */
+.practice-entry-btn {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    letter-spacing: 0.12em;
+    text-align: center;
+    cursor: pointer;
+    -webkit-transition: border-color 0.15s ease, color 0.15s ease;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.practice-entry-btn:hover,
+.practice-entry-btn:active {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* Back button on practice setup */
+.practice-back-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 12px;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    text-align: center;
+}
+
+/* ---- Practice game screen layout ---- */
+
+body.mode-practice #app {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Header bar: name | timer | end button */
+#practice-header {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-box-pack: justify;
+    -webkit-justify-content: space-between;
+    justify-content: space-between;
+    padding: 10px var(--gap);
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.practice-title {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+}
+
+.practice-timer {
+    font-family: var(--font-mono);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    min-width: 60px;
+    text-align: center;
+}
+
+.practice-timer.timer-warning {
+    color: var(--bust-color);
+    -webkit-animation: timerPulse 1s ease infinite;
+    animation: timerPulse 1s ease infinite;
+}
+
+@-webkit-keyframes timerPulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+}
+@keyframes timerPulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+}
+
+.practice-end-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--bust-color);
+    border-radius: var(--radius);
+    color: var(--bust-color);
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+}
+
+.practice-end-btn:active {
+    background: var(--bust-color);
+    color: #fff;
+}
+
+/* Stats strip */
+.practice-strip {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-pack: justify;
+    -webkit-justify-content: space-around;
+    justify-content: space-around;
+    padding: 8px var(--gap);
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.practice-stat {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+}
+
+.practice-stat-value {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.04em;
+}
+
+.practice-stat-label {
+    font-family: var(--font-mono);
+    font-size: 0.52rem;
+    letter-spacing: 0.14em;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
+/* Dart pills row */
+.practice-pills {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: horizontal;
+    -webkit-flex-direction: row;
+    flex-direction: row;
+    -webkit-box-pack: start;
+    -webkit-justify-content: flex-start;
+    justify-content: flex-start;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-flex-wrap: wrap;
+    flex-wrap: wrap;
+    padding: 6px var(--gap);
+    min-height: 36px;
+    width: 100%;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+    -webkit-align-self: stretch;
+    align-self: stretch;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+/* iOS 12 gap polyfill — no gap property support */
+.practice-pills > * { margin: 3px 6px 3px 0; }
+
+.dart-pill {
+    display: inline-block;
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+}
+
+.dart-pill.pill-miss {
+    color: var(--text-dim);
+    border-color: var(--border);
+}
+
+.dart-pill.pill-hot {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+}
+
+/* Practice board — fills remaining space */
+#practice-board {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Summary screen */
+.practice-summary {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: var(--gap);
+}
+
+.practice-summary-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-pack: justify;
+    -webkit-justify-content: space-between;
+    justify-content: space-between;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.practice-summary-row:last-child {
+    border-bottom: none;
+}
+
+.practice-summary-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    color: var(--text-dim);
+}
+
+.practice-summary-value {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+}
+
+/* Practice heatmap container */
+.practice-heatmap {
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto var(--gap-lg);
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+.practice-heatmap svg {
+    border-radius: 50%;
+    box-shadow: 0 0 24px rgba(240,165,0,0.1), 0 0 1px #333;
+}

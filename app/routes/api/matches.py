@@ -360,3 +360,107 @@ def restart_match(match_id):
         "player_ids": player_ids,
         "status":     "active",
     }), 200
+
+
+# ---------------------------------------------------------------------------
+# Practice session endpoints
+# ---------------------------------------------------------------------------
+
+@matches_bp.route("/practice", methods=["POST"])
+def start_practice_session():
+    """
+    Create a practice session — a match with session_type='practice',
+    a single open leg, and an initial open turn ready for throws.
+
+    Payload: { "player_id": 1 }
+
+    Returns: { "match_id", "leg_id", "turn_id" }
+    """
+    data = request.get_json(silent=True)
+    if not data or "player_id" not in data:
+        return jsonify({"error": "player_id is required"}), 400
+
+    player_id = int(data["player_id"])
+
+    db = get_db()
+    cursor = db.cursor()
+
+    # Verify player exists
+    cursor.execute("SELECT id FROM players WHERE id = %s", (player_id,))
+    if not cursor.fetchone():
+        return jsonify({"error": f"Player {player_id} not found"}), 404
+
+    # Create practice match record
+    cursor.execute(
+        """
+        INSERT INTO matches (game_type, legs_to_win, sets_to_win, legs_per_set, session_type)
+        VALUES ('practice', 1, 1, 1, 'practice')
+        """
+    )
+    match_id = cursor.lastrowid
+
+    # Link player to match
+    cursor.execute(
+        "INSERT INTO match_players (match_id, player_id, turn_order) VALUES (%s, %s, 0)",
+        (match_id, player_id)
+    )
+
+    # Create a single open leg (score 0 — no win condition for practice)
+    cursor.execute(
+        """
+        INSERT INTO legs (match_id, game_type, leg_number, starting_score, double_out)
+        VALUES (%s, 'practice', 1, 0, 0)
+        """,
+        (match_id,)
+    )
+    leg_id = cursor.lastrowid
+
+    # Open the first turn
+    cursor.execute(
+        """
+        INSERT INTO turns (leg_id, player_id, turn_number, score_before)
+        VALUES (%s, %s, 1, 0)
+        """,
+        (leg_id, player_id)
+    )
+    turn_id = cursor.lastrowid
+
+    db.commit()
+
+    return jsonify({
+        "match_id": match_id,
+        "leg_id":   leg_id,
+        "turn_id":  turn_id,
+    }), 201
+
+
+@matches_bp.route("/practice/<int:match_id>/end", methods=["POST"])
+def end_practice_session(match_id):
+    """
+    Close out a practice session — marks the match and its leg as complete.
+    """
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute(
+        "SELECT id FROM matches WHERE id = %s AND session_type = 'practice'",
+        (match_id,)
+    )
+    if not cursor.fetchone():
+        return jsonify({"error": "Practice session not found"}), 404
+
+    cursor.execute(
+        "UPDATE matches SET status = 'complete' WHERE id = %s",
+        (match_id,)
+    )
+    cursor.execute(
+        "UPDATE legs SET status = 'complete' WHERE match_id = %s",
+        (match_id,)
+    )
+    cursor.execute(
+        "UPDATE turns SET score_after = score_before WHERE id = %s AND score_after IS NULL",
+        (match_id,)  # close any open turn
+    )
+    db.commit()
+
+    return jsonify({"status": "complete", "match_id": match_id}), 200

@@ -8,7 +8,7 @@ const UI = (() => {
     // Setup Screen
     // ------------------------------------------------------------------
 
-    function buildSetupScreen(existingPlayers, onStartGame, onViewStats) {
+    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice) {
         const app = document.getElementById('app');
         app.innerHTML = '';
         app.style.cssText = '';
@@ -218,6 +218,17 @@ const UI = (() => {
             statsBtn.innerHTML = '📊  VIEW PLAYER STATS';
             statsBtn.addEventListener('click', onViewStats);
             _appTarget.appendChild(statsBtn);
+        }
+
+        // ---- Practice button ----
+        if (onPractice) {
+            const practiceBtn = document.createElement('button');
+            practiceBtn.id = 'setup-practice-btn';
+            practiceBtn.className = 'practice-entry-btn';
+            practiceBtn.type = 'button';
+            practiceBtn.innerHTML = '🎯  PRACTICE MODE';
+            practiceBtn.addEventListener('click', onPractice);
+            _appTarget.appendChild(practiceBtn);
         }
 
         // Defaults
