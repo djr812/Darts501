@@ -224,6 +224,7 @@ var PRACTICE = (function() {
                 _state.timerSeconds = config.durationMinutes * 60;
                 _state.dartsThrown  = 0;
                 _state.totalScore   = 0;
+                _state.turnScore    = 0;
                 _state.segmentCounts = {};
                 _state.multiplier    = 1;
                 _state.turnDarts     = 0;
@@ -303,6 +304,15 @@ var PRACTICE = (function() {
         timerEl.className = 'practice-timer';
         timerEl.textContent = _formatTime(_state.timerSeconds);
         header.appendChild(timerEl);
+
+        var undoBtn = document.createElement('button');
+        undoBtn.id = 'practice-undo-btn';
+        undoBtn.className = 'practice-undo-btn';
+        undoBtn.type = 'button';
+        undoBtn.textContent = '\u21a9 UNDO';
+        undoBtn.disabled = true;
+        undoBtn.addEventListener('click', function() { _undoPracticeDart(); });
+        header.appendChild(undoBtn);
 
         var endBtn = document.createElement('button');
         endBtn.className = 'practice-end-btn';
@@ -439,16 +449,19 @@ var PRACTICE = (function() {
             player_id:    _state.playerId,
             segment:      segment,
             multiplier:   multiplier,
-            score_before: 1,   // practice has no countdown — dummy value to satisfy API validation
+            score_before: 501, // practice has no countdown — high value prevents spurious busts
         })
         .then(function(result) {
-            // Capture turn_id on first dart of each turn
+            // Always capture turn_id — bust throws close the turn immediately
+            // and the next dart opens a new turn with a different ID
+            _state.turnId = result.turn_id;
             if (_state.turnDarts % 3 === 0) {
-                _state.turnId = result.turn_id;
+                _state.turnScore = 0;
             }
 
             _state.dartsThrown++;
             _state.totalScore += points;
+            _state.turnScore  += points;
             _state.turnDarts++;
 
             // Track segment hits for best segment display
@@ -457,14 +470,28 @@ var PRACTICE = (function() {
                 _state.segmentCounts[key] = (_state.segmentCounts[key] || 0) + 1;
             }
 
+            // Enable undo now a dart exists in this turn
+            var undoB = document.getElementById('practice-undo-btn');
+            if (undoB) undoB.disabled = false;
+
             if (SPEECH.isEnabled()) {
                 SPEECH.announceDartScore(segment, multiplier, points);
             }
 
-            // Clear pills at start of each new 3-dart turn (after dart 3 is shown briefly)
-            if (_state.turnDarts % 3 === 1) {
-                var pills = document.getElementById('practice-pills');
-                if (pills) pills.innerHTML = '';
+            // After 3rd dart: announce turn total then clear pills
+            var dartsInTurn = _state.turnDarts % 3;
+            if (dartsInTurn === 0) {
+                if (SPEECH.isEnabled()) {
+                    setTimeout(function() {
+                        SPEECH.announceTurnEnd(_state.turnScore, 0);
+                    }, 900);
+                }
+                setTimeout(function() {
+                    var pills = document.getElementById('practice-pills');
+                    if (pills) pills.innerHTML = '';
+                    var ub = document.getElementById('practice-undo-btn');
+                    if (ub) ub.disabled = true;
+                }, 1800);
             }
 
             _addDartPill(segment, multiplier, points);
@@ -619,6 +646,51 @@ var PRACTICE = (function() {
         inner.appendChild(doneBtn);
     }
 
+
+    // ------------------------------------------------------------------
+    // Undo last dart
+    // ------------------------------------------------------------------
+
+    function _undoPracticeDart() {
+        if (_state.turnDarts % 3 === 0) return;  // no darts in current turn
+
+        var undoBtn = document.getElementById('practice-undo-btn');
+        if (undoBtn) undoBtn.disabled = true;
+
+        API.undoLastThrow(_state.turnId)
+            .then(function(result) {
+                var deleted = result.deleted_throw;
+                var points  = deleted.points || 0;
+
+                // Reverse state
+                _state.dartsThrown  = Math.max(0, _state.dartsThrown - 1);
+                _state.totalScore   = Math.max(0, _state.totalScore - points);
+                _state.turnScore    = Math.max(0, _state.turnScore - points);
+                _state.turnDarts    = Math.max(0, _state.turnDarts - 1);
+
+                // Reverse segment count
+                var seg = deleted.segment;
+                var mul = deleted.multiplier;
+                if (seg > 0) {
+                    var key = (mul > 1 ? (mul === 2 ? 'D' : 'T') : '') + seg;
+                    _state.segmentCounts[key] = Math.max(0, (_state.segmentCounts[key] || 1) - 1);
+                    if (_state.segmentCounts[key] === 0) delete _state.segmentCounts[key];
+                }
+
+                // Remove last pill
+                var pills = document.getElementById('practice-pills');
+                if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
+
+                // Re-enable undo if darts remain in current turn
+                if (undoBtn) undoBtn.disabled = (_state.turnDarts % 3 === 0);
+
+                _updatePracticeStats();
+            })
+            .catch(function() {
+                UI.showToast('UNDO FAILED', 'bust', 2000);
+                if (undoBtn) undoBtn.disabled = false;
+            });
+    }
 
     // ------------------------------------------------------------------
     // SVG Dartboard Heatmap

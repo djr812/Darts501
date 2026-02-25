@@ -2054,6 +2054,30 @@ body.mode-practice #app {
     50%       { opacity: 0.5; }
 }
 
+.practice-undo-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    -webkit-transition: border-color 0.15s, color 0.15s;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.practice-undo-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.practice-undo-btn:not(:disabled):active {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 .practice-end-btn {
     padding: 8px 16px;
     background: transparent;

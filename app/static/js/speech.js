@@ -129,7 +129,7 @@ var SPEECH = (function() {
         // e.g. "Forty five remaining" / "double top to finish" etc.
         if (score === 0)  return '';           // already checked out
         if (score === 2)  return 'Double one';
-        if (score === 50) return 'Bull';
+        if (score === 50) return 'Bulls Eye';
 
         // Clean double finish
         if (score <= 40 && score % 2 === 0) {
@@ -145,7 +145,7 @@ var SPEECH = (function() {
 
     // Segment names for caller phrasing
     var SEGMENT_NAMES = {
-        25: 'bull',
+        25: 'Outer Bull',
         20: 'twenty',  19: 'nineteen', 18: 'eighteen', 17: 'seventeen',
         16: 'sixteen', 15: 'fifteen',  14: 'fourteen',  13: 'thirteen',
         12: 'twelve',  11: 'eleven',   10: 'ten',        9: 'nine',
@@ -158,8 +158,8 @@ var SPEECH = (function() {
      * e.g. segment=20, multiplier=3 → "Treble twenty"
      *      segment=20, multiplier=2 → "Double twenty"
      *      segment=20, multiplier=1 → "Twenty"
-     *      segment=25, multiplier=2 → "Bull"   (double bull = bullseye)
-     *      segment=25, multiplier=1 → "Twenty five"
+     *      segment=25, multiplier=2 → "Bulls Eye"  (double bull)
+     *      segment=25, multiplier=1 → "Outer Bull"
      */
     function _phraseDart(segment, multiplier, points) {
         if (points === 0) return 'Miss';
@@ -168,7 +168,7 @@ var SPEECH = (function() {
 
         // Bull / Bullseye
         if (segment === 25) {
-            return multiplier === 2 ? 'Bullseye' : 'Twenty five';
+            return multiplier === 2 ? 'Bulls Eye' : 'Outer Bull';
         }
 
         if (multiplier === 3) return 'Treble ' + segName;

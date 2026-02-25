@@ -415,11 +415,12 @@ def start_practice_session():
     )
     leg_id = cursor.lastrowid
 
-    # Open the first turn
+    # Open the first turn with score_before=501 so the scoring engine
+    # never triggers a spurious bust (practice has no score countdown)
     cursor.execute(
         """
         INSERT INTO turns (leg_id, player_id, turn_number, score_before)
-        VALUES (%s, %s, 1, 0)
+        VALUES (%s, %s, 1, 501)
         """,
         (leg_id, player_id)
     )
