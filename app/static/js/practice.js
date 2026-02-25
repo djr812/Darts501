@@ -217,6 +217,7 @@ var PRACTICE = (function() {
      */
     function start(config, onEnd) {
         SPEECH.unlock();
+        if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
         UI.setLoading(true);
 
         _resolvePracticePlayer(config.player)
@@ -484,6 +485,11 @@ var PRACTICE = (function() {
             // Enable undo now a dart exists in this turn
             var undoB = document.getElementById('practice-undo-btn');
             if (undoB) undoB.disabled = false;
+
+            // Dart thud
+            if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+                SOUNDS.dart();
+            }
 
             if (SPEECH.isEnabled()) {
                 SPEECH.announceDartScore(segment, multiplier, points);

@@ -41,15 +41,16 @@ var SPEECH = (function() {
     // Core speak helper
     // ------------------------------------------------------------------
 
-    function _speak(text, priority) {
+    function _speak(text, priority, options) {
         if (!_enabled || !isSupported()) return;
         // Cancel current utterance for high-priority announcements (new dart)
         // so queued speech doesn't pile up during fast scoring
         if (priority) window.speechSynthesis.cancel();
         var u = new SpeechSynthesisUtterance(text);
-        u.lang  = 'en-GB';   // British English — fits darts well
-        u.rate  = 1.05;       // Slightly brisk, like a real caller
-        u.pitch = 1.0;
+        u.lang  = 'en-GB';
+        u.rate  = (options && options.rate)  || 1.05;
+        u.pitch = (options && options.pitch) || 1.0;
+        u.volume = (options && options.volume) || 1.0;
         window.speechSynthesis.speak(u);
     }
 
@@ -206,6 +207,15 @@ var SPEECH = (function() {
      * @param {number} remaining   — player's score after the turn
      */
     function announceTurnEnd(turnPoints, remaining) {
+        // Sound effects first (non-blocking)
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+            if (turnPoints === 180) {
+                SOUNDS.oneEighty();
+            } else if (turnPoints >= 100) {
+                SOUNDS.ton();
+            }
+        }
+
         if (!_enabled) return;
 
         var phrase = _phraseScore(turnPoints);
@@ -214,13 +224,21 @@ var SPEECH = (function() {
             phrase = phrase + '... ' + _phraseRemaining(remaining);
         }
 
-        _speak(phrase, false);
+        // 180 gets emphatic treatment — louder, slightly slower, higher pitch
+        if (turnPoints === 180) {
+            _speak(phrase, true, { rate: 0.9, pitch: 1.3, volume: 1.0 });
+        } else {
+            _speak(phrase, false);
+        }
     }
 
     /**
      * Speak a bust.
      */
     function announceBust() {
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+            SOUNDS.bust();
+        }
         _speak('Bust!', true);
     }
 
@@ -229,6 +247,9 @@ var SPEECH = (function() {
      * @param {number} points — the score checked out on
      */
     function announceCheckout(points) {
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+            SOUNDS.checkout();
+        }
         var phrase = _phraseScore(points) + '... checkout!';
         _speak(phrase, true);
     }

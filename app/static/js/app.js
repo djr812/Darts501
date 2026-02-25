@@ -63,6 +63,7 @@
         // Unlock iOS speech engine inside this user gesture (tap on Start Match)
         // so the first programmatic utterance is not silently swallowed by Safari.
         SPEECH.unlock();
+        if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
         UI.setLoading(true);
         const SCORES = { '501': 501, '201': 201, 'Cricket': 0 };
         state.startingScore = SCORES[config.gameType] || 501;
@@ -184,6 +185,11 @@
 
         // Update UI
         UI.addDartPill(player.id, result.points, multiplier, segment);
+
+        // Play dart thud sound
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+            SOUNDS.dart();
+        }
 
         // Announce each dart score immediately as it lands
         if (!result.is_bust) {
