@@ -56,6 +56,59 @@ var PRACTICE = (function() {
         playerSection.appendChild(slotContainer);
         inner.appendChild(playerSection);
 
+        // ---- Practice Mode ----
+        var modeSection = document.createElement('div');
+        modeSection.className = 'setup-section';
+        modeSection.innerHTML = '<div class="setup-label">PRACTICE MODE</div>';
+        var modeRow = document.createElement('div');
+        modeRow.className = 'setup-option-row';
+
+        var selectedMode = 'free';
+        var selectedTarget = null; // { type, label, segment, multiplier } for segment mode
+
+        // Target badge — shows selected target when segment mode active
+        var targetBadge = document.createElement('div');
+        targetBadge.id = 'practice-target-badge';
+        targetBadge.className = 'practice-target-badge hidden';
+
+        var freeModeBtn = document.createElement('button');
+        freeModeBtn.className = 'option-btn selected';
+        freeModeBtn.dataset.value = 'free';
+        freeModeBtn.type = 'button';
+        freeModeBtn.textContent = 'FREE THROW';
+
+        var targetModeBtn = document.createElement('button');
+        targetModeBtn.className = 'option-btn';
+        targetModeBtn.dataset.value = 'target';
+        targetModeBtn.type = 'button';
+        targetModeBtn.textContent = 'TARGET';
+
+        freeModeBtn.addEventListener('click', function() {
+            freeModeBtn.classList.add('selected');
+            targetModeBtn.classList.remove('selected');
+            selectedMode = 'free';
+            selectedTarget = null;
+            targetBadge.className = 'practice-target-badge hidden';
+            targetBadge.textContent = '';
+        });
+
+        targetModeBtn.addEventListener('click', function() {
+            _showTargetModal(function(target) {
+                selectedMode = target.type;
+                selectedTarget = target;
+                freeModeBtn.classList.remove('selected');
+                targetModeBtn.classList.add('selected');
+                targetBadge.className = 'practice-target-badge';
+                targetBadge.textContent = target.label;
+            });
+        });
+
+        modeRow.appendChild(freeModeBtn);
+        modeRow.appendChild(targetModeBtn);
+        modeSection.appendChild(modeRow);
+        modeSection.appendChild(targetBadge);
+        inner.appendChild(modeSection);
+
         // ---- Duration ----
         var durationSection = document.createElement('div');
         durationSection.className = 'setup-section';
@@ -89,7 +142,16 @@ var PRACTICE = (function() {
         startBtn.addEventListener('click', function() {
             var playerData = _collectPracticePlayer(slot);
             if (!playerData) return;
-            onStart({ player: playerData, durationMinutes: selectedDuration });
+            if (selectedMode !== 'free' && !selectedTarget) {
+                UI.showToast('PLEASE SELECT A TARGET', 'bust', 2000);
+                return;
+            }
+            onStart({
+                player:          playerData,
+                durationMinutes: selectedDuration,
+                targetMode:      selectedMode,
+                targetConfig:    selectedTarget,
+            });
         });
         inner.appendChild(startBtn);
 
@@ -208,6 +270,13 @@ var PRACTICE = (function() {
         multiplier:    1,
         turnDarts:     0,     // darts in current turn (max 3)
         turnComplete:  false, // true after 3rd dart — waiting for NEXT
+        onEnd:         null,  // stored so target completion can call it from any function
+        // Target practice fields
+        targetMode:    'free',   // 'free'|'segment'|'trebles'|'doubles'|'checkout'|'clock'
+        targetConfig:  null,     // { segment, multiplier } for 'segment' mode
+        targetHits:    0,
+        targetAttempts:0,
+        clockIndex:    0,        // 0-19, which number we're aiming at in clock mode
     };
 
     /**
@@ -225,12 +294,18 @@ var PRACTICE = (function() {
                 _state.playerId   = player.id;
                 _state.playerName = player.name;
                 _state.timerSeconds = config.durationMinutes * 60;
-                _state.dartsThrown  = 0;
-                _state.totalScore   = 0;
-                _state.turnScore    = 0;
+                _state.dartsThrown   = 0;
+                _state.totalScore    = 0;
+                _state.turnScore     = 0;
                 _state.segmentCounts = {};
                 _state.multiplier    = 1;
                 _state.turnDarts     = 0;
+                _state.targetMode    = config.targetMode    || 'free';
+                _state.targetConfig  = config.targetConfig  || null;
+                _state.targetHits    = 0;
+                _state.targetAttempts = 0;
+                _state.clockIndex    = 0;
+                _state.onEnd         = onEnd;
 
                 // Create a practice match + leg + turn in the DB
                 return _createPracticeSession(player.id);
@@ -337,15 +412,26 @@ var PRACTICE = (function() {
 
         app.appendChild(header);
 
-        // Stats strip
+        // Stats strip — layout depends on target mode
         var strip = document.createElement('div');
         strip.id = 'practice-strip';
         strip.className = 'practice-strip';
-        strip.innerHTML =
-            '<div class="practice-stat"><div class="practice-stat-value" id="prac-darts">0</div><div class="practice-stat-label">DARTS</div></div>' +
-            '<div class="practice-stat"><div class="practice-stat-value" id="prac-avg">0.0</div><div class="practice-stat-label">AVG / DART</div></div>' +
-            '<div class="practice-stat"><div class="practice-stat-value" id="prac-turn">0.0</div><div class="practice-stat-label">3-DART AVG</div></div>' +
-            '<div class="practice-stat"><div class="practice-stat-value" id="prac-best">—</div><div class="practice-stat-label">BEST SEG</div></div>';
+        if (_state.targetMode === 'free') {
+            strip.innerHTML =
+                '<div class="practice-stat"><div class="practice-stat-value" id="prac-darts">0</div><div class="practice-stat-label">DARTS</div></div>' +
+                '<div class="practice-stat"><div class="practice-stat-value" id="prac-avg">0.0</div><div class="practice-stat-label">AVG / DART</div></div>' +
+                '<div class="practice-stat"><div class="practice-stat-value" id="prac-turn">0.0</div><div class="practice-stat-label">3-DART AVG</div></div>' +
+                '<div class="practice-stat"><div class="practice-stat-value" id="prac-best">—</div><div class="practice-stat-label">BEST SEG</div></div>';
+        } else {
+            var targetLabel = _state.targetMode === 'clock'
+                ? _clockTarget()
+                : (_state.targetConfig ? _state.targetConfig.label : '—');
+            strip.innerHTML =
+                '<div class="practice-stat practice-stat-target"><div class="practice-stat-value" id="prac-target">' + targetLabel + '</div><div class="practice-stat-label">TARGET</div></div>' +
+                '<div class="practice-stat"><div class="practice-stat-value" id="prac-hits">0</div><div class="practice-stat-label">HITS</div></div>' +
+                '<div class="practice-stat"><div class="practice-stat-value" id="prac-attempts">0</div><div class="practice-stat-label">DARTS</div></div>' +
+                '<div class="practice-stat"><div class="practice-stat-value" id="prac-rate">0%</div><div class="practice-stat-label">HIT RATE</div></div>';
+        }
         app.appendChild(strip);
 
         // Dart pills for current turn
@@ -389,6 +475,9 @@ var PRACTICE = (function() {
         board.appendChild(_buildPracticeSegmentGrid());
         board.appendChild(_buildPracticeBullRow());
         app.appendChild(board);
+
+        // Highlight target segment(s) on the grid
+        _applyTargetHighlights();
     }
 
     function _buildPracticeSegmentGrid() {
@@ -482,6 +571,26 @@ var PRACTICE = (function() {
                 _state.segmentCounts[key] = (_state.segmentCounts[key] || 0) + 1;
             }
 
+            // Track target hits
+            if (_state.targetMode !== 'free' && segment > 0) {
+                _state.targetAttempts++;
+                if (_isTargetHit(segment, multiplier)) {
+                    _state.targetHits++;
+                    // Clock mode: advance to next number on hit
+                    if (_state.targetMode === 'clock') {
+                        _state.clockIndex++;
+                        _applyTargetHighlights();
+                        // All 20 hit — show congratulations and stop processing
+                        if (_state.clockIndex === 20) {
+                            _addDartPill(segment, multiplier, points);
+                            _updatePracticeStats();
+                            _clockComplete(_state.onEnd);
+                            return; // skip duplicate pill/stats calls below
+                        }
+                    }
+                }
+            }
+
             // Enable undo now a dart exists in this turn
             var undoB = document.getElementById('practice-undo-btn');
             if (undoB) undoB.disabled = false;
@@ -530,31 +639,44 @@ var PRACTICE = (function() {
     }
 
     function _updatePracticeStats() {
-        var dartsEl = document.getElementById('prac-darts');
-        var avgEl   = document.getElementById('prac-avg');
-        var turnEl  = document.getElementById('prac-turn');
-        var bestEl  = document.getElementById('prac-best');
+        if (_state.targetMode === 'free') {
+            var dartsEl = document.getElementById('prac-darts');
+            var avgEl   = document.getElementById('prac-avg');
+            var turnEl  = document.getElementById('prac-turn');
+            var bestEl  = document.getElementById('prac-best');
 
-        if (dartsEl) dartsEl.textContent = _state.dartsThrown;
+            if (dartsEl) dartsEl.textContent = _state.dartsThrown;
 
-        var avg = _state.dartsThrown > 0
-            ? (_state.totalScore / _state.dartsThrown).toFixed(1)
-            : '0.0';
-        if (avgEl) avgEl.textContent = avg;
+            var avg = _state.dartsThrown > 0
+                ? (_state.totalScore / _state.dartsThrown).toFixed(1) : '0.0';
+            if (avgEl) avgEl.textContent = avg;
 
-        var threeAvg = (_state.totalScore / Math.max(1, _state.dartsThrown) * 3).toFixed(1);
-        if (turnEl) turnEl.textContent = threeAvg;
+            var threeAvg = (_state.totalScore / Math.max(1, _state.dartsThrown) * 3).toFixed(1);
+            if (turnEl) turnEl.textContent = threeAvg;
 
-        // Best segment = most hit single segment key
-        var bestKey = '—';
-        var bestCount = 0;
-        Object.keys(_state.segmentCounts).forEach(function(key) {
-            if (_state.segmentCounts[key] > bestCount) {
-                bestCount = _state.segmentCounts[key];
-                bestKey = key;
+            var bestKey = '—'; var bestCount = 0;
+            Object.keys(_state.segmentCounts).forEach(function(key) {
+                if (_state.segmentCounts[key] > bestCount) {
+                    bestCount = _state.segmentCounts[key]; bestKey = key;
+                }
+            });
+            if (bestEl) bestEl.textContent = bestKey;
+        } else {
+            var targetEl   = document.getElementById('prac-target');
+            var hitsEl     = document.getElementById('prac-hits');
+            var attemptsEl = document.getElementById('prac-attempts');
+            var rateEl     = document.getElementById('prac-rate');
+
+            if (targetEl) {
+                targetEl.textContent = _state.targetMode === 'clock'
+                    ? _clockTarget() : (_state.targetConfig ? _state.targetConfig.label : '—');
             }
-        });
-        if (bestEl) bestEl.textContent = bestKey;
+            if (hitsEl)     hitsEl.textContent     = _state.targetHits;
+            if (attemptsEl) attemptsEl.textContent  = _state.targetAttempts;
+            var rate = _state.targetAttempts > 0
+                ? Math.round((_state.targetHits / _state.targetAttempts) * 100) + '%' : '0%';
+            if (rateEl) rateEl.textContent = rate;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -637,13 +759,31 @@ var PRACTICE = (function() {
             }
         });
 
-        [
-            { label: 'DARTS THROWN',  value: _state.dartsThrown },
-            { label: 'TOTAL SCORE',   value: _state.totalScore },
-            { label: 'AVG PER DART',  value: avg },
-            { label: '3-DART AVG',    value: threeAvg },
-            { label: 'MOST HIT',      value: bestKey },
-        ].forEach(function(row) {
+        var summaryRows;
+        if (_state.targetMode === 'free') {
+            summaryRows = [
+                { label: 'DARTS THROWN',  value: _state.dartsThrown },
+                { label: 'TOTAL SCORE',   value: _state.totalScore },
+                { label: 'AVG PER DART',  value: avg },
+                { label: '3-DART AVG',    value: threeAvg },
+                { label: 'MOST HIT',      value: bestKey },
+            ];
+        } else {
+            var hitRate = _state.targetAttempts > 0
+                ? Math.round((_state.targetHits / _state.targetAttempts) * 100) + '%' : '0%';
+            var targetLabel = _state.targetConfig
+                ? _state.targetConfig.label : _state.targetMode.toUpperCase();
+            summaryRows = [
+                { label: 'TARGET',        value: targetLabel },
+                { label: 'DARTS THROWN',  value: _state.targetAttempts },
+                { label: 'HITS',          value: _state.targetHits },
+                { label: 'HIT RATE',      value: hitRate },
+            ];
+            if (_state.targetMode === 'clock') {
+                summaryRows.push({ label: 'REACHED', value: _state.clockIndex + '/20' });
+            }
+        }
+        summaryRows.forEach(function(row) {
             var item = document.createElement('div');
             item.className = 'practice-summary-row';
             item.innerHTML =
@@ -661,6 +801,288 @@ var PRACTICE = (function() {
         inner.appendChild(doneBtn);
     }
 
+
+    // ------------------------------------------------------------------
+    // Target practice helpers
+    // ------------------------------------------------------------------
+
+    var CHECKOUT_DOUBLES = [20,16,10,8,4,2,1,25]; // D25 = Bull
+
+    function _clockTarget() {
+        return (_state.clockIndex < 20)
+            ? String(_state.clockIndex + 1)
+            : 'DONE';
+    }
+
+    function _isTargetHit(segment, multiplier) {
+        switch (_state.targetMode) {
+            case 'segment':
+                var tc = _state.targetConfig;
+                if (!tc) return false;
+                if (tc.segment === 25) {
+                    // Bull family: match exact multiplier
+                    return segment === 25 && multiplier === tc.multiplier;
+                }
+                return segment === tc.segment && multiplier === tc.multiplier;
+            case 'trebles':
+                return multiplier === 3;
+            case 'doubles':
+                return multiplier === 2 || (segment === 25 && multiplier === 2);
+            case 'checkout':
+                // Any double on a checkout double segment, or Bull
+                return (multiplier === 2 && CHECKOUT_DOUBLES.indexOf(segment) !== -1);
+            case 'clock':
+                if (_state.clockIndex >= 20) return false; // already done
+                var target = _state.clockIndex + 1;
+                return segment === target; // any multiplier counts
+            default:
+                return false;
+        }
+    }
+
+    function _applyTargetHighlights() {
+        if (_state.targetMode === 'free') return;
+
+        // Clear existing highlights
+        document.querySelectorAll('.seg-btn').forEach(function(btn) {
+            btn.classList.remove('target-highlight');
+        });
+
+        function highlight(seg) {
+            // Segment grid buttons
+            var btn = document.querySelector('#segment-grid .seg-btn[data-segment="' + seg + '"]');
+            if (btn) btn.classList.add('target-highlight');
+            // Bull row buttons
+            var bullBtn = document.querySelector('#bull-row .seg-btn[data-segment="' + seg + '"]');
+            if (bullBtn) bullBtn.classList.add('target-highlight');
+        }
+
+        function highlightMiss() {
+            var missBtn = document.querySelector('#bull-row .seg-btn:not([data-segment])');
+            // Don't highlight MISS button
+        }
+
+        switch (_state.targetMode) {
+            case 'segment':
+                var tc = _state.targetConfig;
+                if (tc) highlight(tc.segment);
+                break;
+            case 'trebles':
+                for (var s = 1; s <= 20; s++) highlight(s);
+                break;
+            case 'doubles':
+                for (var s = 1; s <= 20; s++) highlight(s);
+                highlight(25);
+                break;
+            case 'checkout':
+                CHECKOUT_DOUBLES.forEach(function(seg) { highlight(seg); });
+                break;
+            case 'clock':
+                var t = _state.clockIndex + 1;
+                if (t <= 20) highlight(t);
+                break;
+        }
+
+        // For trebles/doubles modes also lock the multiplier tab
+        if (_state.targetMode === 'trebles') {
+            _setMultiplierTab(3);
+        } else if (_state.targetMode === 'doubles' || _state.targetMode === 'checkout') {
+            _setMultiplierTab(2);
+        }
+    }
+
+    function _setMultiplierTab(mul) {
+        _state.multiplier = mul;
+        document.querySelectorAll('.tab-btn').forEach(function(b) {
+            b.classList.remove('active-single', 'active-double', 'active-treble');
+        });
+        var cls = mul === 3 ? 'active-treble' : mul === 2 ? 'active-double' : 'active-single';
+        var tab = document.querySelector('.tab-btn[data-multiplier="' + mul + '"]');
+        if (tab) tab.classList.add(cls);
+        document.body.dataset.multiplier = mul;
+    }
+
+    // ------------------------------------------------------------------
+    // Target selection modal
+    // ------------------------------------------------------------------
+
+    function _showTargetModal(onSelect) {
+        var existing = document.getElementById('target-modal');
+        if (existing) existing.remove();
+
+        var overlay = document.createElement('div');
+        overlay.id = 'target-modal';
+        overlay.className = 'modal-overlay';
+
+        var box = document.createElement('div');
+        box.className = 'modal-box target-modal-box';
+
+        var titleEl = document.createElement('div');
+        titleEl.className = 'modal-title';
+        titleEl.textContent = 'SELECT TARGET';
+        box.appendChild(titleEl);
+
+        // ---- Category tabs ----
+        var cats = [
+            { id: 'single',   label: 'SINGLE SEGMENT' },
+            { id: 'group',    label: 'GROUP TARGET'   },
+        ];
+        var catBar = document.createElement('div');
+        catBar.className = 'target-cat-bar';
+        var activeCat = 'single';
+
+        var panels = {};
+
+        cats.forEach(function(cat, i) {
+            var btn = document.createElement('button');
+            btn.className = 'target-cat-btn' + (i === 0 ? ' active' : '');
+            btn.type = 'button';
+            btn.textContent = cat.label;
+            btn.addEventListener('click', function() {
+                activeCat = cat.id;
+                catBar.querySelectorAll('.target-cat-btn').forEach(function(b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                Object.keys(panels).forEach(function(k) {
+                    panels[k].style.display = k === cat.id ? '' : 'none';
+                });
+            });
+            catBar.appendChild(btn);
+        });
+        box.appendChild(catBar);
+
+        // ── Single segment panel ──
+        var singlePanel = document.createElement('div');
+        singlePanel.className = 'target-panel';
+        panels['single'] = singlePanel;
+
+        var segCats = [
+            { label: 'TREBLES', segs: [20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1],
+              mul: 3, prefix: 'T' },
+            { label: 'DOUBLES', segs: [20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1],
+              mul: 2, prefix: 'D' },
+            { label: 'SINGLES', segs: [20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1],
+              mul: 1, prefix: 'S' },
+            { label: 'BULL',    segs: [25],
+              mul: null, prefix: null },
+        ];
+
+        var activeSegCat = 0;
+        var segCatBar = document.createElement('div');
+        segCatBar.className = 'target-segcat-bar';
+        var segPanels = {};
+
+        segCats.forEach(function(sc, i) {
+            var scBtn = document.createElement('button');
+            scBtn.className = 'target-segcat-btn' + (i === 0 ? ' active' : '');
+            scBtn.type = 'button';
+            scBtn.textContent = sc.label;
+            scBtn.addEventListener('click', function() {
+                segCatBar.querySelectorAll('.target-segcat-btn').forEach(function(b) { b.classList.remove('active'); });
+                scBtn.classList.add('active');
+                Object.keys(segPanels).forEach(function(k) {
+                    segPanels[k].style.display = k === String(i) ? '' : 'none';
+                });
+            });
+            segCatBar.appendChild(scBtn);
+        });
+        singlePanel.appendChild(segCatBar);
+
+        segCats.forEach(function(sc, i) {
+            var grid = document.createElement('div');
+            grid.className = 'target-seg-grid';
+            grid.style.display = i === 0 ? '' : 'none';
+            segPanels[String(i)] = grid;
+
+            if (sc.label === 'BULL') {
+                // Two options: Outer Bull (S25) and Bull (D25)
+                [{label: 'OUTER BULL', seg: 25, mul: 1},
+                 {label: 'BULL',       seg: 25, mul: 2}].forEach(function(b) {
+                    var btn = document.createElement('button');
+                    btn.className = 'target-seg-btn';
+                    btn.type = 'button';
+                    btn.textContent = b.label;
+                    btn.addEventListener('click', function() {
+                        overlay.remove();
+                        onSelect({
+                            type:      'segment',
+                            label:     b.label,
+                            segment:   b.seg,
+                            multiplier: b.mul,
+                        });
+                    });
+                    grid.appendChild(btn);
+                });
+            } else {
+                sc.segs.forEach(function(seg) {
+                    var btn = document.createElement('button');
+                    btn.className = 'target-seg-btn';
+                    btn.type = 'button';
+                    btn.textContent = sc.prefix + seg;
+                    btn.addEventListener('click', function() {
+                        overlay.remove();
+                        onSelect({
+                            type:       'segment',
+                            label:      sc.prefix + seg,
+                            segment:    seg,
+                            multiplier: sc.mul,
+                        });
+                    });
+                    grid.appendChild(btn);
+                });
+            }
+            singlePanel.appendChild(grid);
+        });
+        box.appendChild(singlePanel);
+
+        // ── Group targets panel ──
+        var groupPanel = document.createElement('div');
+        groupPanel.className = 'target-panel';
+        groupPanel.style.display = 'none';
+        panels['group'] = groupPanel;
+
+        var groups = [
+            { type: 'trebles',  label: 'ALL TREBLES',
+              desc: 'Hit any treble — tracks treble rate across all segments' },
+            { type: 'doubles',  label: 'ALL DOUBLES',
+              desc: 'Hit any double — great for checkout training' },
+            { type: 'checkout', label: 'CHECKOUT DOUBLES',
+              desc: 'D20 D16 D10 D8 D4 D2 D1 Bull — the key finishing doubles' },
+            { type: 'clock',    label: 'AROUND THE CLOCK',
+              desc: 'Hit 1 through 20 in order — any multiplier counts' },
+        ];
+
+        groups.forEach(function(g) {
+            var card = document.createElement('button');
+            card.className = 'target-group-card';
+            card.type = 'button';
+            card.innerHTML =
+                '<span class="target-group-label">' + g.label + '</span>' +
+                '<span class="target-group-desc">'  + g.desc  + '</span>';
+            card.addEventListener('click', function() {
+                overlay.remove();
+                onSelect({
+                    type:  g.type,
+                    label: g.label,
+                    segment:    null,
+                    multiplier: null,
+                });
+            });
+            groupPanel.appendChild(card);
+        });
+        box.appendChild(groupPanel);
+
+        // Cancel
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'stats-cancel-btn';
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = '✕  CANCEL';
+        cancelBtn.addEventListener('click', function() { overlay.remove(); });
+        box.appendChild(cancelBtn);
+
+        overlay.appendChild(box);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
 
     // ------------------------------------------------------------------
     // Undo last dart
@@ -754,6 +1176,69 @@ var PRACTICE = (function() {
         if (tabs) tabs.querySelectorAll('.tab-btn').forEach(function(btn) {
             btn.disabled = locked;
         });
+    }
+
+    // ------------------------------------------------------------------
+    // Around the Clock completion
+    // ------------------------------------------------------------------
+
+    function _clockComplete(onEnd) {
+        // Stop the timer
+        if (_state.timerInterval) {
+            clearInterval(_state.timerInterval);
+            _state.timerInterval = null;
+        }
+
+        // End the DB session
+        API.endPracticeSession(_state.matchId).catch(function() {});
+
+        // Play checkout sound + speech
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+            SOUNDS.checkout();
+        }
+        if (SPEECH.isEnabled()) {
+            setTimeout(function() {
+                SPEECH.announceCheckout(0);  // triggers sound guard already called above
+            }, 300);
+        }
+
+        // Show congratulations modal
+        var overlay = document.createElement('div');
+        overlay.id = 'clock-complete-modal';
+        overlay.className = 'modal-overlay';
+
+        var box = document.createElement('div');
+        box.className = 'modal-box clock-complete-box';
+
+        box.innerHTML =
+            '<div class="clock-complete-icon">🎯</div>' +
+            '<div class="modal-title">AROUND THE CLOCK!</div>' +
+            '<div class="modal-subtitle">All 20 segments hit in order</div>' +
+            '<div class="clock-complete-stats">' +
+                '<div class="clock-complete-stat">' +
+                    '<span class="clock-stat-value">' + _state.targetAttempts + '</span>' +
+                    '<span class="clock-stat-label">DARTS THROWN</span>' +
+                '</div>' +
+                '<div class="clock-complete-stat">' +
+                    '<span class="clock-stat-value">' +
+                        Math.round((_state.targetHits / Math.max(1, _state.targetAttempts)) * 100) + '%' +
+                    '</span>' +
+                    '<span class="clock-stat-label">HIT RATE</span>' +
+                '</div>' +
+            '</div>';
+
+        var doneBtn = document.createElement('button');
+        doneBtn.className = 'start-btn';
+        doneBtn.type = 'button';
+        doneBtn.textContent = 'BACK TO SETUP';
+        doneBtn.addEventListener('click', function() {
+            overlay.remove();
+            onEnd();
+        });
+        box.appendChild(doneBtn);
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
     }
 
     // ------------------------------------------------------------------

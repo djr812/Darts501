@@ -2286,3 +2286,200 @@ body.mode-practice #app {
     border-radius: 50%;
     box-shadow: 0 0 24px rgba(240,165,0,0.1), 0 0 1px #333;
 }
+
+/* =========================================================
+   TARGET PRACTICE
+   ========================================================= */
+
+/* Setup screen — mode badge */
+.practice-target-badge {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 4px 12px;
+    background: var(--accent-glow);
+    border: 1px solid var(--accent-dim);
+    border-radius: 20px;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+}
+.practice-target-badge.hidden { display: none; }
+
+/* Target highlight on segment buttons */
+.seg-btn.target-highlight {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    background: var(--accent-glow) !important;
+    box-shadow: 0 0 8px rgba(240,165,0,0.3);
+    -webkit-animation: target-pulse 2s ease-in-out infinite;
+    animation: target-pulse 2s ease-in-out infinite;
+}
+@-webkit-keyframes target-pulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(240,165,0,0.25); }
+    50%       { box-shadow: 0 0 14px rgba(240,165,0,0.6); }
+}
+@keyframes target-pulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(240,165,0,0.25); }
+    50%       { box-shadow: 0 0 14px rgba(240,165,0,0.6); }
+}
+
+/* Target stat in strip */
+.practice-stat-target .practice-stat-value {
+    color: var(--accent);
+    font-size: 0.85rem;
+}
+
+/* Target modal */
+.target-modal-box {
+    width: 90%;
+    max-width: 480px;
+    max-height: 80vh;
+    overflow-y: auto;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    gap: var(--gap);
+}
+
+.target-cat-bar,
+.target-segcat-bar {
+    display: -webkit-box;
+    display: flex;
+    gap: var(--gap);
+}
+
+.target-cat-btn,
+.target-segcat-btn {
+    -webkit-box-flex: 1;
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+}
+.target-cat-btn.active,
+.target-segcat-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.target-panel {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    gap: var(--gap);
+}
+
+/* Single segment grid */
+.target-seg-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+}
+
+.target-seg-btn {
+    padding: 10px 4px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    cursor: pointer;
+    text-align: center;
+}
+.target-seg-btn:active {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* Group target cards */
+.target-group-card {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+}
+.target-group-card:active {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+.target-group-label {
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+}
+.target-group-desc {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+}
+
+/* Around the Clock completion modal */
+.clock-complete-box {
+    text-align: center;
+    gap: var(--gap-lg);
+    max-width: 340px;
+}
+
+.clock-complete-icon {
+    font-size: 3rem;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.clock-complete-stats {
+    display: -webkit-box;
+    display: flex;
+    gap: var(--gap-lg);
+    justify-content: center;
+    margin: 8px 0;
+}
+
+.clock-complete-stat {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 20px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    min-width: 100px;
+}
+
+.clock-stat-value {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+}
+
+.clock-stat-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+}
