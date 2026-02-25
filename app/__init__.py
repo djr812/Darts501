@@ -14,7 +14,7 @@ level) makes it easy to:
     - Instantiate multiple app instances in tests
 """
 
-from flask import Flask
+from flask import Flask, redirect, url_for
 from config import DevelopmentConfig, ProductionConfig
 
 
@@ -94,3 +94,9 @@ def _register_blueprints(app: Flask) -> None:
     # --- HTML shell (served at /) ---
     from app.routes.views import views_bp
     app.register_blueprint(views_bp)
+
+    # --- Favicon redirect ---
+    # Browsers request /favicon.ico automatically; redirect to the static PNG
+    @app.route('/favicon.ico')
+    def favicon():
+        return redirect(url_for('static', filename='favicon.png'))
