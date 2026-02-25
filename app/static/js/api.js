@@ -224,6 +224,14 @@ const API = (() => {
      * @param {object} scope - { gameType: 'all'|'501'|'201', doubleOut: 'all'|'1'|'0' }
      * @returns {Promise<object>}
      */
+    async function getPlayerHistory(playerId, offset = 0, limit = 20) {
+        return request('GET', `/api/players/${playerId}/history?offset=${offset}&limit=${limit}`);
+    }
+
+    async function getMatchScorecard(matchId) {
+        return request('GET', `/api/matches/${matchId}/scorecard`);
+    }
+
     async function getPlayerTrend(playerId, scope = {}) {
         const params = new URLSearchParams();
         if (scope.limit)     params.set('limit',      scope.limit);
@@ -273,6 +281,8 @@ const API = (() => {
         startLeg,
         getPlayerStats,
         getPlayerTrend,
+        getPlayerHistory,
+        getMatchScorecard,
         cancelMatch,
         restartMatch,
         flushQueue,

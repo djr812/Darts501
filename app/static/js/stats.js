@@ -292,6 +292,9 @@ const STATS = (() => {
             ['Avg darts to checkout', checkout.avg_darts_to_checkout || '—'],
             ['Favourite double',      favDbl],
         ]));
+
+        // ---- Session history ----
+        _renderHistory(data.player.id, container);
     }
 
     // ------------------------------------------------------------------
@@ -440,6 +443,239 @@ Avg: ${m.avg}  (${m.darts} darts)`;
         card.className = 'stat-card trend-card';
         card.appendChild(svg);
         return card;
+    }
+
+    // ------------------------------------------------------------------
+    // Session history section
+    // ------------------------------------------------------------------
+
+    async function _renderHistory(playerId, container) {
+        const section = document.createElement('div');
+        section.className = 'stat-card history-card';
+
+        const hdr = document.createElement('div');
+        hdr.className = 'stat-card-title history-card-title';
+        hdr.innerHTML = 'SESSION HISTORY <span class="history-loading-inline">…</span>';
+        section.appendChild(hdr);
+
+        const list = document.createElement('div');
+        list.className = 'history-list';
+        section.appendChild(list);
+
+        const moreBtn = document.createElement('button');
+        moreBtn.className = 'history-more-btn';
+        moreBtn.type = 'button';
+        moreBtn.textContent = 'LOAD MORE';
+        moreBtn.style.display = 'none';
+        section.appendChild(moreBtn);
+
+        container.appendChild(section);
+
+        let offset = 0;
+        const PAGE = 20;
+
+        async function loadPage() {
+            moreBtn.style.display = 'none';
+            try {
+                const data = await API.getPlayerHistory(playerId, offset, PAGE);
+                // Use local refs instead of getElementById (avoids duplicate ID issues on reload)
+                const spinner = hdr.querySelector('.history-loading-inline');
+                if (spinner) spinner.remove();
+
+                if (data.sessions.length === 0 && offset === 0) {
+                    list.innerHTML = '<div class="history-empty">No sessions yet</div>';
+                    return;
+                }
+
+                data.sessions.forEach(session => {
+                    const row = document.createElement('button');
+                    row.className = 'history-row';
+                    row.type = 'button';
+
+                    const resultCls = session.result === 'WIN'      ? 'result-win'
+                                    : session.result === 'LOSS'     ? 'result-loss'
+                                    : session.result === 'PRACTICE' ? 'result-practice'
+                                    : 'result-neutral';
+
+                    const oppText = session.is_practice
+                        ? session.game_type
+                        : (session.opponent || '—');
+
+                    row.innerHTML =
+                        `<span class="history-date">${_esc(session.date)}</span>` +
+                        `<span class="history-type ${resultCls}">${_esc(session.result)}</span>` +
+                        `<span class="history-opp">${_esc(oppText)}</span>` +
+                        `<span class="history-avg">${session.avg}</span>` +
+                        `<span class="history-darts">${session.darts}d</span>` +
+                        `<span class="history-chevron">›</span>`;
+
+                    row.addEventListener('click', () => {
+                        if (session.is_practice) {
+                            _showPracticeSummaryModal(session);
+                        } else {
+                            _showScorecardModal(session.match_id, playerId);
+                        }
+                    });
+                    list.appendChild(row);
+                });
+
+                offset += data.sessions.length;
+                if (data.sessions.length === PAGE) {
+                    moreBtn.style.display = '';
+                }
+            } catch(e) {
+                console.error('[history] load failed:', e);
+                const spinner = hdr.querySelector('.history-loading-inline');
+                if (spinner) spinner.textContent = '!';
+            }
+        }
+
+        moreBtn.addEventListener('click', loadPage);
+        loadPage();
+        return section;
+    }
+
+    function _showPracticeSummaryModal(session) {
+        const overlay = _modalOverlay('practice-summary-modal');
+        const box = document.createElement('div');
+        box.className = 'modal-box scorecard-box';
+
+        box.innerHTML =
+            `<div class="modal-title">PRACTICE SESSION</div>` +
+            `<div class="modal-subtitle">${_esc(session.date)}</div>` +
+            `<div class="scorecard-practice-stats">` +
+                `<div class="sc-pstat"><span class="sc-pval">${session.darts}</span><span class="sc-plbl">DARTS</span></div>` +
+                `<div class="sc-pstat"><span class="sc-pval">${session.avg}</span><span class="sc-plbl">3-DART AVG</span></div>` +
+            `</div>`;
+
+        const closeBtn = _closeButton(() => overlay.remove());
+        box.appendChild(closeBtn);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+    }
+
+    async function _showScorecardModal(matchId, focusPlayerId) {
+        const overlay = _modalOverlay('scorecard-modal');
+        const box = document.createElement('div');
+        box.className = 'modal-box scorecard-box';
+        box.innerHTML = '<div class="modal-title">SCORECARD</div><div class="sc-loading">LOADING…</div>';
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        try {
+            const data = await API.getMatchScorecard(matchId);
+            box.innerHTML = '';
+            _renderScorecard(data, focusPlayerId, box, () => overlay.remove());
+        } catch(e) {
+            box.innerHTML = `<div class="modal-title">SCORECARD</div><div class="sc-loading">FAILED TO LOAD</div>`;
+            box.appendChild(_closeButton(() => overlay.remove()));
+        }
+    }
+
+    function _renderScorecard(data, focusPlayerId, box, onClose) {
+        const { match, players, legs } = data;
+
+        // Header
+        const winner = players.find(p => p.id === match.winner_id);
+        const titleEl = document.createElement('div');
+        titleEl.className = 'modal-title';
+        titleEl.textContent = match.game_type.toUpperCase();
+        box.appendChild(titleEl);
+
+        const metaEl = document.createElement('div');
+        metaEl.className = 'sc-meta';
+        metaEl.textContent = match.ended_at +
+            (winner ? '  ·  ' + winner.name.toUpperCase() + ' WINS' : '');
+        box.appendChild(metaEl);
+
+        // One section per leg
+        legs.forEach((leg, li) => {
+            const legHdr = document.createElement('div');
+            legHdr.className = 'sc-leg-header';
+            const legWinner = players.find(p => p.id === leg.winner_id);
+            legHdr.textContent = 'LEG ' + leg.leg_number +
+                (legWinner ? '  ·  ' + legWinner.name.toUpperCase() : '');
+            box.appendChild(legHdr);
+
+            // Column headers
+            const colHdr = document.createElement('div');
+            colHdr.className = 'sc-col-header';
+            // Build columns dynamically per player
+            let hdrHTML = '<span class="sc-turn-num">#</span>';
+            players.forEach(p => {
+                hdrHTML +=
+                    `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">${_esc(p.name.toUpperCase())}</span>`;
+            });
+            colHdr.innerHTML = hdrHTML;
+            box.appendChild(colHdr);
+
+            // Group turns by turn_number
+            const turnMap = {};
+            leg.turns.forEach(t => {
+                if (!turnMap[t.turn_number]) turnMap[t.turn_number] = {};
+                turnMap[t.turn_number][t.player_id] = t;
+            });
+
+            const turnNums = Object.keys(turnMap).map(Number).sort((a,b)=>a-b);
+            turnNums.forEach(tn => {
+                const rowEl = document.createElement('div');
+                rowEl.className = 'sc-turn-row';
+
+                let rowHTML = `<span class="sc-turn-num">${tn}</span>`;
+                players.forEach(p => {
+                    const turn = turnMap[tn][p.id];
+                    if (!turn) {
+                        rowHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">—</span>`;
+                        return;
+                    }
+
+                    const dartStr = turn.throws.map(th => {
+                        let cls = th.is_checkout ? 'dart-checkout' : '';
+                        return `<span class="sc-dart ${cls}">${_esc(th.notation)}</span>`;
+                    }).join('');
+
+                    const turnCls = turn.is_bust ? 'sc-bust'
+                                  : turn.is_checkout ? 'sc-checkout' : '';
+
+                    const remaining = turn.is_bust ? 'BUST'
+                                    : (turn.score_after !== null ? turn.score_after : '—');
+
+                    rowHTML +=
+                        `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">` +
+                            `<span class="sc-darts">${dartStr}</span>` +
+                            `<span class="sc-turn-score ${turnCls}">${turn.is_bust ? 0 : turn.turn_score}</span>` +
+                            `<span class="sc-remaining ${turnCls}">${remaining}</span>` +
+                        `</span>`;
+                });
+                rowEl.innerHTML = rowHTML;
+                box.appendChild(rowEl);
+            });
+        });
+
+        box.appendChild(_closeButton(onClose));
+    }
+
+    // ------------------------------------------------------------------
+    // Modal helpers
+    // ------------------------------------------------------------------
+
+    function _modalOverlay(id) {
+        const existing = document.getElementById(id);
+        if (existing) existing.remove();
+        const overlay = document.createElement('div');
+        overlay.id = id;
+        overlay.className = 'modal-overlay';
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        return overlay;
+    }
+
+    function _closeButton(onClick) {
+        const btn = document.createElement('button');
+        btn.className = 'stats-cancel-btn';
+        btn.type = 'button';
+        btn.textContent = '✕  CLOSE';
+        btn.addEventListener('click', onClick);
+        return btn;
     }
 
     // ------------------------------------------------------------------

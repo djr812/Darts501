@@ -439,3 +439,241 @@ def get_player_trend(player_id):
         })
 
     return jsonify({"matches": matches}), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Session history list
+# ─────────────────────────────────────────────────────────────────────────────
+
+@stats_bp.route("/players/<int:player_id>/history", methods=["GET"])
+def get_player_history(player_id):
+    """
+    Return a paginated list of matches and practice sessions for a player.
+
+    Query params:
+        offset  -- pagination offset (default 0)
+        limit   -- page size (default 20, max 50)
+
+    Returns:
+        { "sessions": [ { match_id, date, type, game_type, opponent,
+                          result, player_avg, duration_darts } ] }
+    """
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute(
+        "SELECT id FROM players WHERE id = %s AND is_active = TRUE",
+        (player_id,)
+    )
+    if not cursor.fetchone():
+        return jsonify({"error": "Player not found"}), 404
+
+    offset = max(0, int(request.args.get("offset", 0)))
+    limit  = min(50, max(1, int(request.args.get("limit", 20))))
+
+    # Simple query — no GROUP_CONCAT, fetch opponents separately per match
+    cursor.execute("""
+        SELECT
+            m.id            AS match_id,
+            m.game_type,
+            m.session_type,
+            m.ended_at,
+            m.winner_id
+        FROM matches m
+        JOIN match_players mp ON mp.match_id = m.id AND mp.player_id = %s
+        WHERE m.status = 'complete'
+        ORDER BY m.ended_at DESC
+        LIMIT %s OFFSET %s
+    """, (player_id, limit, offset))
+
+    rows = cursor.fetchall()
+    sessions = []
+
+    for row in rows:
+        # Opponent names
+        cursor.execute("""
+            SELECT p.name
+            FROM match_players mp
+            JOIN players p ON p.id = mp.player_id
+            WHERE mp.match_id = %s AND mp.player_id != %s
+        """, (row["match_id"], player_id))
+        opp_rows  = cursor.fetchall()
+        opponents = ', '.join(r["name"] for r in opp_rows) if opp_rows else "—"
+
+        # Per-match avg for this player
+        cursor.execute("""
+            SELECT
+                SUM(t.score_before - t.score_after) AS pts,
+                SUM(t.darts_thrown)                 AS darts
+            FROM turns t
+            JOIN legs l ON l.id = t.leg_id
+            WHERE t.player_id  = %s
+              AND l.match_id   = %s
+              AND t.score_after IS NOT NULL
+              AND t.is_bust    = 0
+        """, (player_id, row["match_id"]))
+        avg_row = cursor.fetchone()
+        pts   = int(avg_row["pts"]   or 0)
+        darts = int(avg_row["darts"] or 0)
+        avg   = round((pts / darts) * 3, 1) if darts else 0.0
+
+        is_practice = row["session_type"] == "practice"
+        if is_practice:
+            result = "PRACTICE"
+        elif row["winner_id"] == player_id:
+            result = "WIN"
+        elif row["winner_id"] is None:
+            result = "—"
+        else:
+            result = "LOSS"
+
+        sessions.append({
+            "match_id":    row["match_id"],
+            "date":        str(row["ended_at"])[:10] if row["ended_at"] else "—",
+            "game_type":   row["game_type"],
+            "is_practice": is_practice,
+            "opponent":    opponents,
+            "result":      result,
+            "avg":         avg,
+            "darts":       darts,
+        })
+
+    return jsonify({"sessions": sessions}), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Match / practice scorecard
+# ─────────────────────────────────────────────────────────────────────────────
+
+@stats_bp.route("/matches/<int:match_id>/scorecard", methods=["GET"])
+def get_match_scorecard(match_id):
+    """
+    Return full turn-by-turn scorecard for a match.
+
+    Returns:
+      {
+        match:   { id, game_type, session_type, ended_at, winner_id },
+        players: [ { id, name } ],
+        legs: [
+          {
+            leg_number, winner_id,
+            turns: [
+              {
+                player_id, turn_number, score_before, score_after,
+                darts_thrown, is_bust, is_checkout,
+                throws: [ { dart_number, segment, multiplier, points, is_checkout } ]
+              }
+            ]
+          }
+        ]
+      }
+    """
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute(
+        "SELECT id, game_type, session_type, ended_at, winner_id FROM matches WHERE id = %s",
+        (match_id,)
+    )
+    match = cursor.fetchone()
+    if not match:
+        return jsonify({"error": "Match not found"}), 404
+
+    # Players
+    cursor.execute("""
+        SELECT p.id, p.name
+        FROM match_players mp
+        JOIN players p ON p.id = mp.player_id
+        WHERE mp.match_id = %s
+        ORDER BY mp.turn_order
+    """, (match_id,))
+    players = cursor.fetchall()
+
+    # Legs
+    cursor.execute("""
+        SELECT id, leg_number, winner_id, starting_score
+        FROM legs
+        WHERE match_id = %s
+        ORDER BY leg_number
+    """, (match_id,))
+    legs = cursor.fetchall()
+
+    legs_out = []
+    for leg in legs:
+        # Turns
+        cursor.execute("""
+            SELECT id, player_id, turn_number, score_before, score_after,
+                   darts_thrown, is_bust, is_checkout
+            FROM turns
+            WHERE leg_id = %s
+              AND score_after IS NOT NULL
+            ORDER BY turn_number, player_id
+        """, (leg["id"],))
+        turns = cursor.fetchall()
+
+        turns_out = []
+        for turn in turns:
+            # Throws
+            cursor.execute("""
+                SELECT dart_number, segment, multiplier, points, is_checkout
+                FROM throws
+                WHERE turn_id = %s
+                ORDER BY dart_number
+            """, (turn["id"],))
+            throws = cursor.fetchall()
+
+            throws_out = []
+            for th in throws:
+                seg = th["segment"]
+                mul = th["multiplier"]
+                if seg == 0:
+                    notation = "MISS"
+                elif seg == 25 and mul == 2:
+                    notation = "BULL"
+                elif seg == 25:
+                    notation = "OUTER"
+                else:
+                    prefix = "T" if mul == 3 else "D" if mul == 2 else ""
+                    notation = prefix + str(seg)
+
+                throws_out.append({
+                    "dart_number": th["dart_number"],
+                    "notation":    notation,
+                    "points":      th["points"],
+                    "is_checkout": bool(th["is_checkout"]),
+                })
+
+            score_after = turn["score_after"]
+            turn_score  = turn["score_before"] - (score_after if score_after is not None else turn["score_before"])
+
+            turns_out.append({
+                "player_id":    turn["player_id"],
+                "turn_number":  turn["turn_number"],
+                "score_before": turn["score_before"],
+                "score_after":  score_after,
+                "turn_score":   turn_score,
+                "darts_thrown": turn["darts_thrown"],
+                "is_bust":      bool(turn["is_bust"]),
+                "is_checkout":  bool(turn["is_checkout"]),
+                "throws":       throws_out,
+            })
+
+        legs_out.append({
+            "leg_id":      leg["id"],
+            "leg_number":  leg["leg_number"],
+            "winner_id":   leg["winner_id"],
+            "starting_score": leg["starting_score"],
+            "turns":       turns_out,
+        })
+
+    return jsonify({
+        "match": {
+            "id":           match["id"],
+            "game_type":    match["game_type"],
+            "session_type": match["session_type"],
+            "ended_at":     str(match["ended_at"])[:10] if match["ended_at"] else "—",
+            "winner_id":    match["winner_id"],
+        },
+        "players": [{"id": p["id"], "name": p["name"]} for p in players],
+        "legs":    legs_out,
+    }), 200
