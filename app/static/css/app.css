@@ -1948,29 +1948,16 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
    PRACTICE MODE
    ========================================================= */
 
-/* Practice entry button on setup screen */
-.practice-entry-btn {
-    display: block;
-    width: 100%;
-    margin-top: 10px;
-    padding: 14px;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    color: var(--text-secondary);
-    font-family: var(--font-display);
-    font-size: 0.85rem;
-    letter-spacing: 0.12em;
-    text-align: center;
-    cursor: pointer;
-    -webkit-transition: border-color 0.15s ease, color 0.15s ease;
-    transition: border-color 0.15s ease, color 0.15s ease;
+/* Practice as a game-type button — dashed border signals it's an action not a selection */
+.practice-gametype-btn {
+    border-style: dashed !important;
+    color: var(--text-secondary) !important;
 }
 
-.practice-entry-btn:hover,
-.practice-entry-btn:active {
-    border-color: var(--accent);
-    color: var(--accent);
+.practice-gametype-btn:active {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    background: var(--accent-glow) !important;
 }
 
 /* Back button on practice setup */

@@ -42,6 +42,7 @@ const UI = (() => {
             { value: '501', label: '501' },
             { value: '201', label: '201' },
             { value: 'Cricket', label: 'Cricket', disabled: true, hint: 'COMING SOON' },
+            { value: 'Practice', label: 'PRACTICE', practice: true },
         ];
         gameTypes.forEach(gt => {
             const btn = document.createElement('button');
@@ -54,6 +55,12 @@ const UI = (() => {
             if (gt.disabled) {
                 btn.disabled = true;
                 btn.classList.add('disabled');
+            } else if (gt.practice) {
+                // Practice jumps straight to practice flow — no match config needed
+                btn.classList.add('practice-gametype-btn');
+                btn.addEventListener('click', () => {
+                    if (onPractice) onPractice();
+                });
             } else {
                 btn.addEventListener('click', () => {
                     gameTypeRow.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
@@ -220,16 +227,7 @@ const UI = (() => {
             _appTarget.appendChild(statsBtn);
         }
 
-        // ---- Practice button ----
-        if (onPractice) {
-            const practiceBtn = document.createElement('button');
-            practiceBtn.id = 'setup-practice-btn';
-            practiceBtn.className = 'practice-entry-btn';
-            practiceBtn.type = 'button';
-            practiceBtn.innerHTML = '🎯  PRACTICE MODE';
-            practiceBtn.addEventListener('click', onPractice);
-            _appTarget.appendChild(practiceBtn);
-        }
+
 
         // Defaults
         gameTypeRow.querySelector('[data-value="501"]').click();
