@@ -201,11 +201,13 @@ var PRACTICE = (function() {
         playerName:    '',
         dartsThrown:   0,
         totalScore:    0,
+        turnScore:     0,
         segmentCounts: {},   // { '20': 5, 'T20': 3, ... }
         timerSeconds:  0,
         timerInterval: null,
         multiplier:    1,
         turnDarts:     0,     // darts in current turn (max 3)
+        turnComplete:  false, // true after 3rd dart — waiting for NEXT
     };
 
     /**
@@ -313,6 +315,15 @@ var PRACTICE = (function() {
         undoBtn.disabled = true;
         undoBtn.addEventListener('click', function() { _undoPracticeDart(); });
         header.appendChild(undoBtn);
+
+        var nextBtn = document.createElement('button');
+        nextBtn.id = 'practice-next-btn';
+        nextBtn.className = 'practice-next-btn';
+        nextBtn.type = 'button';
+        nextBtn.textContent = 'NEXT \u2192';
+        nextBtn.disabled = true;
+        nextBtn.addEventListener('click', function() { _advanceToNextTurn(); });
+        header.appendChild(nextBtn);
 
         var endBtn = document.createElement('button');
         endBtn.className = 'practice-end-btn';
@@ -478,20 +489,18 @@ var PRACTICE = (function() {
                 SPEECH.announceDartScore(segment, multiplier, points);
             }
 
-            // After 3rd dart: announce turn total then clear pills
+            // After 3rd dart: announce total, activate NEXT, lock board
             var dartsInTurn = _state.turnDarts % 3;
             if (dartsInTurn === 0) {
+                _state.turnComplete = true;
+                _lockBoard(true);
+                var nb = document.getElementById('practice-next-btn');
+                if (nb) nb.disabled = false;
                 if (SPEECH.isEnabled()) {
                     setTimeout(function() {
                         SPEECH.announceTurnEnd(_state.turnScore, 0);
                     }, 900);
                 }
-                setTimeout(function() {
-                    var pills = document.getElementById('practice-pills');
-                    if (pills) pills.innerHTML = '';
-                    var ub = document.getElementById('practice-undo-btn');
-                    if (ub) ub.disabled = true;
-                }, 1800);
             }
 
             _addDartPill(segment, multiplier, points);
@@ -652,7 +661,11 @@ var PRACTICE = (function() {
     // ------------------------------------------------------------------
 
     function _undoPracticeDart() {
-        if (_state.turnDarts % 3 === 0) return;  // no darts in current turn
+        // Allow undo if darts have been thrown this turn (including completed turns)
+        var dartsThisTurn = _state.turnDarts % 3 === 0 && _state.turnComplete
+            ? 3
+            : _state.turnDarts % 3;
+        if (dartsThisTurn === 0) return;
 
         var undoBtn = document.getElementById('practice-undo-btn');
         if (undoBtn) undoBtn.disabled = true;
@@ -668,6 +681,14 @@ var PRACTICE = (function() {
                 _state.turnScore    = Math.max(0, _state.turnScore - points);
                 _state.turnDarts    = Math.max(0, _state.turnDarts - 1);
 
+                // If we just undid within a completed turn, unlock the board
+                if (_state.turnComplete) {
+                    _state.turnComplete = false;
+                    _lockBoard(false);
+                    var nb = document.getElementById('practice-next-btn');
+                    if (nb) nb.disabled = true;
+                }
+
                 // Reverse segment count
                 var seg = deleted.segment;
                 var mul = deleted.multiplier;
@@ -681,8 +702,17 @@ var PRACTICE = (function() {
                 var pills = document.getElementById('practice-pills');
                 if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
 
-                // Re-enable undo if darts remain in current turn
-                if (undoBtn) undoBtn.disabled = (_state.turnDarts % 3 === 0);
+                // Undo still available if darts remain in this turn
+                var remaining = _state.turnDarts % 3;
+                if (undoBtn) undoBtn.disabled = (remaining === 0 && !_state.turnComplete);
+
+                // Re-announce corrected turn score after undo so caller
+                // reads the updated total before user decides to NEXT or undo again
+                if (_state.turnDarts % 3 > 0 && SPEECH.isEnabled()) {
+                    setTimeout(function() {
+                        SPEECH.announceTurnEnd(_state.turnScore, 0);
+                    }, 400);
+                }
 
                 _updatePracticeStats();
             })
@@ -690,6 +720,34 @@ var PRACTICE = (function() {
                 UI.showToast('UNDO FAILED', 'bust', 2000);
                 if (undoBtn) undoBtn.disabled = false;
             });
+    }
+
+    function _advanceToNextTurn() {
+        // Clear pills, unlock board, reset turn state
+        var pills = document.getElementById('practice-pills');
+        if (pills) pills.innerHTML = '';
+
+        var nextBtn = document.getElementById('practice-next-btn');
+        if (nextBtn) nextBtn.disabled = true;
+
+        var undoBtn = document.getElementById('practice-undo-btn');
+        if (undoBtn) undoBtn.disabled = true;
+
+        _state.turnComplete = false;
+        _state.turnScore    = 0;
+        _lockBoard(false);
+    }
+
+    function _lockBoard(locked) {
+        var board = document.getElementById('practice-board');
+        if (!board) return;
+        board.querySelectorAll('.seg-btn').forEach(function(btn) {
+            btn.disabled = locked;
+        });
+        var tabs = document.getElementById('multiplier-tabs');
+        if (tabs) tabs.querySelectorAll('.tab-btn').forEach(function(btn) {
+            btn.disabled = locked;
+        });
     }
 
     // ------------------------------------------------------------------
