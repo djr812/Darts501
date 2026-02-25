@@ -711,7 +711,7 @@ const UI = (() => {
     function _buildSegmentGrid(onSegment) {
         const grid = document.createElement('div');
         grid.id = 'segment-grid';
-        [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5].forEach(seg => {
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].forEach(seg => {
             const btn = document.createElement('button');
             btn.className = 'seg-btn';
             btn.textContent = seg;
