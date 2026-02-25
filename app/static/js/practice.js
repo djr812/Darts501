@@ -657,7 +657,7 @@ var PRACTICE = (function() {
         // Angle per segment (18 degrees each, starting from -99 degrees
         // so segment 20 is at the top)
         var SEG_ANGLE = 360 / 20;
-        var START_OFFSET = -90 - SEG_ANGLE / 2;  // top centre of segment 20
+        var START_OFFSET = -SEG_ANGLE / 2;  // segment 20 centred at 12 o'clock
 
         // Collect hit counts per zone for colour scaling
         var counts = _state.segmentCounts;
