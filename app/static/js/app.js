@@ -352,7 +352,7 @@
 
     async function _returnToSetup() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket);
     }
 
     // ------------------------------------------------------------------
@@ -483,7 +483,7 @@
         try {
             await API.cancelMatch(state.matchId);
             var existing = await API.getPlayers().catch(function() { return []; });
-            UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice);
+            UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket);
         } catch (err) {
             UI.showToast('CANCEL FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
         } finally {
@@ -537,7 +537,7 @@
                 // onBack — return to setup screen
                 function() {
                     API.getPlayers().then(function(p) {
-                        UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice);
+                        UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
                     });
                 },
                 // onStart — begin the practice session
@@ -545,12 +545,94 @@
                     PRACTICE.start(config, function() {
                         // onEnd — back to setup after session
                         API.getPlayers().then(function(p) {
-                            UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice);
+                            UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
                         });
                     });
                 }
             );
         });
+    }
+
+    function _onCricket() {
+        API.getPlayers().then(function(existing) {
+            _showCricketSetup(existing);
+        });
+    }
+
+    function _showCricketSetup(existingPlayers) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-setup';
+
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        var title = document.createElement('div');
+        title.id = 'setup-title';
+        title.innerHTML = '<div class="setup-logo">DARTS 501</div><div class="setup-subtitle">CRICKET</div>';
+        inner.appendChild(title);
+
+        // Player count
+        var countSection = document.createElement('div');
+        countSection.className = 'setup-section';
+        countSection.innerHTML = '<div class="setup-label">NUMBER OF PLAYERS</div>';
+        var countRow = document.createElement('div');
+        countRow.className = 'setup-option-row';
+        var selectedCount = 2;
+        [2,3,4].forEach(function(n) {
+            var btn = document.createElement('button');
+            btn.className = 'option-btn' + (n === 2 ? ' selected' : '');
+            btn.dataset.value = n;
+            btn.type = 'button';
+            btn.textContent = n;
+            btn.addEventListener('click', function() {
+                countRow.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
+                btn.classList.add('selected');
+                selectedCount = n;
+                UI.renderCricketPlayerSlots(existingPlayers, selectedCount, namesSection);
+            });
+            countRow.appendChild(btn);
+        });
+        countSection.appendChild(countRow);
+        inner.appendChild(countSection);
+
+        // Player name slots
+        var namesSection = document.createElement('div');
+        namesSection.className = 'setup-section';
+        inner.appendChild(namesSection);
+        UI.renderCricketPlayerSlots(existingPlayers, 2, namesSection);
+
+        // Back button
+        var backBtn = document.createElement('button');
+        backBtn.className = 'practice-back-btn';
+        backBtn.type = 'button';
+        backBtn.textContent = '← BACK TO MATCH SETUP';
+        backBtn.addEventListener('click', function() {
+            API.getPlayers().then(function(p) {
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
+            });
+        });
+
+        var startBtn = document.createElement('button');
+        startBtn.className = 'start-btn';
+        startBtn.textContent = 'START CRICKET';
+        startBtn.type = 'button';
+        startBtn.addEventListener('click', function() {
+            var players = UI.collectCricketPlayers(namesSection);
+            if (!players) return;
+            SPEECH.unlock();
+            if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
+            CRICKET_GAME.start({ players: players }, function() {
+                API.getPlayers().then(function(p) {
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
+                });
+            });
+        });
+
+        inner.appendChild(startBtn);
+        inner.appendChild(backBtn);
     }
 
     async function _onViewStats() {
@@ -564,7 +646,7 @@
             STATS.showStatsScreen(player, async () => {
                 // Back button → return to setup screen
                 const existing = await API.getPlayers().catch(() => []);
-                UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice);
+                UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket);
             });
         });
     }
@@ -575,7 +657,7 @@
 
     async function init() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket);
     }
 
     if (document.readyState === 'loading') {

@@ -8,7 +8,7 @@ const UI = (() => {
     // Setup Screen
     // ------------------------------------------------------------------
 
-    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice) {
+    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket) {
         const app = document.getElementById('app');
         app.innerHTML = '';
         app.style.cssText = '';
@@ -41,7 +41,7 @@ const UI = (() => {
         const gameTypes = [
             { value: '501', label: '501' },
             { value: '201', label: '201' },
-            { value: 'Cricket', label: 'Cricket', disabled: true, hint: 'COMING SOON' },
+            { value: 'Cricket', label: 'Cricket', cricket: true },
             { value: 'Practice', label: 'PRACTICE', practice: true },
         ];
         gameTypes.forEach(gt => {
@@ -60,6 +60,12 @@ const UI = (() => {
                 btn.classList.add('practice-gametype-btn');
                 btn.addEventListener('click', () => {
                     if (onPractice) onPractice();
+                });
+            } else if (gt.cricket) {
+                // Cricket has its own setup flow
+                btn.classList.add('cricket-gametype-btn');
+                btn.addEventListener('click', () => {
+                    if (onCricket) onCricket();
                 });
             } else {
                 btn.addEventListener('click', () => {
@@ -1015,9 +1021,25 @@ const UI = (() => {
         document.body.appendChild(overlay);
     }
 
+    function renderCricketPlayerSlots(existingPlayers, count, container) {
+        container.innerHTML = '<div class="setup-label">PLAYERS</div>';
+        const namesRow = document.createElement('div');
+        namesRow.className = 'names-row';
+        for (let i = 0; i < count; i++) {
+            namesRow.appendChild(_buildPlayerSlot(i, count, existingPlayers));
+        }
+        container.appendChild(namesRow);
+    }
+
+    function collectCricketPlayers(container) {
+        return _collectPlayerSelections(container);
+    }
+
     return {
         buildSetupScreen,
         buildShell,
+        renderCricketPlayerSlots,
+        collectCricketPlayers,
         showCongratsModal,
         showLegEndModal,
         showConfirmModal,

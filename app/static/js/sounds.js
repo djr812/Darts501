@@ -141,8 +141,8 @@ var SOUNDS = (function() {
     // ------------------------------------------------------------------
 
     /**
-     * Dart thud — short filtered noise burst with a low thump.
-     * Simulates the sound of a dart hitting a bristle board.
+     * Dart ding — clean bell-like tone with a quick natural decay.
+     * Two sine partials (fundamental + octave) give a warm, rounded ding.
      */
     function dart() {
         if (!_enabled) return;
@@ -151,21 +151,32 @@ var SOUNDS = (function() {
 
         var t = ctx.currentTime;
 
-        // Low thump component
-        var osc = ctx.createOscillator();
-        var g1  = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(120, t);
-        osc.frequency.exponentialRampToValueAtTime(40, t + 0.08);
-        g1.gain.setValueAtTime(0.5, t);
-        g1.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-        osc.connect(g1);
+        // Fundamental — 880 Hz (A5), bright but not harsh
+        var osc1 = ctx.createOscillator();
+        var g1   = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.value = 880;
+        g1.gain.setValueAtTime(0.35, t);
+        g1.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+        osc1.connect(g1);
         g1.connect(ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.12);
+        osc1.start(t);
+        osc1.stop(t + 0.65);
 
-        // Noise burst (bristle impact)
-        _noise(ctx, 0.3, t, 0.06, 3000);
+        // Octave harmonic — 1760 Hz, quieter, fades faster
+        var osc2 = ctx.createOscillator();
+        var g2   = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.value = 1760;
+        g2.gain.setValueAtTime(0.12, t);
+        g2.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+        osc2.connect(g2);
+        g2.connect(ctx.destination);
+        osc2.start(t);
+        osc2.stop(t + 0.3);
+
+        // Soft attack transient — tiny noise click to give it a percussive onset
+        _noise(ctx, 0.06, t, 0.018, 6000);
     }
 
     /**

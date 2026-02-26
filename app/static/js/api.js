@@ -224,6 +224,22 @@ const API = (() => {
      * @param {object} scope - { gameType: 'all'|'501'|'201', doubleOut: 'all'|'1'|'0' }
      * @returns {Promise<object>}
      */
+    async function createCricketMatch(data) {
+        return request('POST', '/api/cricket/matches', data);
+    }
+
+    async function recordCricketThrow(matchId, data) {
+        return request('POST', `/api/cricket/matches/${matchId}/throw`, data);
+    }
+
+    async function undoCricketThrow(matchId) {
+        return request('POST', `/api/cricket/matches/${matchId}/undo`);
+    }
+
+    async function endCricketMatch(matchId) {
+        return request('POST', `/api/cricket/matches/${matchId}/end`);
+    }
+
     async function getPlayerHistory(playerId, offset = 0, limit = 20) {
         return request('GET', `/api/players/${playerId}/history?offset=${offset}&limit=${limit}`);
     }
@@ -282,6 +298,10 @@ const API = (() => {
         getPlayerStats,
         getPlayerTrend,
         getPlayerHistory,
+        createCricketMatch,
+        recordCricketThrow,
+        undoCricketThrow,
+        endCricketMatch,
         getMatchScorecard,
         cancelMatch,
         restartMatch,
