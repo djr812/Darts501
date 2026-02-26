@@ -569,10 +569,8 @@
         inner.className = 'setup-screen-inner';
         app.appendChild(inner);
 
-        var title = document.createElement('div');
-        title.id = 'setup-title';
-        title.innerHTML = '<div class="setup-logo">DARTS 501</div><div class="setup-subtitle">CRICKET</div>';
-        inner.appendChild(title);
+        // Standard header
+        UI.appendSetupHeader(inner, 'Cricket');
 
         // Player count
         var countSection = document.createElement('div');
@@ -604,20 +602,10 @@
         inner.appendChild(namesSection);
         UI.renderCricketPlayerSlots(existingPlayers, 2, namesSection);
 
-        // Back button
-        var backBtn = document.createElement('button');
-        backBtn.className = 'practice-back-btn';
-        backBtn.type = 'button';
-        backBtn.textContent = '← BACK';
-        backBtn.addEventListener('click', function() {
-            API.getPlayers().then(function(p) {
-                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
-            });
-        });
-
+        // Start button
         var startBtn = document.createElement('button');
         startBtn.className = 'start-btn';
-        startBtn.textContent = 'START CRICKET';
+        startBtn.textContent = 'START MATCH';
         startBtn.type = 'button';
         startBtn.addEventListener('click', function() {
             var players = UI.collectCricketPlayers(namesSection);
@@ -630,9 +618,19 @@
                 });
             });
         });
-
         inner.appendChild(startBtn);
-        inner.appendChild(backBtn);
+
+        // Back link at bottom
+        var backLink = document.createElement('button');
+        backLink.className = 'setup-back-link';
+        backLink.type = 'button';
+        backLink.textContent = '← BACK TO HOME';
+        backLink.addEventListener('click', function() {
+            API.getPlayers().then(function(p) {
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
+            });
+        });
+        inner.appendChild(backLink);
     }
 
     async function _onViewStats() {

@@ -3345,36 +3345,33 @@ body.mode-cricket #app {
     width: 100%;
 }
 
-/* ── Match setup back button ── */
-.setup-title-row {
-    display: -webkit-box;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    margin-bottom: 4px;
-}
-
-.setup-back-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text-secondary);
+/* ── Match setup standard header ── */
+.setup-game-name {
     font-family: var(--font-display);
-    font-size: 1.2rem;
-    padding: 6px 14px;
-    cursor: pointer;
-    flex-shrink: 0;
-    line-height: 1;
-    -webkit-transition: border-color 0.15s, color 0.15s;
-    transition: border-color 0.15s, color 0.15s;
-}
-
-.setup-back-btn:active {
-    border-color: var(--accent);
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     color: var(--accent);
+    text-align: center;
+    margin-bottom: 6px;
 }
 
-.setup-title-row #setup-title {
-    text-align: left;
+/* ── Back link (bottom of all setup screens) ── */
+.setup-back-link {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    padding: 10px 4px 4px;
+    cursor: pointer;
+    text-align: center;
+    width: 100%;
+    -webkit-transition: color 0.15s;
+    transition: color 0.15s;
+}
+
+.setup-back-link:active {
+    color: var(--accent);
 }

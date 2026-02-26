@@ -25,7 +25,7 @@ const UI = (() => {
         // Title
         const title = document.createElement('div');
         title.id = 'setup-title';
-        title.innerHTML = '<div class="setup-logo">DARTS 101</div><div class="setup-subtitle">SELECT GAME TYPE</div>';
+        title.innerHTML = '<div class="setup-logo">DARTS 501</div><div class="setup-subtitle">SELECT GAME TYPE</div>';
         inner.appendChild(title);
 
         // Game type tiles
@@ -86,28 +86,8 @@ const UI = (() => {
         inner.className = 'setup-screen-inner';
         app.appendChild(inner);
 
-        // Title + back button
-        const titleRow = document.createElement('div');
-        titleRow.className = 'setup-title-row';
-
-        const backBtn = document.createElement('button');
-        backBtn.className = 'setup-back-btn';
-        backBtn.type = 'button';
-        backBtn.textContent = '←';
-        backBtn.addEventListener('click', () => {
-            API.getPlayers().then(p => {
-                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket);
-            });
-        });
-        titleRow.appendChild(backBtn);
-
-        const title = document.createElement('div');
-        title.id = 'setup-title';
-        title.innerHTML =
-            `<div class="setup-logo">${gameType}</div>` +
-            `<div class="setup-subtitle">MATCH SETUP</div>`;
-        titleRow.appendChild(title);
-        inner.appendChild(titleRow);
+        // Standard header: DARTS 501 logo + game name
+        _appendSetupHeader(inner, gameType);
 
         var _appTarget = inner;
 
@@ -270,6 +250,18 @@ const UI = (() => {
         setsRow.querySelector('[data-value="1"]').click();
         legsRow.querySelector('[data-value="1"]').click();
         countRow.querySelector('[data-count="2"]').click();
+
+        // Back link at bottom
+        const backLink = document.createElement('button');
+        backLink.className = 'setup-back-link';
+        backLink.type = 'button';
+        backLink.textContent = '← BACK TO HOME';
+        backLink.addEventListener('click', () => {
+            API.getPlayers().then(p => {
+                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket);
+            });
+        });
+        _appTarget.appendChild(backLink);
     }
 
     // ------------------------------------------------------------------
@@ -1050,6 +1042,19 @@ const UI = (() => {
         document.body.appendChild(overlay);
     }
 
+    // ── Shared setup screen header ──
+    function _appendSetupHeader(inner, gameTitle) {
+        const logo = document.createElement('div');
+        logo.className = 'setup-logo';
+        logo.textContent = 'DARTS 501';
+        inner.appendChild(logo);
+
+        const sub = document.createElement('div');
+        sub.className = 'setup-game-name';
+        sub.textContent = gameTitle.toUpperCase();
+        inner.appendChild(sub);
+    }
+
     function renderCricketPlayerSlots(existingPlayers, count, container) {
         container.innerHTML = '<div class="setup-label">PLAYERS</div>';
         const namesRow = document.createElement('div');
@@ -1067,6 +1072,7 @@ const UI = (() => {
     return {
         buildSetupScreen,
         buildShell,
+        appendSetupHeader: _appendSetupHeader,
         renderCricketPlayerSlots,
         collectCricketPlayers,
         showCongratsModal,
