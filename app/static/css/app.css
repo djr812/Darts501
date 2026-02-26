@@ -1461,8 +1461,8 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 /* Scrollable content */
 .stats-content {
     flex: 1;
-    overflow-y: auto;
-    padding: 12px 16px 32px;
+    overflow: hidden;        /* columns handle their own scroll */
+    padding: 0;
     display: flex;
     flex-direction: column;
 }
@@ -3067,4 +3067,214 @@ body.mode-cricket #app {
     visibility: hidden;
     height: 0;
     padding: 0;
+}
+
+/* =========================================================
+   STATS TWO-COLUMN LAYOUT
+   ========================================================= */
+
+.stats-two-col {
+    display: -webkit-box;
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    gap: 0;
+}
+
+.stats-col {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px;
+    gap: 10px;
+}
+
+.stats-col-left {
+    -webkit-box-flex: 1;
+    flex: 1;
+    border-right: 1px solid var(--border);
+    min-width: 0;
+}
+
+.stats-col-right {
+    width: 440px;
+    flex-shrink: 0;
+    background: var(--bg-surface);
+    overflow: hidden;           /* no column-level scroll — cards manage themselves */
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+/* ── Condensed stats card ── */
+.condensed-stats-card {
+    padding: 0;
+    overflow: hidden;
+    max-height: 320px;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+}
+
+.condensed-stats-scroll {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+}
+
+.condensed-group-title {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.22em;
+    color: var(--accent);
+    background: var(--bg-surface);
+    padding: 6px 12px 5px;
+    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+}
+.condensed-stats-card .condensed-group-title:first-child {
+    border-top: none;
+}
+
+.condensed-stats-card .stat-row {
+    padding: 5px 12px;
+    font-size: 0.75rem;
+}
+
+.condensed-stats-card .stat-label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.condensed-stats-card .stat-value {
+    font-size: 0.78rem;
+}
+
+.stat-row-highlight .stat-value {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+/* history card inside left column — remove extra margin */
+.stats-col-left .history-card {
+    margin: 0;
+}
+
+/* trend card inside left column */
+.stats-col-left .trend-card {
+    margin: 0;
+}
+
+/* =========================================================
+   STATS HEATMAP CARD
+   ========================================================= */
+
+.heatmap-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.heatmap-wrap {
+    padding: 4px 8px 8px;
+}
+
+.heatmap-inner {
+    display: -webkit-box;
+    display: flex;
+    gap: 12px;
+    padding: 8px;
+    align-items: flex-start;
+}
+
+.heatmap-svg-wrap {
+    flex-shrink: 0;
+    width: 200px;
+}
+
+.heatmap-legend {
+    -webkit-box-flex: 1;
+    flex: 1;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 4px;
+}
+
+.heatmap-legend-title {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+
+.heatmap-legend-item {
+    display: -webkit-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.heatmap-legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.heatmap-legend-text {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+
+.heatmap-legend-text strong {
+    color: var(--text-primary);
+    display: block;
+    font-size: 0.7rem;
+}
+
+.heatmap-gradient-bar-row {
+    display: -webkit-box;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.heatmap-gradient-bar {
+    -webkit-box-flex: 1;
+    flex: 1;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(
+        to right,
+        #0d0d0d 0%,
+        #4a1060 20%,
+        #c0392b 45%,
+        #c8a068 70%,
+        #2ecc71 100%
+    );
+    border: 1px solid var(--border);
+}
+
+.heatmap-gradient-lbl {
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    color: var(--text-dim);
+    flex-shrink: 0;
 }

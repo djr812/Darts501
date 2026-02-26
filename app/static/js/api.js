@@ -240,6 +240,13 @@ const API = (() => {
         return request('POST', `/api/cricket/matches/${matchId}/end`);
     }
 
+    async function getPlayerHeatmap(playerId, scope = {}) {
+        const params = new URLSearchParams();
+        if (scope.gameType)  params.set('game_type',  scope.gameType);
+        if (scope.doubleOut !== undefined) params.set('double_out', scope.doubleOut);
+        return request('GET', `/api/players/${playerId}/stats/heatmap?${params}`);
+    }
+
     async function getPlayerHistory(playerId, offset = 0, limit = 20) {
         return request('GET', `/api/players/${playerId}/history?offset=${offset}&limit=${limit}`);
     }
@@ -298,6 +305,7 @@ const API = (() => {
         getPlayerStats,
         getPlayerTrend,
         getPlayerHistory,
+        getPlayerHeatmap,
         createCricketMatch,
         recordCricketThrow,
         undoCricketThrow,

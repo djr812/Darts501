@@ -442,6 +442,74 @@ def get_player_trend(player_id):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Heatmap
+# ─────────────────────────────────────────────────────────────────────────────
+
+@stats_bp.route("/players/<int:player_id>/stats/heatmap", methods=["GET"])
+def get_player_heatmap(player_id):
+    """
+    Return hit counts per segment+multiplier for a player across all matches.
+
+    Query params:
+        game_type  -- '501' | '201' | 'all'  (default: 'all')
+        double_out -- '1' | '0' | 'all'      (default: 'all')
+
+    Returns:
+        { "counts": { "S20": 12, "T20": 3, "D20": 1, "BULL": 2, "OUTER": 5, ... } }
+        Keys: S<n>, D<n>, T<n> for numbers 1-20; BULL for inner, OUTER for outer bull
+        Misses (segment=0) are excluded.
+    """
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id FROM players WHERE id = %s AND is_active = TRUE", (player_id,))
+    if not cursor.fetchone():
+        return jsonify({"error": "Player not found"}), 404
+
+    game_type  = request.args.get("game_type",  "all")
+    double_out = request.args.get("double_out", "all")
+    scope_sql, scope_params = _scope_clauses(game_type, double_out)
+
+    heatmap_sql = (
+        """
+        SELECT
+            th.segment,
+            th.multiplier,
+            COUNT(*) AS hits
+        FROM throws th
+        JOIN turns   t  ON t.id  = th.turn_id
+        JOIN legs    l  ON l.id  = t.leg_id
+        JOIN matches m  ON m.id  = l.match_id
+        WHERE t.player_id  = %s
+          AND th.segment   != 0
+          AND m.status      = 'complete'
+        """
+        + scope_sql +
+        """
+        GROUP BY th.segment, th.multiplier
+        """
+    )
+    cursor.execute(heatmap_sql, [player_id] + scope_params)
+    rows = cursor.fetchall()
+
+    counts = {}
+    for row in rows:
+        seg = row["segment"]
+        mul = row["multiplier"]
+        hits = row["hits"]
+
+        if seg == 25:
+            key = "BULL" if mul == 2 else "OUTER"
+        else:
+            prefix = "T" if mul == 3 else "D" if mul == 2 else "S"
+            key = prefix + str(seg)
+
+        counts[key] = hits
+
+    return jsonify({"counts": counts}), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Session history list
 # ─────────────────────────────────────────────────────────────────────────────
 

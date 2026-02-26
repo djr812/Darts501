@@ -214,87 +214,116 @@ const STATS = (() => {
         const scope = _getScope(filterBar);
 
         try {
-            const [data, trend] = await Promise.all([
+            const [data, trend, heatmap] = await Promise.all([
                 API.getPlayerStats(playerId, scope),
                 API.getPlayerTrend(playerId, scope),
+                API.getPlayerHeatmap(playerId, scope),
             ]);
-            _render(data, trend, contentArea);
+            _render(data, trend, heatmap, contentArea);
         } catch (err) {
             contentArea.innerHTML = `<div class="stats-error">FAILED TO LOAD STATS<br><small>${err.message}</small></div>`;
         }
     }
 
-    function _render(data, trend, container) {
+    function _render(data, trend, heatmap, container) {
         container.innerHTML = '';
 
         const { records, scoring, checkout } = data;
 
-        // ---- Trend chart ----
+        // ── Two-column layout wrapper ──
+        const cols = document.createElement('div');
+        cols.className = 'stats-two-col';
+        container.appendChild(cols);
+
+        // ── LEFT column: trend chart + session history ──
+        const leftCol = document.createElement('div');
+        leftCol.className = 'stats-col stats-col-left';
+        cols.appendChild(leftCol);
+
         if (trend && trend.matches && trend.matches.length > 1) {
-            container.appendChild(_buildTrendChart(trend.matches));
+            leftCol.appendChild(_buildTrendChart(trend.matches));
         }
+        _renderHistory(data.player.id, leftCol);
 
-        // Helper: build a stat card section
-        function section(title, rows) {
-            const card = document.createElement('div');
-            card.className = 'stat-card';
+        // ── RIGHT column: condensed stats card ──
+        const rightCol = document.createElement('div');
+        rightCol.className = 'stats-col stats-col-right';
+        cols.appendChild(rightCol);
 
-            const h = document.createElement('div');
-            h.className = 'stat-card-title';
-            h.textContent = title;
-            card.appendChild(h);
+        rightCol.appendChild(_buildCondensedStats(records, scoring, checkout));
 
-            rows.forEach(([label, value, sub]) => {
+        // ── Heatmap ──
+        if (heatmap && heatmap.counts) {
+            const hmCard = document.createElement('div');
+            hmCard.className = 'stat-card heatmap-card';
+            const hmTitle = document.createElement('div');
+            hmTitle.className = 'stat-card-title';
+            hmTitle.textContent = 'DART HEATMAP';
+            hmCard.appendChild(hmTitle);
+            hmCard.appendChild(_buildStatsHeatmap(heatmap.counts));
+            rightCol.appendChild(hmCard);
+        }
+    }
+
+    function _buildCondensedStats(records, scoring, checkout) {
+        const card = document.createElement('div');
+        card.className = 'stat-card condensed-stats-card';
+
+        // Scrollable inner wrapper — keeps card at fixed height
+        const scroll = document.createElement('div');
+        scroll.className = 'condensed-stats-scroll';
+        card.appendChild(scroll);
+
+        function group(title, rows) {
+            const hdr = document.createElement('div');
+            hdr.className = 'condensed-group-title';
+            hdr.textContent = title;
+            scroll.appendChild(hdr);
+
+            rows.forEach(([label, value, sub, highlight]) => {
                 const row = document.createElement('div');
-                row.className = 'stat-row';
-                row.innerHTML = `
-                    <span class="stat-label">${_esc(label)}</span>
-                    <span class="stat-value">${_esc(String(value))}${sub ? `<span class="stat-sub"> ${_esc(sub)}</span>` : ''}</span>
-                `;
-                card.appendChild(row);
+                row.className = 'stat-row' + (highlight ? ' stat-row-highlight' : '');
+                row.innerHTML =
+                    `<span class="stat-label">${_esc(label)}</span>` +
+                    `<span class="stat-value">${_esc(String(value))}` +
+                    (sub ? `<span class="stat-sub"> ${_esc(sub)}</span>` : '') +
+                    `</span>`;
+                scroll.appendChild(row);
             });
-
-            return card;
         }
 
-        // ---- Win/Loss record ----
-        container.appendChild(section('RECORD', [
-            ['Matches played',  records.matches_played],
-            ['Matches won',     records.matches_won,    `(${records.match_win_rate}%)`],
-            ['Sets won',        records.sets_won],
-            ['Legs played',     records.legs_played],
-            ['Legs won',        records.legs_won,       `(${records.leg_win_rate}%)`],
-        ]));
-
-        // ---- Scoring ----
-        container.appendChild(section('SCORING', [
-            ['3-dart average',  scoring.three_dart_avg],
-            ['First 9 average', scoring.first9_avg],
-            ['Highest turn',    scoring.highest_turn],
-            ['Lowest turn',     scoring.lowest_turn],
-            ['Highest single dart', scoring.highest_dart],
-            ['Total darts thrown',  scoring.total_darts],
-            ['180s',            scoring.one_eighties],
-            ['140+ turns',      scoring.ton_forties],
-            ['100+ turns',      scoring.tons],
-            ['Busts',           scoring.busts],
-        ]));
-
-        // ---- Checkout ----
         const favDbl = checkout.favourite_double
             ? `${checkout.favourite_double.notation} (×${checkout.favourite_double.times})`
             : '—';
 
-        container.appendChild(section('CHECKOUT', [
-            ['Best checkout',         checkout.best_checkout    || '—'],
-            ['Best double-out finish', checkout.best_double_checkout || '—'],
-            ['Best single-out finish', checkout.best_single_checkout || '—'],
-            ['Avg darts to checkout', checkout.avg_darts_to_checkout || '—'],
-            ['Favourite double',      favDbl],
-        ]));
+        group('RECORD', [
+            ['Played',       records.matches_played],
+            ['Won',          records.matches_won,         `(${records.match_win_rate}%)`,  true],
+            ['Legs won',     records.legs_won,             `of ${records.legs_played}`],
+        ]);
 
-        // ---- Session history ----
-        _renderHistory(data.player.id, container);
+        group('SCORING', [
+            ['3-dart avg',   scoring.three_dart_avg,       null,                            true],
+            ['First 9 avg',  scoring.first9_avg],
+            ['Best turn',    scoring.highest_turn],
+            ['Worst turn',   scoring.lowest_turn],
+            ['Best dart',    scoring.highest_dart],
+            ['Total darts',  scoring.total_darts],
+            ['180s',         scoring.one_eighties,         null,                            scoring.one_eighties > 0],
+            ['140+',         scoring.ton_forties],
+            ['100+',         scoring.tons],
+            ['Busts',        scoring.busts],
+        ]);
+
+        group('CHECKOUT', [
+            ['Best',         checkout.best_checkout        || '—',  null,                   true],
+            ['Best D/O',     checkout.best_double_checkout || '—'],
+            ['Best S/O',     checkout.best_single_checkout || '—'],
+            ['Avg darts',    checkout.avg_darts_to_checkout || '—'],
+            ['Fav double',   favDbl],
+        ]);
+
+        return card;
     }
 
     // ------------------------------------------------------------------
@@ -443,6 +472,260 @@ Avg: ${m.avg}  (${m.darts} darts)`;
         card.className = 'stat-card trend-card';
         card.appendChild(svg);
         return card;
+    }
+
+    // ------------------------------------------------------------------
+    // Stats heatmap (full multi-colour gradient)
+    // ------------------------------------------------------------------
+
+    function _buildStatsHeatmap(counts) {
+        const SEGMENTS = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+        const SIZE = 200, CX = SIZE/2, CY = SIZE/2;
+        const R = SIZE/2 - 4;
+
+        const rBull    = R * 0.06;
+        const rOuter   = R * 0.13;
+        const rInner1  = R * 0.47;
+        const rTreble2 = R * 0.55;
+        const rDouble1 = R * 0.84;
+        const rDouble2 = R * 0.97;
+
+        const SEG_ANGLE   = 360 / 20;
+        const START_OFF   = -SEG_ANGLE / 2;
+
+        // Find max hits for scaling
+        let maxHits = 1;
+        Object.values(counts).forEach(v => { if (v > maxHits) maxHits = v; });
+
+        function getHits(seg, prefix) {
+            if (seg === 25) return counts[prefix === 'D' ? 'BULL' : 'OUTER'] || 0;
+            return counts[prefix + seg] || 0;
+        }
+
+        // Multi-colour gradient: cold (black) → purple → red → tan/orange → green (hot)
+        // Using site palette colours: var colours at 0%, 25%, 50%, 75%, 100%
+        function heatColour(hits, isDouble, isTreble) {
+            if (hits === 0) return null;
+            const t = Math.pow(hits / maxHits, 0.6); // power <1 spreads low values
+
+            // Colour stops matching site palette
+            // 0.00: #0d0d0d  (near black — cold)
+            // 0.20: #4a1060  (deep purple)
+            // 0.45: #c0392b  (site red / bust colour)
+            // 0.70: #c8a068  (site tan / warm)
+            // 1.00: #2ecc71  (site green / checkout colour)
+            const stops = [
+                { t: 0.00, r: 13,  g: 13,  b: 13  },
+                { t: 0.20, r: 74,  g: 16,  b: 96  },
+                { t: 0.45, r: 192, g: 57,  b: 43  },
+                { t: 0.70, r: 200, g: 160, b: 104 },
+                { t: 1.00, r: 46,  g: 204, b: 113 },
+            ];
+
+            // Find the two stops t falls between
+            let lo = stops[0], hi = stops[stops.length - 1];
+            for (let i = 0; i < stops.length - 1; i++) {
+                if (t >= stops[i].t && t <= stops[i+1].t) {
+                    lo = stops[i]; hi = stops[i+1]; break;
+                }
+            }
+            const span = hi.t - lo.t || 1;
+            const f    = (t - lo.t) / span;
+            const r = Math.round(lo.r + f * (hi.r - lo.r));
+            const g = Math.round(lo.g + f * (hi.g - lo.g));
+            const b = Math.round(lo.b + f * (hi.b - lo.b));
+
+            // Trebles/doubles get slightly higher opacity for ring distinction
+            const alpha = isTreble ? 0.95 : isDouble ? 0.88 : 0.80;
+            return `rgba(${r},${g},${b},${alpha})`;
+        }
+
+        function polarToXY(angleDeg, radius) {
+            const rad = (angleDeg - 90) * Math.PI / 180;
+            return { x: CX + radius * Math.cos(rad), y: CY + radius * Math.sin(rad) };
+        }
+
+        function arcPath(r1, r2, a1, a2) {
+            const p1 = polarToXY(a1, r1), p2 = polarToXY(a2, r1);
+            const p3 = polarToXY(a2, r2), p4 = polarToXY(a1, r2);
+            const lg = (a2 - a1) > 180 ? 1 : 0;
+            return `M ${p1.x} ${p1.y} A ${r1} ${r1} 0 ${lg} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${r2} ${r2} 0 ${lg} 0 ${p4.x} ${p4.y} Z`;
+        }
+
+        function svgEl(tag, attrs) {
+            const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+            Object.entries(attrs).forEach(([k,v]) => e.setAttribute(k, v));
+            return e;
+        }
+
+        function tip(el, text) {
+            const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+            t.textContent = text;
+            el.appendChild(t);
+        }
+
+        const svg = svgEl('svg', {
+            viewBox: `0 0 ${SIZE} ${SIZE}`,
+            width: '100%',
+            style: 'width:100%;display:block;',
+        });
+
+        // Dark board background
+        svg.appendChild(svgEl('circle', { cx: CX, cy: CY, r: R, fill: '#0d0d0d', stroke: '#222', 'stroke-width': '1' }));
+
+        SEGMENTS.forEach((seg, i) => {
+            const a1 = START_OFF + i * SEG_ANGLE;
+            const a2 = a1 + SEG_ANGLE;
+
+            const sH = getHits(seg, 'S');
+            const tH = getHits(seg, 'T');
+            const dH = getHits(seg, 'D');
+
+            const zones = [
+                { r1: rOuter,   r2: rInner1,  hits: sH, dbl: false, tbl: false, lbl: 'S' },
+                { r1: rInner1,  r2: rTreble2, hits: tH, dbl: false, tbl: true,  lbl: 'T' },
+                { r1: rTreble2, r2: rDouble1, hits: sH, dbl: false, tbl: false, lbl: 'S' },
+                { r1: rDouble1, r2: rDouble2, hits: dH, dbl: true,  tbl: false, lbl: 'D' },
+            ];
+
+            zones.forEach(zone => {
+                const colour = heatColour(zone.hits, zone.dbl, zone.tbl);
+                const fill   = colour || '#141414';
+                const path   = svgEl('path', {
+                    d: arcPath(zone.r1, zone.r2, a1, a2),
+                    fill,
+                    stroke: '#1e1e1e',
+                    'stroke-width': '0.5',
+                });
+                svg.appendChild(path);
+
+                // Hit count on treble/double rings if >0
+                if (zone.hits > 0 && zone.lbl !== 'S') {
+                    const mid = a1 + SEG_ANGLE / 2;
+                    const mr  = (zone.r1 + zone.r2) / 2;
+                    const mp  = polarToXY(mid, mr);
+                    const txt = svgEl('text', {
+                        x: mp.x, y: mp.y,
+                        'text-anchor': 'middle', 'dominant-baseline': 'central',
+                        fill: '#fff', 'font-size': '6.5', 'font-family': 'monospace',
+                        'font-weight': 'bold', 'pointer-events': 'none',
+                    });
+                    txt.textContent = zone.hits;
+                    svg.appendChild(txt);
+                }
+
+                // Tooltip target
+                const hitPts = zone.hits * (zone.lbl === 'T' ? 3 : zone.lbl === 'D' ? 2 : 1) * seg;
+                const ttEl = svgEl('path', { d: arcPath(zone.r1, zone.r2, a1, a2), fill: 'transparent', stroke: 'none', cursor: 'default' });
+                tip(ttEl, `${zone.lbl}${seg} — ${zone.hits} hit${zone.hits !== 1 ? 's' : ''} — ${hitPts} pts`);
+                svg.appendChild(ttEl);
+            });
+
+            // Number label in wire ring
+            const mid   = a1 + SEG_ANGLE / 2;
+            const labelR = (rDouble2 + R) / 2;
+            const lp    = polarToXY(mid, labelR);
+            const rot   = mid + 90;
+            const lbl   = svgEl('text', {
+                x: lp.x, y: lp.y, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+                fill: '#555', 'font-size': '7.5', 'font-family': 'monospace',
+                transform: `rotate(${rot},${lp.x},${lp.y})`, 'pointer-events': 'none',
+            });
+            lbl.textContent = seg;
+            svg.appendChild(lbl);
+        });
+
+        // Outer bull
+        const obH  = getHits(25, 'S');
+        const obC  = heatColour(obH, false, false);
+        svg.appendChild(svgEl('circle', { cx: CX, cy: CY, r: rOuter, fill: obC || '#141414', stroke: '#1e1e1e', 'stroke-width': '0.5' }));
+        if (obH > 0) {
+            const obTxt = svgEl('text', { x: CX, y: CY + rBull + (rOuter - rBull)/2 - 1,
+                'text-anchor': 'middle', 'dominant-baseline': 'central',
+                fill: '#fff', 'font-size': '6', 'font-family': 'monospace', 'pointer-events': 'none' });
+            obTxt.textContent = obH;
+            svg.appendChild(obTxt);
+        }
+        const obTT = svgEl('circle', { cx: CX, cy: CY, r: rOuter, fill: 'transparent', stroke: 'none', cursor: 'default' });
+        tip(obTT, `Outer Bull — ${obH} hit${obH !== 1 ? 's' : ''} — ${obH * 25} pts`);
+        svg.appendChild(obTT);
+
+        // Inner bull
+        const bH  = getHits(25, 'D');
+        const bC  = heatColour(bH, true, false);
+        svg.appendChild(svgEl('circle', { cx: CX, cy: CY, r: rBull, fill: bC || '#141414', stroke: '#1e1e1e', 'stroke-width': '0.5' }));
+        if (bH > 0) {
+            const bTxt = svgEl('text', { x: CX, y: CY,
+                'text-anchor': 'middle', 'dominant-baseline': 'central',
+                fill: '#fff', 'font-size': '6', 'font-family': 'monospace', 'pointer-events': 'none' });
+            bTxt.textContent = bH;
+            svg.appendChild(bTxt);
+        }
+        const bTT = svgEl('circle', { cx: CX, cy: CY, r: rBull, fill: 'transparent', stroke: 'none', cursor: 'default' });
+        tip(bTT, `Bull — ${bH} hit${bH !== 1 ? 's' : ''} — ${bH * 50} pts`);
+        svg.appendChild(bTT);
+
+        // Gradient legend
+        // ── Side-by-side layout: SVG board + contextual legend ──
+        const inner = document.createElement('div');
+        inner.className = 'heatmap-inner';
+
+        // Left: SVG board
+        const svgWrap = document.createElement('div');
+        svgWrap.className = 'heatmap-svg-wrap';
+        svgWrap.appendChild(svg);
+        inner.appendChild(svgWrap);
+
+        // Right: legend
+        const legend = document.createElement('div');
+        legend.className = 'heatmap-legend';
+
+        const lgTitle = document.createElement('div');
+        lgTitle.className = 'heatmap-legend-title';
+        lgTitle.textContent = 'COLOUR GUIDE';
+        legend.appendChild(lgTitle);
+
+        const legendItems = [
+            { colour: '#2ecc71', label: 'Hottest',    desc: 'Most frequently hit zones' },
+            { colour: '#c8a068', label: 'Hot',         desc: 'Above average frequency'   },
+            { colour: '#c0392b', label: 'Moderate',    desc: 'Occasionally hit'           },
+            { colour: '#4a1060', label: 'Cold',        desc: 'Rarely hit'                 },
+            { colour: '#0d0d0d', label: 'Coldest',     desc: 'Never or almost never hit', border: '#444' },
+        ];
+
+        legendItems.forEach(function(item) {
+            const row = document.createElement('div');
+            row.className = 'heatmap-legend-item';
+
+            const swatch = document.createElement('div');
+            swatch.className = 'heatmap-legend-swatch';
+            swatch.style.background = item.colour;
+            if (item.border) swatch.style.borderColor = item.border;
+            row.appendChild(swatch);
+
+            const txt = document.createElement('div');
+            txt.className = 'heatmap-legend-text';
+            txt.innerHTML = '<strong>' + item.label + '</strong>' + item.desc;
+            row.appendChild(txt);
+
+            legend.appendChild(row);
+        });
+
+        // Gradient bar at bottom of legend
+        const barRow = document.createElement('div');
+        barRow.className = 'heatmap-gradient-bar-row';
+        barRow.innerHTML =
+            '<span class="heatmap-gradient-lbl">COLD</span>' +
+            '<div class="heatmap-gradient-bar"></div>' +
+            '<span class="heatmap-gradient-lbl">HOT</span>';
+        legend.appendChild(barRow);
+
+        inner.appendChild(legend);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'heatmap-wrap';
+        wrap.appendChild(inner);
+        return wrap;
     }
 
     // ------------------------------------------------------------------
