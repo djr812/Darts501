@@ -8,6 +8,7 @@ const UI = (() => {
     // Setup Screen
     // ------------------------------------------------------------------
 
+    // ── Home screen: title + game type tiles + stats button ──
     function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket) {
         const app = document.getElementById('app');
         app.innerHTML = '';
@@ -17,67 +18,109 @@ const UI = (() => {
         if (!document.getElementById('toast'))   document.body.appendChild(_buildToast());
         if (!document.getElementById('loading')) document.body.appendChild(_buildLoading());
 
-        // Inner wrapper handles centring and padding
-        var inner = document.createElement('div');
-        inner.className = 'setup-screen-inner';
+        const inner = document.createElement('div');
+        inner.className = 'setup-screen-inner home-screen-inner';
         app.appendChild(inner);
-
-        // From here, append everything to inner instead of app
-        var _appTarget = inner;
 
         // Title
         const title = document.createElement('div');
         title.id = 'setup-title';
-        title.innerHTML = `<div class="setup-logo">DARTS 501</div><div class="setup-subtitle">MATCH SETUP</div>`;
-        _appTarget.appendChild(title);
+        title.innerHTML = '<div class="setup-logo">DARTS 101</div><div class="setup-subtitle">SELECT GAME TYPE</div>';
+        inner.appendChild(title);
 
-        // ---- Game Type ----
-        const gameTypeSection = document.createElement('div');
-        gameTypeSection.className = 'setup-section';
-        gameTypeSection.innerHTML = '<div class="setup-label">GAME TYPE</div>';
-        const gameTypeRow = document.createElement('div');
-        gameTypeRow.className = 'setup-option-row';
+        // Game type tiles
+        const tilesSection = document.createElement('div');
+        tilesSection.className = 'home-tiles';
+        inner.appendChild(tilesSection);
 
         const gameTypes = [
-            { value: '501', label: '501' },
-            { value: '201', label: '201' },
-            { value: 'Cricket', label: 'Cricket', cricket: true },
-            { value: 'Practice', label: 'PRACTICE', practice: true },
+            { value: '501',      label: '501',      sub: 'Classic',       icon: '🎯' },
+            { value: '201',      label: '201',       sub: 'Short game',    icon: '⚡' },
+            { value: 'Cricket',  label: 'Cricket',   sub: 'Strategic',     icon: '🏏' },
+            { value: 'Practice', label: 'Practice',  sub: 'Solo training', icon: '🎪' },
         ];
+
         gameTypes.forEach(gt => {
-            const btn = document.createElement('button');
-            btn.className = 'option-btn';
-            btn.dataset.value = gt.value;
-            btn.type = 'button';
-            btn.innerHTML = gt.hint
-                ? `${gt.label}<span class="option-hint">${gt.hint}</span>`
-                : gt.label;
-            if (gt.disabled) {
-                btn.disabled = true;
-                btn.classList.add('disabled');
-            } else if (gt.practice) {
-                // Practice jumps straight to practice flow — no match config needed
-                btn.classList.add('practice-gametype-btn');
-                btn.addEventListener('click', () => {
-                    if (onPractice) onPractice();
-                });
-            } else if (gt.cricket) {
-                // Cricket has its own setup flow
-                btn.classList.add('cricket-gametype-btn');
-                btn.addEventListener('click', () => {
-                    if (onCricket) onCricket();
-                });
+            const tile = document.createElement('button');
+            tile.className = 'home-tile';
+            tile.type = 'button';
+            tile.innerHTML =
+                `<span class="home-tile-icon">${gt.icon}</span>` +
+                `<span class="home-tile-label">${gt.label}</span>` +
+                `<span class="home-tile-sub">${gt.sub}</span>`;
+
+            if (gt.value === 'Practice') {
+                tile.addEventListener('click', () => { if (onPractice) onPractice(); });
+            } else if (gt.value === 'Cricket') {
+                tile.addEventListener('click', () => { if (onCricket) onCricket(); });
             } else {
-                btn.addEventListener('click', () => {
-                    gameTypeRow.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-                    btn.classList.add('selected');
-                    checkoutSection.style.display = gt.value === 'Cricket' ? 'none' : '';
+                // 501 / 201 → go to match setup screen
+                tile.addEventListener('click', () => {
+                    _buildMatchSetupScreen(
+                        gt.value, existingPlayers, onStartGame, onViewStats, onPractice, onCricket
+                    );
                 });
             }
-            gameTypeRow.appendChild(btn);
+            tilesSection.appendChild(tile);
         });
-        gameTypeSection.appendChild(gameTypeRow);
-        _appTarget.appendChild(gameTypeSection);
+
+        // Stats button
+        if (onViewStats) {
+            const statsBtn = document.createElement('button');
+            statsBtn.className = 'stats-entry-btn home-stats-btn';
+            statsBtn.type = 'button';
+            statsBtn.innerHTML = '📊  PLAYER STATS';
+            statsBtn.addEventListener('click', onViewStats);
+            inner.appendChild(statsBtn);
+        }
+    }
+
+    // ── Match setup screen: checkout / sets / legs / players / start ──
+    function _buildMatchSetupScreen(gameType, existingPlayers, onStartGame, onViewStats, onPractice, onCricket) {
+        const app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-setup';
+
+        const inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        // Title + back button
+        const titleRow = document.createElement('div');
+        titleRow.className = 'setup-title-row';
+
+        const backBtn = document.createElement('button');
+        backBtn.className = 'setup-back-btn';
+        backBtn.type = 'button';
+        backBtn.textContent = '←';
+        backBtn.addEventListener('click', () => {
+            API.getPlayers().then(p => {
+                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket);
+            });
+        });
+        titleRow.appendChild(backBtn);
+
+        const title = document.createElement('div');
+        title.id = 'setup-title';
+        title.innerHTML =
+            `<div class="setup-logo">${gameType}</div>` +
+            `<div class="setup-subtitle">MATCH SETUP</div>`;
+        titleRow.appendChild(title);
+        inner.appendChild(titleRow);
+
+        var _appTarget = inner;
+
+        // Fake gameTypeRow/gameTypeSel so start button validation still works
+        // We create a hidden selected button representing the chosen game type
+        const hiddenGameTypeRow = document.createElement('div');
+        hiddenGameTypeRow.style.display = 'none';
+        const hiddenBtn = document.createElement('button');
+        hiddenBtn.dataset.value = gameType;
+        hiddenBtn.classList.add('selected');
+        hiddenGameTypeRow.appendChild(hiddenBtn);
+        _appTarget.appendChild(hiddenGameTypeRow);
+        const gameTypeRow = hiddenGameTypeRow;
 
         // ---- Checkout Rule ----
         const checkoutSection = document.createElement('div');
@@ -222,21 +265,7 @@ const UI = (() => {
         });
         _appTarget.appendChild(startBtn);
 
-        // ---- Stats button ----
-        if (onViewStats) {
-            const statsBtn = document.createElement('button');
-            statsBtn.id = 'setup-stats-btn';
-            statsBtn.className = 'stats-entry-btn';
-            statsBtn.type = 'button';
-            statsBtn.innerHTML = '📊  VIEW PLAYER STATS';
-            statsBtn.addEventListener('click', onViewStats);
-            _appTarget.appendChild(statsBtn);
-        }
-
-
-
-        // Defaults
-        gameTypeRow.querySelector('[data-value="501"]').click();
+        // Defaults — no gameTypeRow click needed (it's already set via hidden btn)
         checkoutRow.querySelector('[data-value="double"]').click();
         setsRow.querySelector('[data-value="1"]').click();
         legsRow.querySelector('[data-value="1"]').click();

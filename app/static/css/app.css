@@ -3278,3 +3278,103 @@ body.mode-cricket #app {
     color: var(--text-dim);
     flex-shrink: 0;
 }
+
+/* =========================================================
+   HOME SCREEN
+   ========================================================= */
+
+.home-screen-inner {
+    justify-content: center;
+    gap: var(--gap-lg);
+}
+
+.home-tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    width: 100%;
+    max-width: 480px;
+}
+
+.home-tile {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 24px 16px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    -webkit-transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s;
+    text-align: center;
+}
+
+.home-tile:active {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.home-tile-icon {
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.home-tile-label {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text-primary);
+}
+
+.home-tile-sub {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+.home-stats-btn {
+    max-width: 480px;
+    width: 100%;
+}
+
+/* ── Match setup back button ── */
+.setup-title-row {
+    display: -webkit-box;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 4px;
+}
+
+.setup-back-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    padding: 6px 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
+    -webkit-transition: border-color 0.15s, color 0.15s;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.setup-back-btn:active {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.setup-title-row #setup-title {
+    text-align: left;
+}

@@ -608,7 +608,7 @@
         var backBtn = document.createElement('button');
         backBtn.className = 'practice-back-btn';
         backBtn.type = 'button';
-        backBtn.textContent = '← BACK TO MATCH SETUP';
+        backBtn.textContent = '← BACK';
         backBtn.addEventListener('click', function() {
             API.getPlayers().then(function(p) {
                 UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
