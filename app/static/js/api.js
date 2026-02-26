@@ -163,6 +163,17 @@ const API = (() => {
     }
 
     /**
+     * Submit a complete turn (all darts) in one request.
+     * Replaces the per-dart recordThrow flow for human players.
+     *
+     * @param {object} turnData  { leg_id, player_id, score_before, darts: [{segment, multiplier}] }
+     * @returns {Promise<object>}
+     */
+    async function submitTurn(turnData) {
+        return request('POST', '/api/turns/submit', turnData);
+    }
+
+    /**
      * Fetch all players.
      *
      * @returns {Promise<Array>}
@@ -293,6 +304,7 @@ const API = (() => {
     // Expose public interface
     return {
         recordThrow,
+        submitTurn,
         undoLastThrow,
         getPlayers,
         createPlayer,

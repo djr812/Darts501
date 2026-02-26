@@ -30,7 +30,44 @@
         cpuDifficulty:    'medium',   // 'easy' | 'medium' | 'hard'
         setsScore:        {},
         legsScore:        {},
+        // Pending darts buffer — darts scored locally, not yet sent to server
+        pendingDarts:     [],         // [{ segment, multiplier, points, scoreAfter, isBust, isCheckout }]
+        pendingCheckoutResult: null,  // cached last-dart result if turn ended in checkout/bust
     };
+
+    // ------------------------------------------------------------------
+    // Local scoring engine (mirrors scoring_engine.py exactly)
+    // ------------------------------------------------------------------
+
+    const _LocalScoring = (() => {
+        function calcPoints(seg, mul) {
+            return seg * mul;  // works for bull too: 25*1=25, 25*2=50
+        }
+        function isBust(scoreBefore, points, mul, doubleOut) {
+            const after = scoreBefore - points;
+            if (after < 0) return true;
+            if (doubleOut) {
+                if (after === 1) return true;
+                if (after === 0 && mul !== 2) return true;
+            }
+            return false;
+        }
+        function isCheckout(scoreBefore, seg, mul, doubleOut) {
+            const points = calcPoints(seg, mul);
+            const after  = scoreBefore - points;
+            if (after !== 0) return false;
+            return doubleOut ? mul === 2 : true;
+        }
+        function processThrow(score, dartNumber, seg, mul, doubleOut) {
+            const points       = calcPoints(seg, mul);
+            const checkoutFlag = isCheckout(score, seg, mul, doubleOut);
+            const bustFlag     = checkoutFlag ? false : isBust(score, points, mul, doubleOut);
+            const scoreAfter   = bustFlag ? score : score - points;
+            const turnComplete = checkoutFlag || bustFlag || dartNumber === 3;
+            return { points, scoreAfter, isBust: bustFlag, isCheckout: checkoutFlag, turnComplete };
+        }
+        return { processThrow };
+    })();
 
     // ------------------------------------------------------------------
     // Setup
@@ -93,6 +130,8 @@
             state.matchId = match.id;
             state.legId   = leg.id;
             state.players = players;
+            state.pendingDarts = [];
+            state.pendingCheckoutResult = null;
 
             UI.buildShell(players, { onMultiplier, onSegment, onUndo, onNextPlayer, onCancel, onRestart });
             _startLeg(leg.id);
@@ -119,6 +158,8 @@
         state.turnComplete     = false;
         state.legOver          = false;
         state.cpuTurnRunning   = false;
+        state.pendingDarts     = [];
+        state.pendingCheckoutResult = null;
 
         state.players.forEach(p => {
             p.score = state.startingScore;
@@ -165,59 +206,80 @@
      * Record a single dart via the API and update state + UI.
      * Returns the raw server response (ThrowResult + optional leg info).
      */
-    async function _recordDart(segment, multiplier) {
+    // _recordDart — LOCAL only, no server call.
+    // Scores the dart immediately using the JS engine and buffers it in
+    // state.pendingDarts. Server is only contacted on _submitPendingTurn().
+    function _recordDart(segment, multiplier) {
         const player = currentPlayer();
 
-        const result = await API.recordThrow({
-            leg_id:       state.legId,
-            player_id:    player.id,
-            segment,
-            multiplier,
-            score_before: player.score,
-        });
-
-        // Capture turn metadata on first dart
+        // Capture turn start score on first dart
         if (state.dartsThisTurn === 0) {
-            state.activeTurnId    = result.turn_id;
-            state.turnScoreBefore = result.score_before;
+            state.turnScoreBefore = player.score;
         }
+
+        const dartNumber = state.dartsThisTurn + 1;
+        const result = _LocalScoring.processThrow(
+            player.score, dartNumber, segment, multiplier, state.doubleOut
+        );
+
+        // Buffer the dart
+        state.pendingDarts.push({ segment, multiplier,
+            points:     result.points,
+            scoreAfter: result.scoreAfter,
+            isBust:     result.isBust,
+            isCheckout: result.isCheckout,
+        });
         state.dartsThisTurn++;
 
-        // Update UI
+        // Update UI immediately — no loading spinner
         UI.addDartPill(player.id, result.points, multiplier, segment);
 
-        // Play dart thud sound
-        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
-            SOUNDS.dart();
-        }
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) SOUNDS.dart();
 
-        // Announce each dart score immediately as it lands
-        if (!result.is_bust) {
+        if (!result.isBust) {
             SPEECH.announceDartScore(segment, multiplier, result.points);
         }
 
-        if (result.is_bust) {
+        if (result.isBust) {
             player.score = state.turnScoreBefore;
             UI.setScore(player.id, player.score);
             UI.flashCard(player.id, 'bust');
-
-        } else if (result.is_checkout) {
+        } else if (result.isCheckout) {
             player.score = 0;
             UI.setScore(player.id, 0);
             UI.flashCard(player.id, 'checkout');
-
         } else {
-            player.score = result.score_after;
+            player.score = result.scoreAfter;
             UI.setScore(player.id, player.score);
-            if (result.checkout_suggestion) {
-                UI.setCheckoutHint(player.id, result.checkout_suggestion);
-            }
         }
 
-        // Update checkout panel after every dart
         UI.setCheckoutPanel(player.score, state.doubleOut);
 
-        return result;
+        // Synthesise result shape expected by callers
+        return {
+            points:            result.points,
+            score_before:      state.turnScoreBefore,
+            score_after:       result.scoreAfter,
+            is_bust:           result.isBust,
+            is_checkout:       result.isCheckout,
+            turn_complete:     result.turnComplete,
+            checkout_suggestion: null,  // will arrive from server after submit
+        };
+    }
+
+    // Submit the buffered turn to the server in one request.
+    // Called by onNextPlayer (normal end of turn) and onSegment (checkout).
+    async function _submitPendingTurn() {
+        if (state.pendingDarts.length === 0) return null;
+        const player = currentPlayer();
+        return API.submitTurn({
+            leg_id:       state.legId,
+            player_id:    player.id,
+            score_before: state.turnScoreBefore,
+            darts: state.pendingDarts.map(function(d) {
+                return { segment: d.segment, multiplier: d.multiplier };
+            }),
+        });
     }
 
     // ------------------------------------------------------------------
@@ -257,8 +319,23 @@
                 return result;
             },
             // onTurnEnd — called after all darts thrown
-            (lastResult) => {
+            async (lastResult) => {
                 state.cpuTurnRunning = false;
+
+                // Submit CPU's buffered darts to server
+                if (state.pendingDarts.length > 0) {
+                    try {
+                        const serverResult = await _submitPendingTurn();
+                        state.pendingDarts = [];
+                        // Use server's authoritative leg result for checkout
+                        if (lastResult && lastResult.is_checkout && serverResult) {
+                            lastResult = serverResult;
+                        }
+                    } catch (err) {
+                        console.error('[app] CPU turn submit error:', err);
+                        state.pendingDarts = [];
+                    }
+                }
 
                 if (lastResult && lastResult.is_checkout) {
                     // CPU won the leg
@@ -301,6 +378,8 @@
         state.activeTurnId     = null;
         state.turnScoreBefore  = null;
         state.activeMultiplier = 1;
+        state.pendingDarts     = [];
+        state.pendingCheckoutResult = null;
 
         UI.setMultiplierTab(1);
         UI.setNextPlayerEnabled(false);
@@ -377,83 +456,112 @@
 
         const multiplier = forcedMultiplier !== null ? forcedMultiplier : state.activeMultiplier;
 
-        UI.setLoading(true);
-        try {
-            const result = await _recordDart(segment, multiplier);
+        // _recordDart is now instant/local — no spinner needed
+        const result = _recordDart(segment, multiplier);
 
-            if (result.is_bust) {
-                SPEECH.announceBust();
-                UI.showToast('BUST!', 'bust', 2500);
-                UI.setStatus('BUST — TAP NEXT ▶', 'bust');
-                UI.setCheckoutPanel(currentPlayer().score, state.doubleOut);
-                state.turnComplete = true;
-                UI.setNextPlayerEnabled(true);
+        if (result.is_bust) {
+            SPEECH.announceBust();
+            UI.showToast('BUST!', 'bust', 2500);
+            UI.setStatus('BUST — TAP NEXT ▶', 'bust');
+            UI.setCheckoutPanel(currentPlayer().score, state.doubleOut);
+            state.turnComplete = true;
+            UI.setNextPlayerEnabled(true);
 
-            } else if (result.is_checkout) {
-                SPEECH.announceCheckout(state.turnScoreBefore);
-                state.legOver      = true;
-                state.turnComplete = true;
-                UI.setNextPlayerEnabled(false);
-                UI.setStatus(`${currentPlayer().name.toUpperCase()} CHECKED OUT!`, 'success');
-                UI.setCheckoutPanel(null, state.doubleOut);
-                setTimeout(() => _handleLegWin(result, currentPlayer()), 800);
-
-            } else if (result.turn_complete) {
-                var _turnScored = state.turnScoreBefore - currentPlayer().score;
-                SPEECH.announceTurnEnd(_turnScored, currentPlayer().score);
-                UI.setStatus('END OF TURN — TAP NEXT ▶');
-                state.turnComplete = true;
-                UI.setNextPlayerEnabled(true);
-                if (result.checkout_suggestion) UI.setCheckoutHint(currentPlayer().id, result.checkout_suggestion);
-
-            } else {
-                const dartsLeft = 3 - state.dartsThisTurn;
-                UI.setStatus(`${currentPlayer().score} REMAINING — ${dartsLeft} DART${dartsLeft !== 1 ? 'S' : ''} LEFT`);
-                if (result.checkout_suggestion) {
-                    UI.showToast(result.checkout_suggestion.join(' → '), 'info', 3000);
-                }
+        } else if (result.is_checkout) {
+            // Checkout: submit to server now (we need leg-win resolution)
+            SPEECH.announceCheckout(state.turnScoreBefore);
+            state.legOver      = true;
+            state.turnComplete = true;
+            UI.setNextPlayerEnabled(false);
+            UI.setStatus(`${currentPlayer().name.toUpperCase()} CHECKED OUT!`, 'success');
+            UI.setCheckoutPanel(null, state.doubleOut);
+            UI.setLoading(true);
+            try {
+                const serverResult = await _submitPendingTurn();
+                state.pendingDarts = [];
+                setTimeout(() => _handleLegWin(serverResult, currentPlayer()), 800);
+            } catch (err) {
+                UI.showToast(`SYNC ERROR: ${err.message}`, 'bust', 4000);
+                console.error('[app] Checkout submit error:', err);
+            } finally {
+                UI.setLoading(false);
             }
 
-        } catch (err) {
-            UI.showToast(`ERROR: ${err.message}`, 'bust', 3000);
-            UI.setStatus('ERROR — TRY AGAIN', 'bust');
-            console.error('[app] Throw error:', err);
-        } finally {
-            UI.setLoading(false);
+        } else if (result.turn_complete) {
+            var _turnScored = state.turnScoreBefore - currentPlayer().score;
+            SPEECH.announceTurnEnd(_turnScored, currentPlayer().score);
+            UI.setStatus('END OF TURN — TAP NEXT ▶');
+            state.turnComplete = true;
+            UI.setNextPlayerEnabled(true);
+
+        } else {
+            const dartsLeft = 3 - state.dartsThisTurn;
+            UI.setStatus(`${currentPlayer().score} REMAINING — ${dartsLeft} DART${dartsLeft !== 1 ? 'S' : ''} LEFT`);
         }
     }
 
-    async function onUndo() {
+    function onUndo() {
         if (currentPlayer().isCpu || state.cpuTurnRunning) return;
-        if (!state.activeTurnId || state.dartsThisTurn === 0) {
+        if (state.dartsThisTurn === 0 || state.pendingDarts.length === 0) {
             UI.showToast('NOTHING TO UNDO', 'info'); return;
         }
-        UI.setLoading(true);
-        try {
-            const result = await API.undoLastThrow(state.activeTurnId);
-            const player = currentPlayer();
-            player.score = result.score_reverted_to;
-            UI.setScore(player.id, player.score);
-            const dartsRow = document.getElementById(`darts-${player.id}`);
-            if (dartsRow && dartsRow.lastChild) dartsRow.removeChild(dartsRow.lastChild);
-            state.dartsThisTurn--;
-            state.turnComplete = false;
-            UI.setNextPlayerEnabled(false);
-            UI.setCheckoutHint(player.id, null);
-            UI.setCheckoutPanel(player.score, state.doubleOut);
-            if (state.dartsThisTurn === 0) state.turnScoreBefore = null;
-            const dartsLeft = 3 - state.dartsThisTurn;
-            UI.setStatus(`UNDONE — ${player.score} REMAINING — ${dartsLeft} DART${dartsLeft !== 1 ? 'S' : ''} LEFT`);
-            UI.showToast('DART UNDONE', 'info', 1500);
-        } catch (err) {
-            UI.showToast(`UNDO FAILED: ${err.message}`, 'bust', 3000);
-        } finally {
-            UI.setLoading(false);
+
+        // Pop the last dart from the local buffer — no server call
+        state.pendingDarts.pop();
+        state.dartsThisTurn--;
+        state.turnComplete = false;
+
+        // Recalculate player score from scratch using buffered darts
+        const player = currentPlayer();
+        let score = state.turnScoreBefore;
+        for (const d of state.pendingDarts) {
+            if (d.isBust) { score = state.turnScoreBefore; break; }
+            score = d.scoreAfter;
         }
+        if (state.dartsThisTurn === 0) {
+            score = state.turnScoreBefore;
+            state.turnScoreBefore = null;
+        }
+        player.score = score;
+
+        // Remove last pill from UI
+        const dartsRow = document.getElementById(`darts-${player.id}`);
+        if (dartsRow && dartsRow.lastChild) dartsRow.removeChild(dartsRow.lastChild);
+
+        UI.setScore(player.id, player.score);
+        UI.setNextPlayerEnabled(false);
+        UI.setCheckoutHint(player.id, null);
+        UI.setCheckoutPanel(player.score, state.doubleOut);
+
+        const dartsLeft = 3 - state.dartsThisTurn;
+        UI.setStatus(`UNDONE — ${player.score} REMAINING — ${dartsLeft} DART${dartsLeft !== 1 ? 'S' : ''} LEFT`);
+        UI.showToast('DART UNDONE', 'info', 1500);
     }
 
-    function onNextPlayer() {
+    async function onNextPlayer() {
         if (!state.turnComplete || state.cpuTurnRunning || currentPlayer().isCpu) return;
+
+        // Submit pending darts to server, then advance
+        if (state.pendingDarts.length > 0) {
+            UI.setLoading(true);
+            try {
+                const serverResult = await _submitPendingTurn();
+                state.pendingDarts = [];
+
+                // Apply server's checkout suggestion now that we have it
+                if (serverResult && serverResult.checkout_suggestion) {
+                    const next = state.players[(state.currentIndex + 1) % state.players.length];
+                    if (next) UI.setCheckoutHint(next.id, serverResult.checkout_suggestion);
+                }
+            } catch (err) {
+                UI.showToast(`SYNC ERROR: ${err.message}`, 'bust', 4000);
+                console.error('[app] Turn submit error:', err);
+                // Still advance — don't block the game on a network hiccup
+            } finally {
+                UI.setLoading(false);
+            }
+        }
+
         _advancePlayer();
     }
 

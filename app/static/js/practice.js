@@ -259,6 +259,7 @@ var PRACTICE = (function() {
         matchId:       null,
         legId:         null,
         turnId:        null,
+        pendingDarts:  [],    // buffered darts not yet sent to server
         playerId:      null,
         playerName:    '',
         dartsThrown:   0,
@@ -538,92 +539,73 @@ var PRACTICE = (function() {
     // Dart recording
     // ------------------------------------------------------------------
 
+    // _recordPracticeDart — local only, no server call.
+    // Darts are buffered in _state.pendingDarts and submitted in bulk
+    // when the player taps NEXT. Timer expiry and END discard pending darts.
     function _recordPracticeDart(segment) {
         var multiplier = _state.multiplier;
         var points = segment === 0 ? 0 : segment * multiplier;
 
-        // Passes score_before: 0 every time — the throws endpoint auto-creates/
-        // continues turns. For practice we don't track score countdown, only
-        // accumulate stats, so score_before is always 0.
-        API.recordThrow({
-            leg_id:       _state.legId,
-            player_id:    _state.playerId,
-            segment:      segment,
-            multiplier:   multiplier,
-            score_before: 501, // practice has no countdown — high value prevents spurious busts
-        })
-        .then(function(result) {
-            // Always capture turn_id — bust throws close the turn immediately
-            // and the next dart opens a new turn with a different ID
-            _state.turnId = result.turn_id;
-            if (_state.turnDarts % 3 === 0) {
-                _state.turnScore = 0;
-            }
+        if (_state.turnDarts % 3 === 0) {
+            _state.turnScore = 0;
+        }
 
-            _state.dartsThrown++;
-            _state.totalScore += points;
-            _state.turnScore  += points;
-            _state.turnDarts++;
+        _state.dartsThrown++;
+        _state.totalScore += points;
+        _state.turnScore  += points;
+        _state.turnDarts++;
 
-            // Track segment hits for best segment display
-            if (segment > 0) {
-                var key = (multiplier > 1 ? (multiplier === 2 ? 'D' : 'T') : '') + segment;
-                _state.segmentCounts[key] = (_state.segmentCounts[key] || 0) + 1;
-            }
+        // Buffer dart for later submission
+        _state.pendingDarts.push({ segment: segment, multiplier: multiplier, points: points });
 
-            // Track target hits
-            if (_state.targetMode !== 'free' && segment > 0) {
-                _state.targetAttempts++;
-                if (_isTargetHit(segment, multiplier)) {
-                    _state.targetHits++;
-                    // Clock mode: advance to next number on hit
-                    if (_state.targetMode === 'clock') {
-                        _state.clockIndex++;
-                        _applyTargetHighlights();
-                        // All 20 hit — show congratulations and stop processing
-                        if (_state.clockIndex === 20) {
-                            _addDartPill(segment, multiplier, points);
-                            _updatePracticeStats();
-                            _clockComplete(_state.onEnd);
-                            return; // skip duplicate pill/stats calls below
-                        }
+        // Track segment hits for heatmap/best segment display
+        if (segment > 0) {
+            var key = (multiplier > 1 ? (multiplier === 2 ? 'D' : 'T') : '') + segment;
+            _state.segmentCounts[key] = (_state.segmentCounts[key] || 0) + 1;
+        }
+
+        // Track target hits
+        if (_state.targetMode !== 'free' && segment > 0) {
+            _state.targetAttempts++;
+            if (_isTargetHit(segment, multiplier)) {
+                _state.targetHits++;
+                if (_state.targetMode === 'clock') {
+                    _state.clockIndex++;
+                    _applyTargetHighlights();
+                    if (_state.clockIndex === 20) {
+                        _addDartPill(segment, multiplier, points);
+                        _updatePracticeStats();
+                        _clockComplete(_state.onEnd);
+                        return;
                     }
                 }
             }
+        }
 
-            // Enable undo now a dart exists in this turn
-            var undoB = document.getElementById('practice-undo-btn');
-            if (undoB) undoB.disabled = false;
+        // Enable undo
+        var undoB = document.getElementById('practice-undo-btn');
+        if (undoB) undoB.disabled = false;
 
-            // Dart thud
-            if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
-                SOUNDS.dart();
-            }
+        // Sounds + speech — instant, no waiting on server
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) SOUNDS.dart();
+        if (SPEECH.isEnabled()) SPEECH.announceDartScore(segment, multiplier, points);
 
+        // After 3rd dart: activate NEXT, lock board
+        var dartsInTurn = _state.turnDarts % 3;
+        if (dartsInTurn === 0) {
+            _state.turnComplete = true;
+            _lockBoard(true);
+            var nb = document.getElementById('practice-next-btn');
+            if (nb) nb.disabled = false;
             if (SPEECH.isEnabled()) {
-                SPEECH.announceDartScore(segment, multiplier, points);
+                setTimeout(function() {
+                    SPEECH.announceTurnEnd(_state.turnScore, 0);
+                }, 900);
             }
+        }
 
-            // After 3rd dart: announce total, activate NEXT, lock board
-            var dartsInTurn = _state.turnDarts % 3;
-            if (dartsInTurn === 0) {
-                _state.turnComplete = true;
-                _lockBoard(true);
-                var nb = document.getElementById('practice-next-btn');
-                if (nb) nb.disabled = false;
-                if (SPEECH.isEnabled()) {
-                    setTimeout(function() {
-                        SPEECH.announceTurnEnd(_state.turnScore, 0);
-                    }, 900);
-                }
-            }
-
-            _addDartPill(segment, multiplier, points);
-            _updatePracticeStats();
-        })
-        .catch(function() {
-            UI.showToast('ERROR RECORDING DART', 'bust', 2000);
-        });
+        _addDartPill(segment, multiplier, points);
+        _updatePracticeStats();
     }
 
     function _addDartPill(segment, multiplier, points) {
@@ -713,6 +695,9 @@ var PRACTICE = (function() {
 
     function _endSession(onEnd) {
         clearInterval(_state.timerInterval);
+
+        // Discard any pending darts — partial turn is abandoned on END/timer
+        _state.pendingDarts = [];
 
         // Close the practice match on the server
         API.endPracticeSession(_state.matchId)
@@ -1088,70 +1073,76 @@ var PRACTICE = (function() {
     // Undo last dart
     // ------------------------------------------------------------------
 
+    // _undoPracticeDart — local only, pops from buffer, no server call.
     function _undoPracticeDart() {
-        // Allow undo if darts have been thrown this turn (including completed turns)
         var dartsThisTurn = _state.turnDarts % 3 === 0 && _state.turnComplete
             ? 3
             : _state.turnDarts % 3;
-        if (dartsThisTurn === 0) return;
+        if (dartsThisTurn === 0 || _state.pendingDarts.length === 0) return;
 
         var undoBtn = document.getElementById('practice-undo-btn');
-        if (undoBtn) undoBtn.disabled = true;
 
-        API.undoLastThrow(_state.turnId)
-            .then(function(result) {
-                var deleted = result.deleted_throw;
-                var points  = deleted.points || 0;
+        // Pop from local buffer
+        var deleted = _state.pendingDarts.pop();
+        var points  = deleted.points || 0;
+        var seg     = deleted.segment;
+        var mul     = deleted.multiplier;
 
-                // Reverse state
-                _state.dartsThrown  = Math.max(0, _state.dartsThrown - 1);
-                _state.totalScore   = Math.max(0, _state.totalScore - points);
-                _state.turnScore    = Math.max(0, _state.turnScore - points);
-                _state.turnDarts    = Math.max(0, _state.turnDarts - 1);
+        // Reverse state
+        _state.dartsThrown = Math.max(0, _state.dartsThrown - 1);
+        _state.totalScore  = Math.max(0, _state.totalScore  - points);
+        _state.turnScore   = Math.max(0, _state.turnScore   - points);
+        _state.turnDarts   = Math.max(0, _state.turnDarts   - 1);
 
-                // If we just undid within a completed turn, unlock the board
-                if (_state.turnComplete) {
-                    _state.turnComplete = false;
-                    _lockBoard(false);
-                    var nb = document.getElementById('practice-next-btn');
-                    if (nb) nb.disabled = true;
-                }
+        // Unlock board if we just undid the 3rd dart
+        if (_state.turnComplete) {
+            _state.turnComplete = false;
+            _lockBoard(false);
+            var nb = document.getElementById('practice-next-btn');
+            if (nb) nb.disabled = true;
+        }
 
-                // Reverse segment count
-                var seg = deleted.segment;
-                var mul = deleted.multiplier;
-                if (seg > 0) {
-                    var key = (mul > 1 ? (mul === 2 ? 'D' : 'T') : '') + seg;
-                    _state.segmentCounts[key] = Math.max(0, (_state.segmentCounts[key] || 1) - 1);
-                    if (_state.segmentCounts[key] === 0) delete _state.segmentCounts[key];
-                }
+        // Reverse segment count
+        if (seg > 0) {
+            var key = (mul > 1 ? (mul === 2 ? 'D' : 'T') : '') + seg;
+            _state.segmentCounts[key] = Math.max(0, (_state.segmentCounts[key] || 1) - 1);
+            if (_state.segmentCounts[key] === 0) delete _state.segmentCounts[key];
+        }
 
-                // Remove last pill
-                var pills = document.getElementById('practice-pills');
-                if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
+        // Remove last pill
+        var pills = document.getElementById('practice-pills');
+        if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
 
-                // Undo still available if darts remain in this turn
-                var remaining = _state.turnDarts % 3;
-                if (undoBtn) undoBtn.disabled = (remaining === 0 && !_state.turnComplete);
+        // Disable undo if no more buffered darts
+        if (undoBtn) undoBtn.disabled = (_state.pendingDarts.length === 0);
 
-                // Re-announce corrected turn score after undo so caller
-                // reads the updated total before user decides to NEXT or undo again
-                if (_state.turnDarts % 3 > 0 && SPEECH.isEnabled()) {
-                    setTimeout(function() {
-                        SPEECH.announceTurnEnd(_state.turnScore, 0);
-                    }, 400);
-                }
+        if (_state.turnDarts % 3 > 0 && SPEECH.isEnabled()) {
+            setTimeout(function() { SPEECH.announceTurnEnd(_state.turnScore, 0); }, 400);
+        }
 
-                _updatePracticeStats();
-            })
-            .catch(function() {
-                UI.showToast('UNDO FAILED', 'bust', 2000);
-                if (undoBtn) undoBtn.disabled = false;
-            });
+        _updatePracticeStats();
     }
 
     function _advanceToNextTurn() {
-        // Clear pills, unlock board, reset turn state
+        // Submit buffered darts to server, then clear and unlock
+        var darts = _state.pendingDarts.slice();
+        _state.pendingDarts = [];
+
+        if (darts.length > 0) {
+            API.submitTurn({
+                leg_id:       _state.legId,
+                player_id:    _state.playerId,
+                score_before: 501,   // practice has no countdown — server ignores bust/checkout
+                darts: darts.map(function(d) {
+                    return { segment: d.segment, multiplier: d.multiplier };
+                }),
+            }).catch(function(err) {
+                console.error('[practice] Turn submit error:', err);
+                // Non-fatal — session stats are tracked locally
+            });
+        }
+
+        // Clear pills, unlock board, reset turn state immediately
         var pills = document.getElementById('practice-pills');
         if (pills) pills.innerHTML = '';
 
@@ -1188,6 +1179,9 @@ var PRACTICE = (function() {
             clearInterval(_state.timerInterval);
             _state.timerInterval = null;
         }
+
+        // Discard any partial turn — clock completed mid-turn
+        _state.pendingDarts = [];
 
         // End the DB session
         API.endPracticeSession(_state.matchId).catch(function() {});

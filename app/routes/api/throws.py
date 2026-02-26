@@ -261,6 +261,159 @@ def record_throw():
     return jsonify(response), 200
 
 
+@throws_bp.route("/turns/submit", methods=["POST"])
+def submit_turn():
+    """
+    Submit a complete turn (1-3 darts) in a single request.
+
+    Replaces the per-dart POST /api/throws flow for human players.
+    Processes all darts through the scoring engine, writes one turn
+    record + N throw records in a single transaction, and handles
+    checkout/leg-win if the turn ended in a checkout.
+
+    Body:
+    {
+        "leg_id":       int,
+        "player_id":    int,
+        "score_before": int,
+        "darts": [
+            { "segment": int, "multiplier": int },
+            ...
+        ]
+    }
+
+    Returns the same shape as the last per-dart response would have,
+    plus leg_result if a checkout occurred.
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    missing = [f for f in ("leg_id", "player_id", "score_before", "darts") if f not in data]
+    if missing:
+        return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+
+    leg_id       = data["leg_id"]
+    player_id    = data["player_id"]
+    score_before = data["score_before"]
+    darts        = data["darts"]
+
+    if not isinstance(darts, list) or not (1 <= len(darts) <= 3):
+        return jsonify({"error": "darts must be a list of 1-3 throws"}), 400
+
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute(
+        "SELECT id, starting_score, double_out, match_id FROM legs WHERE id = %s",
+        (leg_id,)
+    )
+    leg = cursor.fetchone()
+    if not leg:
+        return jsonify({"error": f"Leg {leg_id} not found"}), 404
+
+    double_out = bool(leg.get("double_out", True))
+    match_id   = leg["match_id"]
+
+    # Open turn
+    turn_id = open_turn(leg_id, player_id, score_before)
+
+    # Process each dart through the scoring engine
+    running_score = score_before
+    turn_score_before = score_before
+    results = []
+    final_is_bust = False
+    final_is_checkout = False
+
+    for i, dart in enumerate(darts):
+        seg = dart["segment"]
+        mul = dart["multiplier"]
+        dart_number = i + 1
+
+        state = {
+            "score":       running_score,
+            "dart_number": dart_number,
+            "turn_darts":  results,
+        }
+        result = process_throw(state, seg, mul, double_out)
+
+        if result.error:
+            # Roll back the open turn on validation error
+            cursor.execute("DELETE FROM turns WHERE id = %s", (turn_id,))
+            db.commit()
+            return jsonify({"error": result.error}), 400
+
+        insert_throw(
+            turn_id      = turn_id,
+            dart_number  = dart_number,
+            segment      = seg,
+            multiplier   = mul,
+            points       = result.points,
+            score_before = running_score,
+            score_after  = result.score_after,
+            is_bust      = result.is_bust,
+            is_checkout  = result.is_checkout,
+        )
+        increment_darts_thrown(turn_id)
+
+        results.append({
+            "segment":    seg,
+            "multiplier": mul,
+            "points":     result.points,
+            "score_after": result.score_after,
+            "is_bust":    result.is_bust,
+            "is_checkout": result.is_checkout,
+        })
+
+        if result.is_bust:
+            final_is_bust = True
+            running_score = turn_score_before   # bust reverts score
+            break
+        elif result.is_checkout:
+            final_is_checkout = True
+            running_score = 0
+            break
+        else:
+            running_score = result.score_after
+
+        if result.turn_complete:
+            break
+
+    # Close the turn
+    final_score_after = turn_score_before if final_is_bust else running_score
+    close_turn(
+        turn_id     = turn_id,
+        score_after = final_score_after,
+        is_bust     = final_is_bust,
+        is_checkout = final_is_checkout,
+    )
+
+    # Checkout suggestion for the next turn
+    checkout_suggestion = None
+    if not final_is_checkout and not final_is_bust:
+        checkout_suggestion = _get_checkout_suggestion(running_score)
+
+    # Leg win resolution
+    leg_result = None
+    if final_is_checkout:
+        leg_result = _record_leg_win(match_id, player_id, leg_id)
+
+    response = {
+        "turn_id":             turn_id,
+        "score_before":        score_before,
+        "score_after":         final_score_after,
+        "is_bust":             final_is_bust,
+        "is_checkout":         final_is_checkout,
+        "turn_complete":       True,
+        "darts":               results,
+        "checkout_suggestion": checkout_suggestion,
+    }
+    if leg_result:
+        response.update(leg_result)
+
+    return jsonify(response), 200
+
+
 @throws_bp.route("/throws/last", methods=["DELETE"])
 def undo_last_throw():
     data = request.get_json(silent=True)

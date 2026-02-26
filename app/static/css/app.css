@@ -3290,10 +3290,10 @@ body.mode-cricket #app {
 
 .home-tiles {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
     width: 100%;
-    max-width: 480px;
+    max-width: 600px;
 }
 
 .home-tile {
@@ -3303,8 +3303,8 @@ body.mode-cricket #app {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 24px 16px;
+    gap: 5px;
+    padding: 18px 10px;
     background: var(--bg-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -3314,19 +3314,30 @@ body.mode-cricket #app {
     text-align: center;
 }
 
+.home-tile-soon {
+    opacity: 0.45;
+    cursor: default;
+    border-style: dashed;
+}
+
+.home-tile-soon .home-tile-sub {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
 .home-tile:active {
     border-color: var(--accent);
     background: var(--accent-glow);
 }
 
 .home-tile-icon {
-    font-size: 2rem;
+    font-size: 1.7rem;
     line-height: 1;
 }
 
 .home-tile-label {
     font-family: var(--font-display);
-    font-size: 1.3rem;
+    font-size: 1.1rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     color: var(--text-primary);
@@ -3334,14 +3345,14 @@ body.mode-cricket #app {
 
 .home-tile-sub {
     font-family: var(--font-mono);
-    font-size: 0.62rem;
-    letter-spacing: 0.1em;
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
     color: var(--text-dim);
     text-transform: uppercase;
 }
 
 .home-stats-btn {
-    max-width: 480px;
+    max-width: 600px;
     width: 100%;
 }
 

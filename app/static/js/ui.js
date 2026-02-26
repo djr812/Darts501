@@ -37,24 +37,27 @@ const UI = (() => {
             { value: '501',      label: '501',      sub: 'Classic',       icon: '🎯' },
             { value: '201',      label: '201',       sub: 'Short game',    icon: '⚡' },
             { value: 'Cricket',  label: 'Cricket',   sub: 'Strategic',     icon: '🏏' },
+            { value: 'Shanghai', label: 'Shanghai',  sub: 'Coming Soon',   icon: '🀄', comingSoon: true },
+            { value: 'Killer',   label: 'Killer',    sub: 'Coming Soon',   icon: '☠️',  comingSoon: true },
             { value: 'Practice', label: 'Practice',  sub: 'Solo training', icon: '🎪' },
         ];
 
         gameTypes.forEach(gt => {
             const tile = document.createElement('button');
-            tile.className = 'home-tile';
+            tile.className = 'home-tile' + (gt.comingSoon ? ' home-tile-soon' : '');
             tile.type = 'button';
             tile.innerHTML =
                 `<span class="home-tile-icon">${gt.icon}</span>` +
                 `<span class="home-tile-label">${gt.label}</span>` +
                 `<span class="home-tile-sub">${gt.sub}</span>`;
 
-            if (gt.value === 'Practice') {
+            if (gt.comingSoon) {
+                tile.disabled = true;
+            } else if (gt.value === 'Practice') {
                 tile.addEventListener('click', () => { if (onPractice) onPractice(); });
             } else if (gt.value === 'Cricket') {
                 tile.addEventListener('click', () => { if (onCricket) onCricket(); });
             } else {
-                // 501 / 201 → go to match setup screen
                 tile.addEventListener('click', () => {
                     _buildMatchSetupScreen(
                         gt.value, existingPlayers, onStartGame, onViewStats, onPractice, onCricket
