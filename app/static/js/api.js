@@ -251,6 +251,18 @@ const API = (() => {
         return request('POST', `/api/cricket/matches/${matchId}/end`);
     }
 
+    async function createShanghaiMatch(data) {
+        return request('POST', '/api/shanghai/matches', data);
+    }
+
+    async function submitShanghaiRound(matchId, data) {
+        return request('POST', `/api/shanghai/matches/${matchId}/submit`, data);
+    }
+
+    async function endShanghaiMatch(matchId) {
+        return request('POST', `/api/shanghai/matches/${matchId}/end`);
+    }
+
     async function getPlayerHeatmap(playerId, scope = {}) {
         const params = new URLSearchParams();
         if (scope.gameType)  params.set('game_type',  scope.gameType);
@@ -322,6 +334,9 @@ const API = (() => {
         recordCricketThrow,
         undoCricketThrow,
         endCricketMatch,
+        createShanghaiMatch,
+        submitShanghaiRound,
+        endShanghaiMatch,
         getMatchScorecard,
         cancelMatch,
         restartMatch,

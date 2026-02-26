@@ -3386,3 +3386,310 @@ body.mode-cricket #app {
 .setup-back-link:active {
     color: var(--accent);
 }
+
+/* =========================================================
+   SHANGHAI GAME SCREEN
+   ========================================================= */
+
+body.mode-shanghai {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-base);
+}
+
+/* ── Header ── */
+.sh-header {
+    display: -webkit-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.sh-btn {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    cursor: pointer;
+    -webkit-transition: border-color 0.15s, color 0.15s;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.sh-btn:disabled { opacity: 0.35; cursor: default; }
+
+.sh-btn-next {
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 700;
+}
+.sh-btn-next:disabled { opacity: 0.35; }
+
+.sh-btn-end {
+    color: var(--text-dim);
+    margin-left: auto;
+}
+
+/* ── Scoreboard ── */
+.sh-scoreboard {
+    display: -webkit-box;
+    display: flex;
+    gap: 0;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    max-height: 38vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.sh-player-col {
+    -webkit-box-flex: 1;
+    flex: 1;
+    min-width: 70px;
+    border-right: 1px solid var(--border);
+}
+.sh-player-col:last-child { border-right: none; }
+
+.sh-player-col.sh-active-player .sh-player-header {
+    background: var(--accent-glow);
+    border-bottom-color: var(--accent);
+}
+
+.sh-player-header {
+    padding: 6px 8px;
+    border-bottom: 2px solid var(--border);
+    text-align: center;
+    position: sticky;
+    top: 0;
+    background: var(--bg-surface);
+    z-index: 1;
+}
+
+.sh-player-name {
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sh-player-total {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+}
+
+.sh-round-row {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-align: center;
+    padding: 4px 4px;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
+    color: var(--text-dim);
+    min-height: 24px;
+    line-height: 1.4;
+}
+
+.sh-round-row.sh-round-done {
+    color: var(--text-secondary);
+}
+
+.sh-round-row.sh-round-active {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.sh-round-row.sh-round-shanghai {
+    color: var(--color-checkout, #2ecc71);
+    font-weight: 700;
+    background: rgba(46,204,113,0.08);
+}
+
+/* ── Target banner ── */
+.sh-target-banner {
+    display: -webkit-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.sh-banner-round {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+}
+
+.sh-banner-target {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    text-align: center;
+    -webkit-box-flex: 1;
+    flex: 1;
+}
+
+.sh-banner-player {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    text-align: right;
+}
+
+/* ── Dart pills ── */
+.sh-pills {
+    display: -webkit-box;
+    display: flex;
+    gap: 6px;
+    padding: 5px 12px;
+    min-height: 34px;
+    align-items: center;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+
+/* ── Multiplier tabs ── */
+.sh-tabs {
+    display: -webkit-box;
+    display: flex;
+    gap: 0;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.sh-tabs .tab-btn {
+    -webkit-box-flex: 1;
+    flex: 1;
+    padding: 9px 4px;
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    border: none;
+    border-right: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text-dim);
+    cursor: pointer;
+}
+.sh-tabs .tab-btn:last-child { border-right: none; }
+.sh-tabs .tab-btn.active-single { background: var(--bg-surface); color: var(--text-primary); }
+.sh-tabs .tab-btn.active-double { background: var(--color-double-bg, #1a2e1a); color: var(--color-double, #2ecc71); }
+.sh-tabs .tab-btn.active-treble { background: var(--color-treble-bg, #1a1a2e); color: var(--color-treble, #9b59b6); }
+.sh-tabs .tab-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* ── Segment grid ── */
+.sh-seg-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+    padding: 8px;
+    -webkit-box-flex: 1;
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    align-content: start;
+}
+
+.sh-seg-btn {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    padding: 14px 4px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    cursor: pointer;
+    -webkit-transition: border-color 0.12s, background 0.12s;
+    transition: border-color 0.12s, background 0.12s;
+    text-align: center;
+}
+
+.sh-seg-btn:active { background: var(--accent-glow); }
+.sh-seg-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* Target number highlighted */
+.sh-seg-btn.sh-seg-target {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+    color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.sh-bull-btn {
+    grid-column: span 2;
+    background: var(--bg-surface);
+    border-color: var(--color-bull, #e74c3c);
+    color: var(--color-bull, #e74c3c);
+    font-size: 0.85rem;
+}
+
+.sh-miss-btn {
+    grid-column: span 3;
+    background: var(--bg-surface);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+
+/* ── Result modal ── */
+.sh-result-box {
+    text-align: center;
+}
+
+.sh-result-icon {
+    font-size: 3rem;
+    margin-bottom: 8px;
+}
+
+.sh-result-scores {
+    margin: 16px 0;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sh-result-score-row {
+    display: -webkit-box;
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: var(--bg-raised);
+    border-radius: var(--radius);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.sh-result-score-row.sh-result-winner {
+    background: var(--accent-glow);
+    color: var(--accent);
+    font-weight: 700;
+    border: 1px solid var(--accent);
+}

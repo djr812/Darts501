@@ -200,6 +200,17 @@ var SPEECH = (function() {
     }
 
     /**
+     * Shanghai-specific turn announcement.
+     * Says "{Name}, your number is {target}"
+     * @param {string} playerName
+     * @param {string|number} target  — e.g. "7" or "Bull"
+     */
+    function announceShanghai(playerName, target) {
+        if (!_enabled) return;
+        _speak(playerName + ', your number is ' + target, false);
+    }
+
+    /**
      * Speak the turn total and remaining score after a full turn.
      * Only announces remaining if score ≤ 170.
      *
@@ -279,6 +290,7 @@ var SPEECH = (function() {
         unlock:            unlock,
         announceDartScore: announceDartScore,
         announcePlayer:    announcePlayer,
+        announceShanghai:  announceShanghai,
         announceTurnEnd:   announceTurnEnd,
         announceBust:      announceBust,
         announceCheckout:  announceCheckout,

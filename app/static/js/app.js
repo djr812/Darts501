@@ -431,7 +431,7 @@
 
     async function _returnToSetup() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai);
     }
 
     // ------------------------------------------------------------------
@@ -591,7 +591,7 @@
         try {
             await API.cancelMatch(state.matchId);
             var existing = await API.getPlayers().catch(function() { return []; });
-            UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket);
+            UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai);
         } catch (err) {
             UI.showToast('CANCEL FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
         } finally {
@@ -645,7 +645,7 @@
                 // onBack — return to setup screen
                 function() {
                     API.getPlayers().then(function(p) {
-                        UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
+                        UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai);
                     });
                 },
                 // onStart — begin the practice session
@@ -653,7 +653,7 @@
                     PRACTICE.start(config, function() {
                         // onEnd — back to setup after session
                         API.getPlayers().then(function(p) {
-                            UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
+                            UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai);
                         });
                     });
                 }
@@ -664,6 +664,12 @@
     function _onCricket() {
         API.getPlayers().then(function(existing) {
             _showCricketSetup(existing);
+        });
+    }
+
+    function _onShanghai() {
+        API.getPlayers().then(function(existing) {
+            _showShanghaiSetup(existing);
         });
     }
 
@@ -722,7 +728,7 @@
             if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
             CRICKET_GAME.start({ players: players }, function() {
                 API.getPlayers().then(function(p) {
-                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai);
                 });
             });
         });
@@ -735,7 +741,118 @@
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', function() {
             API.getPlayers().then(function(p) {
-                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket);
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai);
+            });
+        });
+        inner.appendChild(backLink);
+    }
+
+    function _showShanghaiSetup(existingPlayers) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-setup';
+
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        UI.appendSetupHeader(inner, 'Shanghai');
+
+        // Game length
+        var lengthSection = document.createElement('div');
+        lengthSection.className = 'setup-section';
+        lengthSection.innerHTML = '<div class="setup-label">GAME LENGTH</div>';
+        var lengthRow = document.createElement('div');
+        lengthRow.className = 'setup-option-row';
+        var selectedRounds = 7;
+        [
+            { rounds: 7,  label: '7 ROUNDS',  hint: 'Short' },
+            { rounds: 20, label: '20 ROUNDS', hint: 'Full'  },
+        ].forEach(function(opt) {
+            var btn = document.createElement('button');
+            btn.className = 'option-btn' + (opt.rounds === 7 ? ' selected' : '');
+            btn.dataset.rounds = opt.rounds;
+            btn.type = 'button';
+            btn.innerHTML = opt.label + '<span class="option-hint">' + opt.hint + '</span>';
+            btn.addEventListener('click', function() {
+                lengthRow.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
+                btn.classList.add('selected');
+                selectedRounds = opt.rounds;
+            });
+            lengthRow.appendChild(btn);
+        });
+        lengthSection.appendChild(lengthRow);
+        inner.appendChild(lengthSection);
+
+        // Player count
+        var countSection = document.createElement('div');
+        countSection.className = 'setup-section';
+        countSection.innerHTML = '<div class="setup-label">NUMBER OF PLAYERS</div>';
+        var countRow = document.createElement('div');
+        countRow.className = 'setup-option-row';
+        var namesSection = document.createElement('div');
+        namesSection.className = 'setup-section';
+
+        var startBtn = document.createElement('button');
+        startBtn.className = 'start-btn';
+        startBtn.textContent = 'START MATCH';
+        startBtn.type = 'button';
+        startBtn.disabled = true;
+
+        [1, 2, 3, 4].forEach(function(n) {
+            var btn = document.createElement('button');
+            btn.className = 'option-btn count-btn';
+            btn.dataset.count = n;
+            btn.type = 'button';
+            btn.innerHTML = n === 1 ? '1<span class="option-hint">vs CPU</span>' : String(n);
+            btn.addEventListener('click', function() {
+                countRow.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
+                btn.classList.add('selected');
+                if (n === 1) {
+                    UI.showDifficultyModal(function(difficulty) {
+                        UI.renderShanghaiPlayerSlots(existingPlayers, 1, namesSection, difficulty);
+                        startBtn.disabled = false;
+                    });
+                } else {
+                    UI.renderShanghaiPlayerSlots(existingPlayers, n, namesSection, null);
+                    startBtn.disabled = false;
+                }
+            });
+            countRow.appendChild(btn);
+        });
+        countSection.appendChild(countRow);
+        inner.appendChild(countSection);
+        inner.appendChild(namesSection);
+
+        startBtn.addEventListener('click', function() {
+            var roundsSel = lengthRow.querySelector('.option-btn.selected');
+            if (!roundsSel) { UI.showToast('SELECT GAME LENGTH', 'bust', 2000); return; }
+            var players = UI.collectShanghaiPlayers(namesSection);
+            if (!players) return;
+            var cpuPlayer   = players.find(function(p) { return p.isCpu; });
+            var cpuDifficulty = cpuPlayer ? (cpuPlayer.difficulty || 'medium') : 'medium';
+            SPEECH.unlock();
+            if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
+            SHANGHAI_GAME.start({
+                players:      players,
+                numRounds:    parseInt(roundsSel.dataset.rounds, 10),
+                cpuDifficulty: cpuDifficulty,
+            }, function() {
+                API.getPlayers().then(function(p) {
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai);
+                });
+            });
+        });
+        inner.appendChild(startBtn);
+
+        var backLink = document.createElement('button');
+        backLink.className = 'setup-back-link';
+        backLink.type = 'button';
+        backLink.textContent = '← BACK TO HOME';
+        backLink.addEventListener('click', function() {
+            API.getPlayers().then(function(p) {
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai);
             });
         });
         inner.appendChild(backLink);
@@ -752,7 +869,7 @@
             STATS.showStatsScreen(player, async () => {
                 // Back button → return to setup screen
                 const existing = await API.getPlayers().catch(() => []);
-                UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket);
+                UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai);
             });
         });
     }
@@ -763,7 +880,7 @@
 
     async function init() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai);
     }
 
     if (document.readyState === 'loading') {

@@ -9,7 +9,7 @@ const UI = (() => {
     // ------------------------------------------------------------------
 
     // ── Home screen: title + game type tiles + stats button ──
-    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket) {
+    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai) {
         const app = document.getElementById('app');
         app.innerHTML = '';
         app.style.cssText = '';
@@ -37,7 +37,7 @@ const UI = (() => {
             { value: '501',      label: '501',      sub: 'Classic',       icon: '🎯' },
             { value: '201',      label: '201',       sub: 'Short game',    icon: '⚡' },
             { value: 'Cricket',  label: 'Cricket',   sub: 'Strategic',     icon: '🏏' },
-            { value: 'Shanghai', label: 'Shanghai',  sub: 'Coming Soon',   icon: '🀄', comingSoon: true },
+            { value: 'Shanghai', label: 'Shanghai',  sub: '7 or 20 rounds', icon: '🀄' },
             { value: 'Killer',   label: 'Killer',    sub: 'Coming Soon',   icon: '☠️',  comingSoon: true },
             { value: 'Practice', label: 'Practice',  sub: 'Solo training', icon: '🎪' },
         ];
@@ -53,6 +53,8 @@ const UI = (() => {
 
             if (gt.comingSoon) {
                 tile.disabled = true;
+            } else if (gt.value === 'Shanghai') {
+                tile.addEventListener('click', () => { if (onShanghai) onShanghai(); });
             } else if (gt.value === 'Practice') {
                 tile.addEventListener('click', () => { if (onPractice) onPractice(); });
             } else if (gt.value === 'Cricket') {
@@ -60,7 +62,7 @@ const UI = (() => {
             } else {
                 tile.addEventListener('click', () => {
                     _buildMatchSetupScreen(
-                        gt.value, existingPlayers, onStartGame, onViewStats, onPractice, onCricket
+                        gt.value, existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai
                     );
                 });
             }
@@ -79,7 +81,7 @@ const UI = (() => {
     }
 
     // ── Match setup screen: checkout / sets / legs / players / start ──
-    function _buildMatchSetupScreen(gameType, existingPlayers, onStartGame, onViewStats, onPractice, onCricket) {
+    function _buildMatchSetupScreen(gameType, existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai) {
         const app = document.getElementById('app');
         app.innerHTML = '';
         app.style.cssText = '';
@@ -261,7 +263,7 @@ const UI = (() => {
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', () => {
             API.getPlayers().then(p => {
-                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket);
+                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai);
             });
         });
         _appTarget.appendChild(backLink);
@@ -1058,6 +1060,83 @@ const UI = (() => {
         inner.appendChild(sub);
     }
 
+    function renderShanghaiPlayerSlots(existingPlayers, count, container, difficulty) {
+        container.innerHTML = '';
+        var grid = document.createElement('div');
+        grid.id = 'setup-names-grid';
+        grid.style.gridTemplateColumns = count <= 2 ? '1fr 1fr' : 'repeat(4, 1fr)';
+        for (var i = 0; i < count; i++) {
+            var isCpu = (count === 1 && i === 1);
+            var slot = _buildPlayerSlot(i, count, existingPlayers, isCpu);
+            if (isCpu && difficulty) slot.dataset.difficulty = difficulty;
+            grid.appendChild(slot);
+        }
+        // For 1-player mode, add a CPU slot
+        if (count === 1) {
+            var cpuSlot = _buildCpuSlot(difficulty || 'medium', existingPlayers, container);
+            grid.appendChild(cpuSlot);
+        }
+        container.appendChild(grid);
+        setTimeout(function() {
+            var fi = container.querySelector('.name-input');
+            if (fi) fi.focus();
+        }, 150);
+    }
+
+    function _buildCpuSlot(difficulty, existingPlayers, container) {
+        var label = (typeof CPU !== 'undefined' && CPU.LABELS) ? (CPU.LABELS[difficulty] || difficulty) : difficulty;
+        var slot = document.createElement('div');
+        slot.className = 'name-slot cpu-slot';
+        slot.dataset.mode       = 'cpu';
+        slot.dataset.isCpu      = 'true';
+        slot.dataset.difficulty = difficulty;
+        slot.innerHTML =
+            '<div class="name-label">OPPONENT</div>' +
+            '<div class="cpu-badge">🤖 CPU</div>' +
+            '<div class="cpu-difficulty">' + _esc(label) + '</div>' +
+            '<button class="cpu-change-btn" type="button">CHANGE</button>';
+        slot.querySelector('.cpu-change-btn').addEventListener('click', function () {
+            _showDifficultyModal(function (newDifficulty) {
+                renderShanghaiPlayerSlots(existingPlayers, 1, container, newDifficulty);
+            });
+        });
+        return slot;
+    }
+
+    function collectShanghaiPlayers(container) {
+        var slots = container.querySelectorAll('.name-slot');
+        if (!slots.length) { showToast('NO PLAYERS SET UP', 'bust', 2000); return null; }
+        var players = [];
+        for (var i = 0; i < slots.length; i++) {
+            var slot = slots[i];
+            if (slot.dataset.isCpu === 'true' || slot.classList.contains('cpu-slot')) {
+                players.push({
+                    id:         null,
+                    name:       'CPU',
+                    isCpu:      true,
+                    difficulty: slot.dataset.difficulty || 'medium',
+                    mode:       'cpu',
+                });
+                continue;
+            }
+            // Check if using existing player select
+            var sel  = slot.querySelector('.name-select');
+            var inp  = slot.querySelector('.name-input');
+            var mode = slot.dataset.mode || 'new';
+            if (mode === 'existing' && sel && sel.value) {
+                var opt = sel.options[sel.selectedIndex];
+                players.push({ id: parseInt(sel.value, 10), name: opt.text, isCpu: false, mode: 'existing' });
+            } else if (inp && inp.value.trim()) {
+                players.push({ id: null, name: inp.value.trim(), isCpu: false, mode: 'new' });
+            } else {
+                showToast('ENTER ALL PLAYER NAMES', 'bust', 2000);
+                return null;
+            }
+        }
+        if (players.length < 2) { showToast('NEED AT LEAST 2 PLAYERS', 'bust', 2000); return null; }
+        return players;
+    }
+
     function renderCricketPlayerSlots(existingPlayers, count, container) {
         container.innerHTML = '<div class="setup-label">PLAYERS</div>';
         const namesRow = document.createElement('div');
@@ -1076,6 +1155,9 @@ const UI = (() => {
         buildSetupScreen,
         buildShell,
         appendSetupHeader: _appendSetupHeader,
+        showDifficultyModal: _showDifficultyModal,
+        renderShanghaiPlayerSlots,
+        collectShanghaiPlayers,
         renderCricketPlayerSlots,
         collectCricketPlayers,
         showCongratsModal,
