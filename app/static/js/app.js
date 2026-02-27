@@ -133,7 +133,7 @@
             state.pendingDarts = [];
             state.pendingCheckoutResult = null;
 
-            UI.buildShell(players, { onMultiplier, onSegment, onUndo, onNextPlayer, onCancel, onRestart });
+            UI.buildShell(players, { onMultiplier, onSegment, onUndo, onNextPlayer, onCancel, onRestart }, config.gameType);
             _startLeg(leg.id);
 
         } catch (err) {

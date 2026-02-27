@@ -3710,3 +3710,119 @@ body.mode-shanghai {
     font-size: 0.75rem;
     padding: 12px 0;
 }
+
+/* =========================================================
+   RULES BUTTON & MODAL
+   ========================================================= */
+
+/* Rules button — purple style matching AI analysis */
+.rules-btn {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    padding: 0 12px;
+    height: 32px;
+    border-radius: var(--radius);
+    border: 1px solid #4a3a6a;
+    background: var(--bg-raised);
+    color: #a78bfa;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    -webkit-flex-shrink: 0;
+    -webkit-transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.rules-btn:active {
+    border-color: #a78bfa;
+    background: rgba(167,139,250,0.12);
+}
+
+/* Overlay — same base as other modals but purple tint */
+.rules-overlay {
+    background: rgba(10, 6, 20, 0.88);
+}
+
+/* Modal box */
+.rules-box {
+    max-width: 480px;
+    width: 92vw;
+    max-height: 82vh;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #4a3a6a;
+    background: #0f0a1a;
+}
+
+/* Title bar */
+.rules-title {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    color: #a78bfa;
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid #2a1f3d;
+    flex-shrink: 0;
+    -webkit-flex-shrink: 0;
+}
+
+/* Scrollable body */
+.rules-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 20px;
+    flex: 1;
+    -webkit-box-flex: 1;
+}
+
+/* Individual section */
+.rules-section {
+    margin-bottom: 20px;
+}
+
+.rules-section:last-child {
+    margin-bottom: 0;
+}
+
+.rules-heading {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.16em;
+    color: #a78bfa;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.rules-text {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+/* Close button */
+.rules-close-btn {
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    padding: 14px;
+    border: none;
+    border-top: 1px solid #2a1f3d;
+    background: rgba(167,139,250,0.08);
+    color: #a78bfa;
+    cursor: pointer;
+    flex-shrink: 0;
+    -webkit-flex-shrink: 0;
+    -webkit-transition: background 0.15s;
+    transition: background 0.15s;
+}
+
+.rules-close-btn:active {
+    background: rgba(167,139,250,0.18);
+}

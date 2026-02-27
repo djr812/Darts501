@@ -139,6 +139,13 @@ var CRICKET_GAME = (function () {
         nextBtn.addEventListener('click', _onNext);
         header.appendChild(nextBtn);
 
+        var rulesBtn = document.createElement('button');
+        rulesBtn.type = 'button';
+        rulesBtn.className = 'rules-btn';
+        rulesBtn.textContent = '📖 RULES';
+        rulesBtn.addEventListener('click', function() { UI.showRulesModal('cricket'); });
+        header.appendChild(rulesBtn);
+
         var endBtn = document.createElement('button');
         endBtn.id = 'cricket-end-btn';
         endBtn.className = 'cricket-end-btn';

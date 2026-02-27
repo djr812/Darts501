@@ -187,6 +187,13 @@ var SHANGHAI_GAME = (function () {
         nextBtn.addEventListener('click', _onNext);
         header.appendChild(nextBtn);
 
+        var rulesBtn = document.createElement('button');
+        rulesBtn.type = 'button';
+        rulesBtn.className = 'rules-btn';
+        rulesBtn.textContent = '📖 RULES';
+        rulesBtn.addEventListener('click', function() { UI.showRulesModal('shanghai'); });
+        header.appendChild(rulesBtn);
+
         var endBtn = document.createElement('button');
         endBtn.id = 'sh-end-btn';
         endBtn.className = 'sh-btn sh-btn-end';

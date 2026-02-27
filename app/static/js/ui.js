@@ -642,11 +642,12 @@ const UI = (() => {
     // Game Shell
     // ------------------------------------------------------------------
 
-    function buildShell(players, callbacks) {
+    function buildShell(players, callbacks, gameType) {
         const app = document.getElementById('app');
         app.innerHTML = '';
         app.style.cssText = '';
         document.body.className = 'mode-game';
+        _currentGameType = gameType || '501';
         app.appendChild(_buildHeader());
         app.appendChild(_buildSidebar(players));
         app.appendChild(_buildBoard(callbacks));
@@ -654,6 +655,8 @@ const UI = (() => {
         if (!document.getElementById('toast'))   document.body.appendChild(_buildToast());
         if (!document.getElementById('loading')) document.body.appendChild(_buildLoading());
     }
+
+    var _currentGameType = '501';
 
     function _buildHeader() {
         const el = document.createElement('header');
@@ -682,8 +685,15 @@ const UI = (() => {
             _updateSpeechBtn(speechBtn, nowEnabled);
         });
 
+        const rulesBtn = document.createElement('button');
+        rulesBtn.type = 'button';
+        rulesBtn.className = 'rules-btn';
+        rulesBtn.textContent = '📖 RULES';
+        rulesBtn.addEventListener('click', function() { showRulesModal(_currentGameType); });
+
         el.appendChild(title);
         el.appendChild(matchInfo);
+        el.appendChild(rulesBtn);
         el.appendChild(speechBtn);
         return el;
     }
@@ -1172,6 +1182,186 @@ const UI = (() => {
         return _collectPlayerSelections(container);
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Rules modal
+    // ─────────────────────────────────────────────────────────────────
+
+    var RULES_CONTENT = {
+        '501': {
+            title: '501',
+            sections: [
+                {
+                    heading: 'Objective',
+                    body: 'Start with 501 points and reduce your score to exactly zero. The final dart must land in a Double or the Bullseye (inner bull counts as a double).'
+                },
+                {
+                    heading: 'Turn Structure',
+                    body: 'Each player throws 3 darts per turn. The total scored is deducted from the running total.'
+                },
+                {
+                    heading: 'Doubles & Trebles',
+                    body: 'The narrow outer ring scores double the segment value. The narrow inner ring scores triple the segment value. Outer bull = 25 pts. Inner bull (Bullseye) = 50 pts and counts as a double for checkout.'
+                },
+                {
+                    heading: 'Bust',
+                    body: 'If your score would drop below zero, to exactly 1, or you reach zero without a double finish, it is a BUST. Your score returns to what it was at the start of that turn and play passes to the next player.'
+                },
+                {
+                    heading: 'Checkout',
+                    body: 'To win a leg you must reach exactly zero with your final dart landing on a Double (or inner bull). Common finishes include D20 (40), D16 (32), and Bull (50). The highest possible checkout is T20-T20-Bull for 170.'
+                },
+                {
+                    heading: 'Sets & Legs',
+                    body: 'A match is decided by legs and sets. Win the required number of legs to take a set, and the required number of sets to win the match. Configuration is chosen at match setup.'
+                },
+                {
+                    heading: 'CPU Opponent',
+                    body: 'Three difficulty levels are available: Warm-Up Dummy (easy), Pub Regular (medium), and League Night (hard). Each level affects accuracy on trebles, doubles, and target selection.'
+                },
+            ]
+        },
+        '201': {
+            title: '201',
+            sections: [
+                {
+                    heading: 'Objective',
+                    body: 'Identical to 501 but starting from 201 points. A shorter, faster game — typically decided in a single leg.'
+                },
+                {
+                    heading: 'Double Start (optional)',
+                    body: 'If Double Start is selected at setup, you must hit a Double before any score counts. Until a double is hit, all darts are ignored.'
+                },
+                {
+                    heading: 'Checkout',
+                    body: 'Same as 501 — reach exactly zero, last dart must be a Double or inner Bull. The lower starting score means the game moves quickly and checkout opportunities arrive early.'
+                },
+                {
+                    heading: 'Bust',
+                    body: 'Same rules as 501 apply — going below zero, hitting 1, or failing to finish on a double are all busts.'
+                },
+            ]
+        },
+        'cricket': {
+            title: 'Cricket',
+            sections: [
+                {
+                    heading: 'Objective',
+                    body: 'Be the first player to close all 7 numbers (15, 16, 17, 18, 19, 20, and Bull) while having a score equal to or greater than all opponents.'
+                },
+                {
+                    heading: 'Scoring Numbers',
+                    body: 'Only the numbers 15 through 20 and the Bull are in play. Hitting any other number has no effect.'
+                },
+                {
+                    heading: 'Closing a Number',
+                    body: 'A number requires 3 marks to close. A single hit = 1 mark, a double = 2 marks, a treble = 3 marks (closes in one throw). Outer Bull = 1 mark, Inner Bull = 2 marks.'
+                },
+                {
+                    heading: 'Scoring Points',
+                    body: 'Once you have closed a number (3 marks), any additional hits on that number score points — but only while at least one opponent still has it open. Single = face value, double = 2×, treble = 3×.'
+                },
+                {
+                    heading: 'Win Condition',
+                    body: 'You win when all 7 numbers are closed AND your point total is greater than or equal to every opponent\'s score. You can\'t win while trailing on points, even if you\'ve closed everything.'
+                },
+                {
+                    heading: 'Strategy',
+                    body: 'Close numbers quickly to stop opponents scoring on them, and build points on numbers you\'ve closed that opponents haven\'t. The Bull is often the key battleground.'
+                },
+            ]
+        },
+        'shanghai': {
+            title: 'Shanghai',
+            sections: [
+                {
+                    heading: 'Objective',
+                    body: 'Score the most points over 7 or 20 rounds. In each round, only darts landing on that round\'s target number count.'
+                },
+                {
+                    heading: 'Round Targets',
+                    body: 'Round 1 targets the 1, Round 2 targets the 2, and so on up to Round 7 (or Round 20 in the long game). Darts hitting any other number score zero — but are not a penalty.'
+                },
+                {
+                    heading: 'Scoring',
+                    body: 'Single = 1× the target number. Double = 2×. Treble = 3×. For example, in Round 5: single scores 5, double scores 10, treble scores 15.'
+                },
+                {
+                    heading: 'Shanghai — Instant Win',
+                    body: 'If you hit a Single, Double, AND Treble of the target number all in the same round (in any order), that is a SHANGHAI — an instant win regardless of the current scores.'
+                },
+                {
+                    heading: 'Turn Structure',
+                    body: 'Each player throws up to 3 darts per round. All players complete each round before moving to the next. There is no bust — a zero-score round simply scores zero.'
+                },
+                {
+                    heading: 'Winning',
+                    body: 'After all rounds, the player with the highest total score wins. If scores are tied, a sudden-death Bull tiebreak is played — each tied player throws one dart at the bull. Highest score (inner bull 50 beats outer bull 25) wins. If still tied, repeat until broken.'
+                },
+                {
+                    heading: 'CPU Opponent',
+                    body: 'The CPU always aims for the treble of the current target number. Difficulty affects accuracy — easy misses frequently, medium is competitive, hard rarely misses.'
+                },
+            ]
+        },
+    };
+
+    function showRulesModal(gameType) {
+        var existing = document.getElementById('rules-modal');
+        if (existing) existing.remove();
+
+        var key = (gameType || '501').toLowerCase();
+        var rules = RULES_CONTENT[key] || RULES_CONTENT['501'];
+
+        var overlay = document.createElement('div');
+        overlay.id = 'rules-modal';
+        overlay.className = 'modal-overlay rules-overlay';
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) overlay.remove();
+        });
+
+        var box = document.createElement('div');
+        box.className = 'modal-box rules-box';
+
+        // Header
+        var titleEl = document.createElement('div');
+        titleEl.className = 'rules-title';
+        titleEl.textContent = rules.title + ' — HOW TO PLAY';
+        box.appendChild(titleEl);
+
+        // Scrollable content
+        var body = document.createElement('div');
+        body.className = 'rules-body';
+
+        rules.sections.forEach(function(sec) {
+            var section = document.createElement('div');
+            section.className = 'rules-section';
+
+            var heading = document.createElement('div');
+            heading.className = 'rules-heading';
+            heading.textContent = sec.heading;
+            section.appendChild(heading);
+
+            var text = document.createElement('p');
+            text.className = 'rules-text';
+            text.textContent = sec.body;
+            section.appendChild(text);
+
+            body.appendChild(section);
+        });
+        box.appendChild(body);
+
+        // Close button
+        var closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'rules-close-btn';
+        closeBtn.textContent = 'CLOSE';
+        closeBtn.addEventListener('click', function() { overlay.remove(); });
+        box.appendChild(closeBtn);
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+    }
+
     return {
         buildSetupScreen,
         buildShell,
@@ -1193,6 +1383,7 @@ const UI = (() => {
         flashCard,
         setMultiplierTab,
         addTouchSafeListener: _addTouchSafeListener,
+        showRulesModal,
         setNextPlayerEnabled,
         setUndoEnabled,
         setStatus,
