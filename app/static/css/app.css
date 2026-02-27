@@ -2276,15 +2276,13 @@ body.mode-practice #app {
 /* Practice heatmap container */
 .practice-heatmap {
     width: 100%;
-    max-width: 320px;
-    margin: 0 auto var(--gap-lg);
+    margin: 0 0 var(--gap-lg);
     -webkit-box-sizing: border-box;
     box-sizing: border-box;
 }
 
 .practice-heatmap svg {
     border-radius: 50%;
-    box-shadow: 0 0 24px rgba(240,165,0,0.1), 0 0 1px #333;
 }
 
 /* =========================================================
@@ -3693,4 +3691,22 @@ body.mode-shanghai {
     color: var(--accent);
     font-weight: 700;
     border: 1px solid var(--accent);
+}
+
+/* Practice summary modal — widen to fit heatmap+legend side by side */
+.practice-summary-modal-box {
+    max-width: 620px;
+    width: 92vw;
+}
+
+.practice-heatmap-wrap {
+    margin-top: 12px;
+}
+
+.practice-heatmap-loading {
+    text-align: center;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 12px 0;
 }

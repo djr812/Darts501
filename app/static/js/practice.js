@@ -1246,259 +1246,225 @@ var PRACTICE = (function() {
 
     /**
      * Build an SVG dartboard heatmap from _state.segmentCounts.
+     * Uses the same multi-colour gradient style as the Player Stats page.
      *
-     * Segment ring structure (radii as fractions of board radius):
-     *   Bull       0  -> 0.06
-     *   Outer bull 0.06 -> 0.12
-     *   Single (inner) 0.12 -> 0.47
-     *   Treble     0.47 -> 0.54
-     *   Single (outer) 0.54 -> 0.83
-     *   Double     0.83 -> 0.95
-     *   Wire (outer) 0.95 -> 1.0
-     *
-     * Segment order clockwise from top: 20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5
+     * Note: practice segmentCounts uses '' prefix for singles (not 'S'),
+     * so getHits bridges that difference before passing to the shared renderer.
      */
     function _buildHeatmap() {
-        var SEGMENTS = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
-        var SIZE     = 320;
-        var CX = SIZE / 2, CY = SIZE / 2;
-        var R  = SIZE / 2 - 4;   // board radius with small margin
-
-        // Radii fractions
-        var rBull     = R * 0.06;
-        var rOuter    = R * 0.13;
-        var rInner1   = R * 0.47;
-        var rTreble1  = R * 0.47;
-        var rTreble2  = R * 0.55;
-        var rInner2   = R * 0.55;
-        var rDouble1  = R * 0.84;
-        var rDouble2  = R * 0.97;
-
-        // Angle per segment (18 degrees each, starting from -99 degrees
-        // so segment 20 is at the top)
-        var SEG_ANGLE = 360 / 20;
-        var START_OFFSET = -SEG_ANGLE / 2;  // segment 20 centred at 12 o'clock
-
-        // Collect hit counts per zone for colour scaling
         var counts = _state.segmentCounts;
-        var maxHits = 1;
+
+        // Bridge practice key format ('T20', 'D20', '20') to stats format
+        // ('T20', 'D20', 'S20', 'BULL', 'OUTER') expected by _buildStatsStyleHeatmap
+        var normalised = {};
         Object.keys(counts).forEach(function(k) {
-            if (counts[k] > maxHits) maxHits = counts[k];
+            if (k === 'D25') {
+                normalised['BULL'] = counts[k];
+            } else if (k === '25') {
+                normalised['OUTER'] = counts[k];
+            } else if (/^\d+$/.test(k)) {
+                normalised['S' + k] = counts[k];
+            } else {
+                normalised[k] = counts[k];   // T## and D## pass through unchanged
+            }
         });
 
+        return _buildStatsStyleHeatmap(normalised);
+    }
+
+    /**
+     * Shared multi-colour heatmap renderer.
+     * Accepts counts in stats format: S##, T##, D##, BULL, OUTER.
+     * Returns a div wrapping the SVG board + side legend (same as stats page).
+     */
+    function _buildStatsStyleHeatmap(counts) {
+        var SEGMENTS = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+        var SIZE = 200, CX = SIZE/2, CY = SIZE/2;
+        var R = SIZE/2 - 4;
+
+        var rBull    = R * 0.06;
+        var rOuter   = R * 0.13;
+        var rInner1  = R * 0.47;
+        var rTreble2 = R * 0.55;
+        var rDouble1 = R * 0.84;
+        var rDouble2 = R * 0.97;
+
+        var SEG_ANGLE  = 360 / 20;
+        var START_OFF  = -SEG_ANGLE / 2;
+
+        var maxHits = 1;
+        Object.values(counts).forEach(function(v) { if (v > maxHits) maxHits = v; });
+
         function getHits(seg, prefix) {
-            // prefix: '' = single, 'D' = double, 'T' = treble
+            if (seg === 25) return counts[prefix === 'D' ? 'BULL' : 'OUTER'] || 0;
             return counts[prefix + seg] || 0;
         }
 
-        function heatColour(hits) {
+        function heatColour(hits, isDouble, isTreble) {
             if (hits === 0) return null;
-            var t = Math.min(hits / maxHits, 1);
-            // Dark amber at low end, bright amber at high end
-            // 0 hits = no overlay, >0 = amber glow scaling to full
-            var alpha = 0.2 + t * 0.75;
-            return 'rgba(240,165,0,' + alpha.toFixed(2) + ')';
+            var t = Math.pow(hits / maxHits, 0.6);
+            var stops = [
+                { t: 0.00, r: 13,  g: 13,  b: 13  },
+                { t: 0.20, r: 74,  g: 16,  b: 96  },
+                { t: 0.45, r: 192, g: 57,  b: 43  },
+                { t: 0.70, r: 200, g: 160, b: 104 },
+                { t: 1.00, r: 46,  g: 204, b: 113 },
+            ];
+            var lo = stops[0], hi = stops[stops.length - 1];
+            for (var i = 0; i < stops.length - 1; i++) {
+                if (t >= stops[i].t && t <= stops[i+1].t) { lo = stops[i]; hi = stops[i+1]; break; }
+            }
+            var span = hi.t - lo.t || 1;
+            var f = (t - lo.t) / span;
+            var r = Math.round(lo.r + f * (hi.r - lo.r));
+            var g = Math.round(lo.g + f * (hi.g - lo.g));
+            var b = Math.round(lo.b + f * (hi.b - lo.b));
+            var alpha = isTreble ? 0.95 : isDouble ? 0.88 : 0.80;
+            return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
         }
 
         function polarToXY(angleDeg, radius) {
             var rad = (angleDeg - 90) * Math.PI / 180;
-            return {
-                x: CX + radius * Math.cos(rad),
-                y: CY + radius * Math.sin(rad),
-            };
+            return { x: CX + radius * Math.cos(rad), y: CY + radius * Math.sin(rad) };
         }
 
-        function arcPath(r1, r2, startAngle, endAngle) {
-            var p1 = polarToXY(startAngle, r1);
-            var p2 = polarToXY(endAngle,   r1);
-            var p3 = polarToXY(endAngle,   r2);
-            var p4 = polarToXY(startAngle, r2);
-            var large = (endAngle - startAngle) > 180 ? 1 : 0;
-            return [
-                'M', p1.x, p1.y,
-                'A', r1, r1, 0, large, 1, p2.x, p2.y,
-                'L', p3.x, p3.y,
-                'A', r2, r2, 0, large, 0, p4.x, p4.y,
-                'Z'
-            ].join(' ');
+        function arcPath(r1, r2, a1, a2) {
+            var p1 = polarToXY(a1, r1), p2 = polarToXY(a2, r1);
+            var p3 = polarToXY(a2, r2), p4 = polarToXY(a1, r2);
+            var lg = (a2 - a1) > 180 ? 1 : 0;
+            return 'M ' + p1.x + ' ' + p1.y + ' A ' + r1 + ' ' + r1 + ' 0 ' + lg + ' 1 ' + p2.x + ' ' + p2.y +
+                   ' L ' + p3.x + ' ' + p3.y + ' A ' + r2 + ' ' + r2 + ' 0 ' + lg + ' 0 ' + p4.x + ' ' + p4.y + ' Z';
         }
 
-        // SVG namespace helper
-        function el(tag, attrs) {
+        function svgEl(tag, attrs) {
             var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
             Object.keys(attrs).forEach(function(k) { e.setAttribute(k, attrs[k]); });
             return e;
         }
 
-        function tooltip(svgEl, text) {
+        function tip(e, text) {
             var t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
             t.textContent = text;
-            svgEl.appendChild(t);
+            e.appendChild(t);
         }
 
-        var svg = el('svg', {
-            viewBox: '0 0 ' + SIZE + ' ' + SIZE,
-            width:   '100%',
-            style:   'max-width:320px;display:block;margin:0 auto;',
-        });
+        var svg = svgEl('svg', { viewBox: '0 0 ' + SIZE + ' ' + SIZE, width: '100%', style: 'width:100%;display:block;' });
+        svg.appendChild(svgEl('circle', { cx: CX, cy: CY, r: R, fill: '#0d0d0d', stroke: '#222', 'stroke-width': '1' }));
 
-        // Background circle
-        svg.appendChild(el('circle', { cx: CX, cy: CY, r: R,
-            fill: '#111', stroke: '#333', 'stroke-width': '1' }));
-
-        // Draw each of the 20 segments
         SEGMENTS.forEach(function(seg, i) {
-            var startAngle = START_OFFSET + i * SEG_ANGLE;
-            var endAngle   = startAngle + SEG_ANGLE;
-
-            var singleHits  = getHits(seg, '');
-            var trebleHits  = getHits(seg, 'T');
-            var doubleHits  = getHits(seg, 'D');
-
+            var a1 = START_OFF + i * SEG_ANGLE, a2 = a1 + SEG_ANGLE;
+            var sH = getHits(seg, 'S'), tH = getHits(seg, 'T'), dH = getHits(seg, 'D');
             var zones = [
-                // [r1, r2, hits, zone label]
-                { r1: rOuter,   r2: rInner1,  hits: singleHits, label: 'S' },
-                { r1: rTreble1, r2: rTreble2, hits: trebleHits, label: 'T' },
-                { r1: rInner2,  r2: rDouble1, hits: singleHits, label: 'S' },
-                { r1: rDouble1, r2: rDouble2, hits: doubleHits, label: 'D' },
+                { r1: rOuter,   r2: rInner1,  hits: sH, dbl: false, tbl: false, lbl: 'S' },
+                { r1: rInner1,  r2: rTreble2, hits: tH, dbl: false, tbl: true,  lbl: 'T' },
+                { r1: rTreble2, r2: rDouble1, hits: sH, dbl: false, tbl: false, lbl: 'S' },
+                { r1: rDouble1, r2: rDouble2, hits: dH, dbl: true,  tbl: false, lbl: 'D' },
             ];
-
             zones.forEach(function(zone) {
-                var path = el('path', {
-                    d:    arcPath(zone.r1, zone.r2, startAngle, endAngle),
-                    fill: '#1a1a1a',
-                    stroke: '#2a2a2a',
-                    'stroke-width': '0.5',
-                });
-
-                var colour = heatColour(zone.hits);
-                if (colour) {
-                    var overlay = el('path', {
-                        d:    arcPath(zone.r1, zone.r2, startAngle, endAngle),
-                        fill: colour,
-                        stroke: 'none',
-                        'pointer-events': 'none',
-                    });
-                    svg.appendChild(path);
-                    svg.appendChild(overlay);
-                } else {
-                    svg.appendChild(path);
+                var colour = heatColour(zone.hits, zone.dbl, zone.tbl);
+                var path = svgEl('path', { d: arcPath(zone.r1, zone.r2, a1, a2),
+                    fill: colour || '#141414', stroke: '#1e1e1e', 'stroke-width': '0.5' });
+                svg.appendChild(path);
+                if (zone.hits > 0 && zone.lbl !== 'S') {
+                    var mid = a1 + SEG_ANGLE / 2, mr = (zone.r1 + zone.r2) / 2;
+                    var mp = polarToXY(mid, mr);
+                    var txt = svgEl('text', { x: mp.x, y: mp.y, 'text-anchor': 'middle',
+                        'dominant-baseline': 'central', fill: '#fff', 'font-size': '6.5',
+                        'font-family': 'monospace', 'font-weight': 'bold', 'pointer-events': 'none' });
+                    txt.textContent = zone.hits;
+                    svg.appendChild(txt);
                 }
-
-                // Hit count label in treble ring if >0
-                if (zone.hits > 0 && zone.label !== 'S') {
-                    var midAngle = startAngle + SEG_ANGLE / 2;
-                    var midR = (zone.r1 + zone.r2) / 2;
-                    var mp = polarToXY(midAngle, midR);
-                    var t = el('text', {
-                        x: mp.x, y: mp.y,
-                        'text-anchor': 'middle',
-                        'dominant-baseline': 'central',
-                        fill: '#fff',
-                        'font-size': '7',
-                        'font-family': 'monospace',
-                        'pointer-events': 'none',
-                    });
-                    t.textContent = zone.hits;
-                    svg.appendChild(t);
-                }
-
-                // Invisible touch target with tooltip
-                var hitTotal  = zone.hits * (zone.label === 'T' ? 3 : zone.label === 'D' ? 2 : 1) * seg;
-                var touchTarget = el('path', {
-                    d:    arcPath(zone.r1, zone.r2, startAngle, endAngle),
-                    fill: 'transparent',
-                    stroke: 'none',
-                    cursor: 'pointer',
-                });
-                tooltip(touchTarget,
-                    zone.label + seg +
-                    ' — ' + zone.hits + ' hit' + (zone.hits !== 1 ? 's' : '') +
-                    ' — ' + hitTotal + ' pts'
-                );
-                svg.appendChild(touchTarget);
+                var hitPts = zone.hits * (zone.lbl === 'T' ? 3 : zone.lbl === 'D' ? 2 : 1) * seg;
+                var tt = svgEl('path', { d: arcPath(zone.r1, zone.r2, a1, a2), fill: 'transparent', stroke: 'none', cursor: 'default' });
+                tip(tt, zone.lbl + seg + ' — ' + zone.hits + ' hit' + (zone.hits !== 1 ? 's' : '') + ' — ' + hitPts + ' pts');
+                svg.appendChild(tt);
             });
-
-            // Segment number label in outer single ring
-            var midAngle = startAngle + SEG_ANGLE / 2;
-            var labelR   = (rDouble2 + R) / 2;
-            var lp = polarToXY(midAngle, labelR);
-            // Rotate label to be readable
-            var rotate = midAngle + 90;
-            var lbl = el('text', {
-                x: lp.x, y: lp.y,
-                'text-anchor': 'middle',
-                'dominant-baseline': 'central',
-                fill: '#666',
-                'font-size': '8',
-                'font-family': 'monospace',
-                transform: 'rotate(' + rotate + ',' + lp.x + ',' + lp.y + ')',
-                'pointer-events': 'none',
-            });
+            var mid = a1 + SEG_ANGLE / 2, labelR = (rDouble2 + R) / 2;
+            var lp = polarToXY(mid, labelR);
+            var lbl = svgEl('text', { x: lp.x, y: lp.y, 'text-anchor': 'middle',
+                'dominant-baseline': 'central', fill: '#555', 'font-size': '7.5',
+                'font-family': 'monospace', transform: 'rotate(' + (mid+90) + ',' + lp.x + ',' + lp.y + ')',
+                'pointer-events': 'none' });
             lbl.textContent = seg;
             svg.appendChild(lbl);
         });
 
-        // Outer bull ring
-        var outerBullHits = getHits(25, '');
-        var outerBullColour = heatColour(outerBullHits);
-        var outerBull = el('circle', { cx: CX, cy: CY, r: rOuter,
-            fill: '#1a1a1a', stroke: '#2a2a2a', 'stroke-width': '0.5' });
-        svg.appendChild(outerBull);
-        if (outerBullColour) {
-            var outerBullOverlay = el('circle', { cx: CX, cy: CY, r: rOuter,
-                fill: outerBullColour, stroke: 'none', 'pointer-events': 'none' });
-            svg.appendChild(outerBullOverlay);
+        // Outer bull
+        var obH = getHits(25, 'S');
+        svg.appendChild(svgEl('circle', { cx: CX, cy: CY, r: rOuter, fill: heatColour(obH, false, false) || '#141414', stroke: '#1e1e1e', 'stroke-width': '0.5' }));
+        if (obH > 0) {
+            var obTxt = svgEl('text', { x: CX, y: CY + rBull + (rOuter-rBull)/2 - 1, 'text-anchor': 'middle',
+                'dominant-baseline': 'central', fill: '#fff', 'font-size': '6', 'font-family': 'monospace', 'pointer-events': 'none' });
+            obTxt.textContent = obH;
+            svg.appendChild(obTxt);
         }
-        var obTarget = el('circle', { cx: CX, cy: CY, r: rOuter,
-            fill: 'transparent', stroke: 'none', cursor: 'pointer' });
-        var obScore = outerBullHits * 25;
-        tooltip(obTarget, 'Outer Bull — ' + outerBullHits + ' hits — ' + obScore + ' pts');
-        svg.appendChild(obTarget);
+        var obTT = svgEl('circle', { cx: CX, cy: CY, r: rOuter, fill: 'transparent', stroke: 'none', cursor: 'default' });
+        tip(obTT, 'Outer Bull — ' + obH + ' hit' + (obH !== 1 ? 's' : '') + ' — ' + (obH*25) + ' pts');
+        svg.appendChild(obTT);
 
-        // Bull (double bull)
-        var bullHits = getHits(25, 'D');
-        var bullColour = heatColour(bullHits);
-        var bull = el('circle', { cx: CX, cy: CY, r: rBull,
-            fill: '#1a1a1a', stroke: '#2a2a2a', 'stroke-width': '0.5' });
-        svg.appendChild(bull);
-        if (bullColour) {
-            var bullOverlay = el('circle', { cx: CX, cy: CY, r: rBull,
-                fill: bullColour, stroke: 'none', 'pointer-events': 'none' });
-            svg.appendChild(bullOverlay);
+        // Inner bull
+        var bH = getHits(25, 'D');
+        svg.appendChild(svgEl('circle', { cx: CX, cy: CY, r: rBull, fill: heatColour(bH, true, false) || '#141414', stroke: '#1e1e1e', 'stroke-width': '0.5' }));
+        if (bH > 0) {
+            var bTxt = svgEl('text', { x: CX, y: CY, 'text-anchor': 'middle',
+                'dominant-baseline': 'central', fill: '#fff', 'font-size': '6', 'font-family': 'monospace', 'pointer-events': 'none' });
+            bTxt.textContent = bH;
+            svg.appendChild(bTxt);
         }
-        var bullTarget = el('circle', { cx: CX, cy: CY, r: rBull,
-            fill: 'transparent', stroke: 'none', cursor: 'pointer' });
-        var bullScore = bullHits * 50;
-        tooltip(bullTarget, 'Bull — ' + bullHits + ' hits — ' + bullScore + ' pts');
-        svg.appendChild(bullTarget);
+        var bTT = svgEl('circle', { cx: CX, cy: CY, r: rBull, fill: 'transparent', stroke: 'none', cursor: 'default' });
+        tip(bTT, 'Bull — ' + bH + ' hit' + (bH !== 1 ? 's' : '') + ' — ' + (bH*50) + ' pts');
+        svg.appendChild(bTT);
 
-        // Bull text
-        if (bullHits > 0) {
-            var bt = el('text', { x: CX, y: CY,
-                'text-anchor': 'middle', 'dominant-baseline': 'central',
-                fill: '#fff', 'font-size': '7', 'font-family': 'monospace',
-                'pointer-events': 'none' });
-            bt.textContent = bullHits;
-            svg.appendChild(bt);
-        }
+        // Wrap: SVG left, legend right (same layout as stats page)
+        var inner = document.createElement('div');
+        inner.className = 'heatmap-inner';
 
-        // Legend
-        var legendY = SIZE - 10;
-        ['0 hits', '≥1 hit', 'max hits'].forEach(function(label, i) {
-            var lx = 16 + i * 100;
-            var rect = el('rect', { x: lx, y: legendY - 6, width: 10, height: 10,
-                rx: 2, fill: i === 0 ? '#1a1a1a' : i === 1 ? 'rgba(240,165,0,0.25)' : 'rgba(240,165,0,0.95)',
-                stroke: '#333', 'stroke-width': '0.5' });
-            svg.appendChild(rect);
-            var lt = el('text', { x: lx + 13, y: legendY + 1,
-                fill: '#666', 'font-size': '8', 'font-family': 'monospace',
-                'dominant-baseline': 'central' });
-            lt.textContent = label;
-            svg.appendChild(lt);
+        var svgWrap = document.createElement('div');
+        svgWrap.className = 'heatmap-svg-wrap';
+        svgWrap.appendChild(svg);
+        inner.appendChild(svgWrap);
+
+        var legend = document.createElement('div');
+        legend.className = 'heatmap-legend';
+
+        var lgTitle = document.createElement('div');
+        lgTitle.className = 'heatmap-legend-title';
+        lgTitle.textContent = 'COLOUR GUIDE';
+        legend.appendChild(lgTitle);
+
+        [
+            { colour: '#2ecc71', label: 'Hottest',  desc: 'Most frequently hit zones' },
+            { colour: '#c8a068', label: 'Hot',       desc: 'Above average frequency'   },
+            { colour: '#c0392b', label: 'Moderate',  desc: 'Occasionally hit'           },
+            { colour: '#4a1060', label: 'Cold',      desc: 'Rarely hit'                 },
+            { colour: '#0d0d0d', label: 'Coldest',   desc: 'Never or almost never hit', border: '#444' },
+        ].forEach(function(item) {
+            var row = document.createElement('div');
+            row.className = 'heatmap-legend-item';
+            var swatch = document.createElement('div');
+            swatch.className = 'heatmap-legend-swatch';
+            swatch.style.background = item.colour;
+            if (item.border) swatch.style.borderColor = item.border;
+            row.appendChild(swatch);
+            var txt = document.createElement('div');
+            txt.className = 'heatmap-legend-text';
+            txt.innerHTML = '<strong>' + item.label + '</strong>' + item.desc;
+            row.appendChild(txt);
+            legend.appendChild(row);
         });
 
-        return svg;
+        var barRow = document.createElement('div');
+        barRow.className = 'heatmap-gradient-bar-row';
+        barRow.innerHTML = '<span class="heatmap-gradient-lbl">COLD</span>' +
+                           '<div class="heatmap-gradient-bar"></div>' +
+                           '<span class="heatmap-gradient-lbl">HOT</span>';
+        legend.appendChild(barRow);
+        inner.appendChild(legend);
+
+        var wrap = document.createElement('div');
+        wrap.className = 'heatmap-wrap';
+        wrap.appendChild(inner);
+        return wrap;
     }
 
     // ------------------------------------------------------------------
