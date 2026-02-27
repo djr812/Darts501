@@ -102,7 +102,7 @@ const UI = (() => {
         hiddenGameTypeRow.style.display = 'none';
         const hiddenBtn = document.createElement('button');
         hiddenBtn.dataset.value = gameType;
-        hiddenBtn.classList.add('selected');
+        hiddenBtn.classList.add('option-btn', 'selected');
         hiddenGameTypeRow.appendChild(hiddenBtn);
         _appTarget.appendChild(hiddenGameTypeRow);
         const gameTypeRow = hiddenGameTypeRow;
