@@ -784,9 +784,12 @@ Avg: ${m.avg}  (${m.darts} darts)`;
                         ? session.game_type
                         : (session.opponent || '—');
 
+                    const gameLabel = (session.game_type || '').toUpperCase();
+
                     row.innerHTML =
                         `<span class="history-date">${_esc(session.date)}</span>` +
                         `<span class="history-type ${resultCls}">${_esc(session.result)}</span>` +
+                        `<span class="history-game">${_esc(gameLabel)}</span>` +
                         `<span class="history-opp">${_esc(oppText)}</span>` +
                         `<span class="history-avg">${session.avg}</span>` +
                         `<span class="history-darts">${session.darts}d</span>` +

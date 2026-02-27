@@ -2521,7 +2521,7 @@ body.mode-practice #app {
 
 .history-row {
     display: grid;
-    grid-template-columns: 80px 54px 1fr 44px 36px 16px;
+    grid-template-columns: 80px 54px 52px 1fr 44px 36px 16px;
     align-items: center;
     gap: 6px;
     padding: 10px 16px;
@@ -2542,6 +2542,7 @@ body.mode-practice #app {
 .history-row:active     { background: var(--bg-raised); }
 
 .history-date   { color: var(--text-secondary); }
+.history-game   { color: var(--text-dim); font-size: 0.62rem; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .history-opp    { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .history-avg    { color: var(--accent); text-align: right; }
 .history-darts  { color: var(--text-dim); text-align: right; }
