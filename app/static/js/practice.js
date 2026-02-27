@@ -455,7 +455,7 @@ var PRACTICE = (function() {
             btn.dataset.multiplier = tab.multiplier;
             btn.dataset.activeClass = tab.cls;
             btn.type = 'button';
-            btn.addEventListener('click', function() {
+            UI.addTouchSafeListener(btn, function() {
                 _state.multiplier = tab.multiplier;
                 document.querySelectorAll('.tab-btn').forEach(function(b) {
                     b.classList.remove('active-single', 'active-double', 'active-treble');
@@ -516,8 +516,7 @@ var PRACTICE = (function() {
         outer.textContent = 'OUTER';
         outer.dataset.segment = 25;
         outer.addEventListener('click', function() {
-            _state.multiplier = 1;
-            _recordPracticeDart(25);
+            _recordPracticeDart(25, 1);
         });
         row.appendChild(outer);
 
@@ -527,8 +526,7 @@ var PRACTICE = (function() {
         bull.textContent = 'BULL';
         bull.dataset.segment = 25;
         bull.addEventListener('click', function() {
-            _state.multiplier = 2;
-            _recordPracticeDart(25);
+            _recordPracticeDart(25, 2);
         });
         row.appendChild(bull);
 
@@ -542,8 +540,8 @@ var PRACTICE = (function() {
     // _recordPracticeDart — local only, no server call.
     // Darts are buffered in _state.pendingDarts and submitted in bulk
     // when the player taps NEXT. Timer expiry and END discard pending darts.
-    function _recordPracticeDart(segment) {
-        var multiplier = _state.multiplier;
+    function _recordPracticeDart(segment, forcedMultiplier) {
+        var multiplier = (forcedMultiplier !== undefined) ? forcedMultiplier : _state.multiplier;
         var points = segment === 0 ? 0 : segment * multiplier;
 
         if (_state.turnDarts % 3 === 0) {

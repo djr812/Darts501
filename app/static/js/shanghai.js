@@ -232,7 +232,7 @@ var SHANGHAI_GAME = (function () {
             btn.dataset.multiplier = t.mul;
             btn.dataset.activeClass = t.cls;
             btn.textContent = t.label;
-            btn.addEventListener('click', function () {
+            UI.addTouchSafeListener(btn, function () {
                 if (_state.turnComplete || _state.cpuRunning) return;
                 _state.multiplier = t.mul;
                 tabs.querySelectorAll('.tab-btn').forEach(function (b) {

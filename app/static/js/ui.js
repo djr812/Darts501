@@ -9,6 +9,27 @@ const UI = (() => {
     // ------------------------------------------------------------------
 
     // ── Home screen: title + game type tiles + stats button ──
+    /**
+     * Attach a listener that fires on touchend (preventing the subsequent
+     * synthetic click) on touch devices, and on click on non-touch devices.
+     * This prevents iOS Safari from mis-firing a tap on a tab button as a
+     * click on whatever element happens to be underneath after layout shift.
+     */
+    function _addTouchSafeListener(el, handler) {
+        var touched = false;
+        el.addEventListener('touchend', function(e) {
+            e.preventDefault();   // suppress the 300ms synthetic click
+            touched = true;
+            handler();
+            // Reset flag after the synthetic click window passes
+            setTimeout(function() { touched = false; }, 600);
+        }, { passive: false });
+        el.addEventListener('click', function() {
+            if (touched) return;  // already handled by touchend
+            handler();
+        });
+    }
+
     function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai) {
         const app = document.getElementById('app');
         app.innerHTML = '';
@@ -734,7 +755,7 @@ const UI = (() => {
             btn.textContent = tab.label;
             btn.dataset.multiplier = tab.multiplier;
             btn.dataset.activeClass = tab.cls;
-            btn.addEventListener('click', () => onMultiplier(tab.multiplier, btn));
+            _addTouchSafeListener(btn, () => onMultiplier(tab.multiplier, btn));
             row.appendChild(btn);
         });
         return row;
@@ -1171,6 +1192,7 @@ const UI = (() => {
         setCheckoutPanel,
         flashCard,
         setMultiplierTab,
+        addTouchSafeListener: _addTouchSafeListener,
         setNextPlayerEnabled,
         setUndoEnabled,
         setStatus,

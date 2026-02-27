@@ -171,7 +171,7 @@ var CRICKET_GAME = (function () {
             btn.dataset.activeClass = t.cls;
             btn.type = 'button';
             btn.textContent = t.label;
-            btn.addEventListener('click', function () {
+            UI.addTouchSafeListener(btn, function () {
                 if (_state.turnComplete) return;
                 _state.multiplier = t.mul;
                 tabs.querySelectorAll('.tab-btn').forEach(function (b) {
