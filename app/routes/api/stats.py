@@ -516,7 +516,7 @@ def get_player_heatmap(player_id):
 @stats_bp.route("/players/<int:player_id>/history", methods=["GET"])
 def get_player_history(player_id):
     """
-    Return a paginated list of matches and practice sessions for a player.
+    Return a paginated list of matches (excluding practice sessions) for a player.
 
     Query params:
         offset  -- pagination offset (default 0)
@@ -550,6 +550,7 @@ def get_player_history(player_id):
         FROM matches m
         JOIN match_players mp ON mp.match_id = m.id AND mp.player_id = %s
         WHERE m.status = 'complete'
+          AND m.session_type != 'practice'
         ORDER BY m.ended_at DESC
         LIMIT %s OFFSET %s
     """, (player_id, limit, offset))
