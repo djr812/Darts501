@@ -851,8 +851,8 @@ var SHANGHAI_GAME = (function () {
 
         if (SPEECH.isEnabled()) {
             setTimeout(function () {
-                if (winnerId) {
-                    SPEECH.announceCheckout && SPEECH.announceCheckout(0);
+                if (winnerId && winner) {
+                    SPEECH.announceCricketWin && SPEECH.announceCricketWin(winner.name);
                 }
             }, 400);
         }

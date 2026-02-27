@@ -554,7 +554,7 @@ var CRICKET_GAME = (function () {
         if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) SOUNDS.checkout();
         if (SPEECH.isEnabled()) {
             setTimeout(function () {
-                SPEECH.announceCheckout && SPEECH.announceCheckout(0);
+                SPEECH.announceCricketWin && SPEECH.announceCricketWin(winner.name);
             }, 400);
         }
 
