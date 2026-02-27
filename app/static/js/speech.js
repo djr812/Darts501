@@ -62,7 +62,7 @@ var SPEECH = (function() {
     var SPECIAL_SCORES = {
         180: 'One hundred and eighty!',
         171: 'One hundred and seventy one',
-        170: 'One hundred and seventy',
+        170: 'Big fish!',
         167: 'One hundred and sixty seven',
         164: 'One hundred and sixty four',
         161: 'One hundred and sixty one',
@@ -235,9 +235,11 @@ var SPEECH = (function() {
             phrase = phrase + '... ' + _phraseRemaining(remaining);
         }
 
-        // 180 gets emphatic treatment — louder, slightly slower, higher pitch
+        // 180 and 170 get emphatic treatment — louder, slightly slower, higher pitch
         if (turnPoints === 180) {
             _speak(phrase, true, { rate: 0.9, pitch: 1.3, volume: 1.0 });
+        } else if (turnPoints === 170) {
+            _speak(phrase, true, { rate: 0.95, pitch: 1.2, volume: 1.0 });
         } else {
             _speak(phrase, false);
         }
