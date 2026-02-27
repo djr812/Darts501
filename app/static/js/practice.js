@@ -676,6 +676,11 @@ var PRACTICE = (function() {
                 timerEl.classList.add('timer-warning');
             }
 
+            // "30 seconds remaining" call
+            if (_state.timerSeconds === 30 && SPEECH.isEnabled()) {
+                SPEECH.announceTimer && SPEECH.announceTimer('30 seconds remaining');
+            }
+
             if (_state.timerSeconds <= 0) {
                 clearInterval(_state.timerInterval);
                 _endSession(onEnd);
