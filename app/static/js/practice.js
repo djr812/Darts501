@@ -808,8 +808,15 @@ var PRACTICE = (function() {
                 var tc = _state.targetConfig;
                 if (!tc) return false;
                 if (tc.segment === 25) {
-                    // Bull family: match exact multiplier
+                    // Bull family: match exact multiplier (outer vs inner are distinct targets)
                     return segment === 25 && multiplier === tc.multiplier;
+                }
+                // When a single segment is the target, singles/doubles/trebles of
+                // that segment all count as hits — only misses on other numbers don't.
+                // When doubles or trebles are explicitly targeted (tc.multiplier > 1),
+                // keep exact matching so stats are specific.
+                if (tc.multiplier === 1) {
+                    return segment === tc.segment;  // any multiplier on the target segment
                 }
                 return segment === tc.segment && multiplier === tc.multiplier;
             case 'trebles':
