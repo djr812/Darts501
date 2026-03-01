@@ -372,44 +372,64 @@ var PRACTICE = (function() {
         // Header
         var header = document.createElement('header');
         header.id = 'practice-header';
+        header.className = 'game-header';
 
+        // ── Left: player name + timer + rules ──
+        var leftSlot = document.createElement('div');
+        leftSlot.className = 'gh-left';
+        var titleWrap = document.createElement('div');
+        titleWrap.className = 'gh-title-wrap';
         var titleEl = document.createElement('div');
-        titleEl.className = 'practice-title';
-        titleEl.textContent = _state.playerName.toUpperCase() + ' — PRACTICE';
-        header.appendChild(titleEl);
-
+        titleEl.className = 'gh-game-name';
+        titleEl.textContent = 'PRACTICE';
         var timerEl = document.createElement('div');
         timerEl.id = 'practice-timer';
-        timerEl.className = 'practice-timer';
+        timerEl.className = 'gh-match-info practice-timer-inline';
         timerEl.textContent = _formatTime(_state.timerSeconds);
-        header.appendChild(timerEl);
+        titleWrap.appendChild(titleEl);
+        titleWrap.appendChild(timerEl);
+        leftSlot.appendChild(titleWrap);
+        var rulesBtn = document.createElement('button');
+        rulesBtn.type = 'button';
+        rulesBtn.className = 'rules-btn';
+        rulesBtn.textContent = '📖 RULES';
+        rulesBtn.addEventListener('click', function() {
+            if (typeof UI !== 'undefined') UI.showRulesModal('practice');
+        });
+        leftSlot.appendChild(rulesBtn);
+        header.appendChild(leftSlot);
 
+        // ── Centre: End ──
+        var centreSlot = document.createElement('div');
+        centreSlot.className = 'gh-centre';
+        var endBtn = document.createElement('button');
+        endBtn.className = 'gh-btn gh-btn-red';
+        endBtn.type = 'button';
+        endBtn.textContent = '✕ END';
+        endBtn.addEventListener('click', function() { _endSession(onEnd); });
+        centreSlot.appendChild(endBtn);
+        header.appendChild(centreSlot);
+
+        // ── Right: Undo + Next ──
+        var rightSlot = document.createElement('div');
+        rightSlot.className = 'gh-right';
         var undoBtn = document.createElement('button');
         undoBtn.id = 'practice-undo-btn';
-        undoBtn.className = 'practice-undo-btn';
+        undoBtn.className = 'gh-btn gh-btn-undo';
         undoBtn.type = 'button';
-        undoBtn.textContent = '\u21a9 UNDO';
+        undoBtn.textContent = '⟵ UNDO';
         undoBtn.disabled = true;
         undoBtn.addEventListener('click', function() { _undoPracticeDart(); });
-        header.appendChild(undoBtn);
-
         var nextBtn = document.createElement('button');
         nextBtn.id = 'practice-next-btn';
-        nextBtn.className = 'practice-next-btn';
+        nextBtn.className = 'gh-btn gh-btn-next';
         nextBtn.type = 'button';
-        nextBtn.textContent = 'NEXT \u2192';
+        nextBtn.textContent = 'NEXT ▶';
         nextBtn.disabled = true;
         nextBtn.addEventListener('click', function() { _advanceToNextTurn(); });
-        header.appendChild(nextBtn);
-
-        var endBtn = document.createElement('button');
-        endBtn.className = 'practice-end-btn';
-        endBtn.type = 'button';
-        endBtn.textContent = 'END';
-        endBtn.addEventListener('click', function() {
-            _endSession(onEnd);
-        });
-        header.appendChild(endBtn);
+        rightSlot.appendChild(undoBtn);
+        rightSlot.appendChild(nextBtn);
+        header.appendChild(rightSlot);
 
         app.appendChild(header);
 

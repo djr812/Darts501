@@ -127,20 +127,147 @@ body.mode-stats #app {
 /* --- Header --- */
 #header {
     grid-area: header;
+}
+
+/* ── Shared game header bar (501/201/Cricket/Shanghai/Practice) ── */
+.game-header,
+#header {
     display: -webkit-box;
     display: -webkit-flex;
     display: flex;
     -webkit-box-align: center;
     -webkit-align-items: center;
     align-items: center;
-    -webkit-box-pack: justify;
-    -webkit-justify-content: space-between;
-    justify-content: space-between;
-    padding: 8px 16px;
+    padding: 0 12px;
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
     height: 52px;
+    gap: 8px;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
 }
+
+/* Left slot: title wrap + rules btn */
+.gh-left {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    gap: 8px;
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    min-width: 0;
+}
+
+.gh-title-wrap {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.gh-game-name {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.gh-match-info {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+/* Centre slot: End + Restart */
+.gh-centre {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    gap: 6px;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+/* Right slot: Undo + Next (+ Speech for 501/201) */
+.gh-right {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    gap: 6px;
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    -webkit-box-pack: end;
+    -webkit-justify-content: flex-end;
+    justify-content: flex-end;
+}
+
+/* Shared game-header button base */
+.gh-btn {
+    height: 34px;
+    padding: 0 11px;
+    border-radius: var(--radius);
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    white-space: nowrap;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    -webkit-transition: background 0.1s, -webkit-transform 0.1s;
+    transition: background 0.1s, transform 0.1s;
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text-primary);
+}
+.gh-btn:active { -webkit-transform: scale(0.95); transform: scale(0.95); }
+.gh-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Red: End / Restart */
+.gh-btn-red {
+    border-color: #6a2020;
+    color: #e05555;
+    background: rgba(192,57,43,0.08);
+}
+.gh-btn-red:active { background: rgba(192,57,43,0.18); }
+
+/* Undo */
+.gh-btn-undo {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+}
+.gh-btn-undo:active { background: var(--accent-glow); }
+.gh-btn-undo:disabled { border-color: var(--border); color: var(--text-dim); }
+
+/* Next */
+.gh-btn-next {
+    border-color: var(--treble-color);
+    color: var(--treble-color);
+}
+.gh-btn-next:active { background: rgba(46,204,113,0.12); }
+.gh-btn-next:disabled { border-color: var(--border); color: var(--text-dim); }
 
 /* Speech toggle button in header */
 .speech-toggle {
@@ -172,20 +299,12 @@ body.mode-stats #app {
     transform: scale(0.96);
 }
 
-#header h1 {
-    font-family: var(--font-display);
-    font-size: 1.4rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: var(--accent);
-    text-transform: uppercase;
-}
-
+/* Legacy match-info (keep for setMatchInfo() compat) */
 #match-info {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    letter-spacing: 0.08em;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    letter-spacing: 0.07em;
 }
 
 /* --- Sidebar: Scoreboard --- */
@@ -519,49 +638,15 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     -webkit-box-align: center;
     -webkit-align-items: center;
     align-items: center;
-    padding: 4px 10px;
-    background: var(--bg-surface);
-    border-top: 1px solid var(--border);
-    height: 52px;
-    -webkit-box-sizing: border-box;
-    box-sizing: border-box;
-}
-
-/* Three-slot layout: left and right are equal flex:1 wings,
-   centre is fixed and truly centred in the bar */
-.status-slot {
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    -webkit-box-align: center;
-    -webkit-align-items: center;
-    align-items: center;
-}
-
-.status-slot-left {
-    -webkit-box-flex: 1;
-    -webkit-flex: 1;
-    flex: 1;
-    -webkit-box-pack: start;
-    -webkit-justify-content: flex-start;
-    justify-content: flex-start;
-}
-
-.status-slot-centre {
     -webkit-box-pack: center;
     -webkit-justify-content: center;
     justify-content: center;
-    -webkit-flex-shrink: 0;
-    flex-shrink: 0;
-}
-
-.status-slot-right {
-    -webkit-box-flex: 1;
-    -webkit-flex: 1;
-    flex: 1;
-    -webkit-box-pack: end;
-    -webkit-justify-content: flex-end;
-    justify-content: flex-end;
+    padding: 4px 10px;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    height: 36px;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 #status-message {
@@ -578,60 +663,7 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 #status-message.bust    { color: var(--bust-color); font-weight: bold; }
 #status-message.success { color: var(--checkout-color); font-weight: bold; }
 
-/* Action buttons in status bar */
-.action-btn {
-    height: 36px;
-    padding: 0 12px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    background: var(--bg-raised);
-    color: var(--text-primary);
-    font-family: var(--font-display);
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    cursor: pointer;
-    white-space: nowrap;
-    -webkit-transition: all 0.1s ease;
-    transition: all 0.1s ease;
-}
-
-.action-btn:active { transform: scale(0.96); }
-
-.action-btn.undo {
-    border-color: var(--accent-dim);
-    color: var(--accent);
-}
-
-.action-btn.undo:active { background: var(--accent-glow); }
-
-.action-btn.next-player {
-    border-color: var(--treble-color);
-    color: var(--treble-color);
-}
-
-.action-btn.next-player:active { background: rgba(39, 174, 96, 0.15); }
-
-.action-btn.next-player:disabled {
-    border-color: var(--border);
-    color: var(--text-dim);
-    cursor: not-allowed;
-}
-
-.action-btn.match-cancel {
-    border-color: #6a2a2a;
-    color: #c0392b;
-}
-.action-btn.match-cancel:active { background: rgba(192,57,43,0.12); }
-
-.action-btn.match-restart {
-    border-color: #4a3a1a;
-    color: #e67e22;
-}
-.action-btn.match-restart:active { background: rgba(230,126,34,0.12); }
-
-/* Cancel + Restart live inside .status-slot-centre — no wrapper needed */
+/* action-btn replaced by gh-btn system */
 
 /* --- Confirm modal --- */
 .confirm-box {
@@ -1540,9 +1572,7 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 #multiplier-tabs > * + * {
     margin-left: 8px;
 }
-#status-bar > * + * {
-    margin-left: 8px;
-}
+/* removed */
 .setup-option-row > * + * {
     margin-left: 8px;
 }
@@ -1580,7 +1610,7 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     margin-top: 12px;
 }
 /* iOS 12 flex gap polyfill for new groups */
-.status-slot-centre > * + * { margin-left: 8px; }
+/* removed orphan */
 .confirm-btn-row > * + * { margin-left: 12px; }
 
 /* =============================================================
@@ -2051,75 +2081,7 @@ body.mode-practice #app {
     50%       { opacity: 0.5; }
 }
 
-.practice-undo-btn {
-    padding: 8px 16px;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text-secondary);
-    font-family: var(--font-display);
-    font-size: 0.78rem;
-    letter-spacing: 0.1em;
-    cursor: pointer;
-    -webkit-transition: border-color 0.15s, color 0.15s;
-    transition: border-color 0.15s, color 0.15s;
-}
-
-.practice-undo-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
-}
-
-.practice-undo-btn:not(:disabled):active {
-    border-color: var(--accent);
-    color: var(--accent);
-}
-
-.practice-next-btn {
-    padding: 8px 16px;
-    background: transparent;
-    border: 1px solid var(--accent-dim);
-    border-radius: var(--radius);
-    color: var(--accent-dim);
-    font-family: var(--font-display);
-    font-size: 0.78rem;
-    letter-spacing: 0.1em;
-    cursor: pointer;
-    -webkit-transition: border-color 0.15s, color 0.15s, background 0.15s;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-
-.practice-next-btn:not(:disabled) {
-    border-color: var(--accent);
-    color: var(--accent);
-}
-
-.practice-next-btn:not(:disabled):active {
-    background: var(--accent);
-    color: #000;
-}
-
-.practice-next-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
-}
-
-.practice-end-btn {
-    padding: 8px 16px;
-    background: transparent;
-    border: 1px solid var(--bust-color);
-    border-radius: var(--radius);
-    color: var(--bust-color);
-    font-family: var(--font-display);
-    font-size: 0.78rem;
-    letter-spacing: 0.1em;
-    cursor: pointer;
-}
-
-.practice-end-btn:active {
-    background: var(--bust-color);
-    color: #fff;
-}
+/* practice header btns now use gh-btn system */
 
 /* Stats strip */
 .practice-strip {
@@ -2759,45 +2721,7 @@ body.mode-cricket #app {
 
 /* ── Header ── */
 .cricket-header {
-    display: -webkit-box;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    background: var(--bg-raised);
-    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
-    gap: 8px;
-}
-
-.cricket-undo-btn,
-.cricket-next-btn,
-.cricket-end-btn {
-    padding: 8px 16px;
-    border-radius: var(--radius);
-    font-family: var(--font-display);
-    font-size: 0.78rem;
-    letter-spacing: 0.08em;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    background: transparent;
-}
-
-.cricket-undo-btn:disabled { opacity: 0.3; cursor: default; }
-
-.cricket-next-btn:not(:disabled) {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: var(--accent-glow);
-    -webkit-animation: next-pulse 1.5s ease-in-out infinite;
-    animation: next-pulse 1.5s ease-in-out infinite;
-}
-
-.cricket-end-btn {
-    margin-left: auto;
-    color: var(--bust-color);
-    border-color: var(--bust-color);
 }
 
 /* ── Scoreboard ── */
@@ -3401,45 +3325,7 @@ body.mode-shanghai {
 }
 
 /* ── Header ── */
-.sh-header {
-    display: -webkit-box;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 8px 12px;
-    background: var(--bg-surface);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-}
-
-.sh-btn {
-    font-family: var(--font-display);
-    font-size: 0.78rem;
-    letter-spacing: 0.1em;
-    padding: 8px 16px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    background: var(--bg-raised);
-    color: var(--text-secondary);
-    cursor: pointer;
-    -webkit-transition: border-color 0.15s, color 0.15s;
-    transition: border-color 0.15s, color 0.15s;
-}
-
-.sh-btn:disabled { opacity: 0.35; cursor: default; }
-
-.sh-btn-next {
-    border-color: var(--accent);
-    color: var(--accent);
-    font-weight: 700;
-}
-.sh-btn-next:disabled { opacity: 0.35; }
-
-.sh-btn-end {
-    color: var(--text-dim);
-    margin-left: auto;
-}
+.sh-header { flex-shrink: 0; }
 
 /* ── Scoreboard ── */
 .sh-scoreboard {

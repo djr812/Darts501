@@ -167,40 +167,62 @@ var SHANGHAI_GAME = (function () {
 
         // ── Header ──────────────────────────────────────────────────
         var header = document.createElement('div');
-        header.className = 'sh-header';
+        header.className = 'sh-header game-header';
 
-        var undoBtn = document.createElement('button');
-        undoBtn.id = 'sh-undo-btn';
-        undoBtn.className = 'sh-btn sh-btn-undo';
-        undoBtn.type = 'button';
-        undoBtn.textContent = '↩ UNDO';
-        undoBtn.disabled = true;
-        undoBtn.addEventListener('click', _onUndo);
-        header.appendChild(undoBtn);
-
-        var nextBtn = document.createElement('button');
-        nextBtn.id = 'sh-next-btn';
-        nextBtn.className = 'sh-btn sh-btn-next';
-        nextBtn.type = 'button';
-        nextBtn.textContent = 'NEXT ›';
-        nextBtn.disabled = true;
-        nextBtn.addEventListener('click', _onNext);
-        header.appendChild(nextBtn);
-
+        // ── Left: game name + details + rules ──
+        var leftSlot = document.createElement('div');
+        leftSlot.className = 'gh-left';
+        var titleWrap = document.createElement('div');
+        titleWrap.className = 'gh-title-wrap';
+        var titleEl = document.createElement('div');
+        titleEl.className = 'gh-game-name';
+        titleEl.textContent = 'SHANGHAI';
+        var subEl = document.createElement('div');
+        subEl.className = 'gh-match-info';
+        subEl.textContent = _state.numRounds + ' ROUNDS · ' + _state.players.length + ' PLAYERS';
+        titleWrap.appendChild(titleEl);
+        titleWrap.appendChild(subEl);
+        leftSlot.appendChild(titleWrap);
         var rulesBtn = document.createElement('button');
         rulesBtn.type = 'button';
         rulesBtn.className = 'rules-btn';
         rulesBtn.textContent = '📖 RULES';
         rulesBtn.addEventListener('click', function() { UI.showRulesModal('shanghai'); });
-        header.appendChild(rulesBtn);
+        leftSlot.appendChild(rulesBtn);
+        header.appendChild(leftSlot);
 
+        // ── Centre: End ──
+        var centreSlot = document.createElement('div');
+        centreSlot.className = 'gh-centre';
         var endBtn = document.createElement('button');
         endBtn.id = 'sh-end-btn';
-        endBtn.className = 'sh-btn sh-btn-end';
+        endBtn.className = 'gh-btn gh-btn-red';
         endBtn.type = 'button';
-        endBtn.textContent = 'END';
+        endBtn.textContent = '✕ END';
         endBtn.addEventListener('click', _onEnd);
-        header.appendChild(endBtn);
+        centreSlot.appendChild(endBtn);
+        header.appendChild(centreSlot);
+
+        // ── Right: Undo + Next ──
+        var rightSlot = document.createElement('div');
+        rightSlot.className = 'gh-right';
+        var undoBtn = document.createElement('button');
+        undoBtn.id = 'sh-undo-btn';
+        undoBtn.className = 'gh-btn gh-btn-undo';
+        undoBtn.type = 'button';
+        undoBtn.textContent = '⟵ UNDO';
+        undoBtn.disabled = true;
+        undoBtn.addEventListener('click', _onUndo);
+        var nextBtn = document.createElement('button');
+        nextBtn.id = 'sh-next-btn';
+        nextBtn.className = 'gh-btn gh-btn-next';
+        nextBtn.type = 'button';
+        nextBtn.textContent = 'NEXT ▶';
+        nextBtn.disabled = true;
+        nextBtn.addEventListener('click', _onNext);
+        rightSlot.appendChild(undoBtn);
+        rightSlot.appendChild(nextBtn);
+        header.appendChild(rightSlot);
 
         app.appendChild(header);
 

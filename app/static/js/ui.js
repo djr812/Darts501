@@ -662,11 +662,52 @@ const UI = (() => {
         const el = document.createElement('header');
         el.id = 'header';
 
-        const title = document.createElement('h1');
-        title.textContent = 'DARTS 501';
+        // ── Left: game name + match info + rules ──
+        const leftSlot = document.createElement('div');
+        leftSlot.className = 'gh-left';
 
-        const matchInfo = document.createElement('span');
+        const titleWrap = document.createElement('div');
+        titleWrap.className = 'gh-title-wrap';
+
+        const title = document.createElement('div');
+        title.className = 'gh-game-name';
+        title.textContent = _currentGameType.toUpperCase();
+
+        const matchInfo = document.createElement('div');
         matchInfo.id = 'match-info';
+        matchInfo.className = 'gh-match-info';
+
+        titleWrap.appendChild(title);
+        titleWrap.appendChild(matchInfo);
+        leftSlot.appendChild(titleWrap);
+
+        const rulesBtn = document.createElement('button');
+        rulesBtn.type = 'button';
+        rulesBtn.className = 'rules-btn';
+        rulesBtn.textContent = '📖 RULES';
+        rulesBtn.addEventListener('click', function() { showRulesModal(_currentGameType); });
+        leftSlot.appendChild(rulesBtn);
+
+        // ── Centre: End + Restart ──
+        const centreSlot = document.createElement('div');
+        centreSlot.className = 'gh-centre';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'gh-btn gh-btn-red'; cancelBtn.id = 'btn-cancel';
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = '✕ END';
+
+        const restartBtn = document.createElement('button');
+        restartBtn.className = 'gh-btn gh-btn-red'; restartBtn.id = 'btn-restart';
+        restartBtn.type = 'button';
+        restartBtn.textContent = '↺ RESTART';
+
+        centreSlot.appendChild(cancelBtn);
+        centreSlot.appendChild(restartBtn);
+
+        // ── Right: Undo + Next + Speech ──
+        const rightSlot = document.createElement('div');
+        rightSlot.className = 'gh-right';
 
         const speechBtn = document.createElement('button');
         speechBtn.id    = 'btn-speech';
@@ -675,26 +716,38 @@ const UI = (() => {
         speechBtn.className = 'speech-toggle';
         speechBtn.setAttribute('aria-pressed', 'true');
         _updateSpeechBtn(speechBtn, true);
-
         speechBtn.addEventListener('click', function() {
-            if (!SPEECH.isSupported()) {
-                return;
-            }
+            if (!SPEECH.isSupported()) return;
             var nowEnabled = !SPEECH.isEnabled();
             SPEECH.setEnabled(nowEnabled);
             _updateSpeechBtn(speechBtn, nowEnabled);
         });
 
-        const rulesBtn = document.createElement('button');
-        rulesBtn.type = 'button';
-        rulesBtn.className = 'rules-btn';
-        rulesBtn.textContent = '📖 RULES';
-        rulesBtn.addEventListener('click', function() { showRulesModal(_currentGameType); });
+        const undoBtn = document.createElement('button');
+        undoBtn.className = 'gh-btn gh-btn-undo'; undoBtn.id = 'btn-undo';
+        undoBtn.type = 'button';
+        undoBtn.textContent = '⟵ UNDO';
 
-        el.appendChild(title);
-        el.appendChild(matchInfo);
-        el.appendChild(rulesBtn);
-        el.appendChild(speechBtn);
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'gh-btn gh-btn-next'; nextBtn.id = 'btn-next';
+        nextBtn.type = 'button';
+        nextBtn.textContent = 'NEXT ▶';
+        nextBtn.disabled = true;
+
+        rightSlot.appendChild(speechBtn);
+        rightSlot.appendChild(undoBtn);
+        rightSlot.appendChild(nextBtn);
+
+        el.appendChild(leftSlot);
+        el.appendChild(centreSlot);
+        el.appendChild(rightSlot);
+
+        // Store refs so _buildStatusBar callbacks can be wired later
+        el._cancelBtn  = cancelBtn;
+        el._restartBtn = restartBtn;
+        el._undoBtn    = undoBtn;
+        el._nextBtn    = nextBtn;
+
         return el;
     }
 
@@ -805,54 +858,24 @@ const UI = (() => {
     }
 
     function _buildStatusBar(callbacks) {
+        // Wire up callbacks to buttons already created in _buildHeader
+        const header = document.getElementById('header');
+        if (header) {
+            if (header._cancelBtn)  header._cancelBtn.addEventListener('click', callbacks.onCancel);
+            if (header._restartBtn) header._restartBtn.addEventListener('click', callbacks.onRestart);
+            if (header._undoBtn)    header._undoBtn.addEventListener('click', callbacks.onUndo);
+            if (header._nextBtn)    header._nextBtn.addEventListener('click', callbacks.onNextPlayer);
+        }
+
+        // Status message bar (thin footer for contextual messages only)
         const el = document.createElement('footer');
         el.id = 'status-bar';
-
-        // Left slot (flex:1) — UNDO, left-aligned
-        const leftSlot = document.createElement('div');
-        leftSlot.className = 'status-slot status-slot-left';
-
-        const undoBtn = document.createElement('button');
-        undoBtn.className = 'action-btn undo'; undoBtn.id = 'btn-undo';
-        undoBtn.textContent = '⟵ UNDO';
-        undoBtn.addEventListener('click', callbacks.onUndo);
-        leftSlot.appendChild(undoBtn);
-
-        // Centre slot — Cancel / Restart / status message stacked
-        const centreSlot = document.createElement('div');
-        centreSlot.className = 'status-slot status-slot-centre';
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'action-btn match-cancel'; cancelBtn.id = 'btn-cancel';
-        cancelBtn.textContent = '✕ CANCEL';
-        cancelBtn.addEventListener('click', callbacks.onCancel);
-
-        const restartBtn = document.createElement('button');
-        restartBtn.className = 'action-btn match-restart'; restartBtn.id = 'btn-restart';
-        restartBtn.textContent = '↺ RESTART';
-        restartBtn.addEventListener('click', callbacks.onRestart);
 
         const msg = document.createElement('span');
         msg.id = 'status-message';
         msg.textContent = 'SELECT MULTIPLIER THEN SEGMENT';
+        el.appendChild(msg);
 
-        centreSlot.appendChild(cancelBtn);
-        centreSlot.appendChild(restartBtn);
-        centreSlot.appendChild(msg);
-
-        // Right slot (flex:1) — NEXT, right-aligned
-        const rightSlot = document.createElement('div');
-        rightSlot.className = 'status-slot status-slot-right';
-
-        const nextBtn = document.createElement('button');
-        nextBtn.className = 'action-btn next-player'; nextBtn.id = 'btn-next';
-        nextBtn.textContent = 'NEXT ▶'; nextBtn.disabled = true;
-        nextBtn.addEventListener('click', callbacks.onNextPlayer);
-        rightSlot.appendChild(nextBtn);
-
-        el.appendChild(leftSlot);
-        el.appendChild(centreSlot);
-        el.appendChild(rightSlot);
         return el;
     }
 
@@ -1267,6 +1290,35 @@ const UI = (() => {
                 {
                     heading: 'Strategy',
                     body: 'Close numbers quickly to stop opponents scoring on them, and build points on numbers you\'ve closed that opponents haven\'t. The Bull is often the key battleground.'
+                },
+            ]
+        },
+        'practice': {
+            title: 'Practice',
+            sections: [
+                {
+                    heading: 'Objective',
+                    body: 'Sharpen your accuracy across a timed session. Choose Free Throw mode to aim at anything, or select a specific target to focus your training.'
+                },
+                {
+                    heading: 'Free Throw Mode',
+                    body: 'Throw at any segment you like. The session tracks your 3-dart average, best segment, and builds a heatmap of where your darts land.'
+                },
+                {
+                    heading: 'Target Mode',
+                    body: 'Choose a specific target — a single segment, doubles, trebles, checkout doubles, or Around the Clock. The session tracks how often you hit the target and your hit rate percentage.'
+                },
+                {
+                    heading: 'Around the Clock',
+                    body: 'Hit segments 1 through 20 in order. Any multiplier of the correct number advances the clock. The session records how many you complete in the time.'
+                },
+                {
+                    heading: 'Turn Structure',
+                    body: 'Darts are entered in groups of 3. Press NEXT after each set of 3 to record the turn and move on. Use UNDO to correct the last dart entered.'
+                },
+                {
+                    heading: 'Session End',
+                    body: 'When the timer runs out (or you press END), a summary is shown with your stats and a heatmap of the session\'s throws.'
                 },
             ]
         },
