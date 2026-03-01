@@ -401,6 +401,65 @@ def submit_shanghai_round(match_id):
     return jsonify(state), 200
 
 
+@shanghai_bp.route("/shanghai/matches/<int:match_id>/restart", methods=["POST"])
+def restart_shanghai_match(match_id):
+    """Restart a Shanghai match — wipe all rounds/throws and reset to fresh state."""
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute(
+        "SELECT id, status FROM matches WHERE id = %s",
+        (match_id,)
+    )
+    match = cursor.fetchone()
+    if not match:
+        return jsonify({"error": "Match not found"}), 404
+    if match["status"] not in ("active", "cancelled"):
+        return jsonify({"error": "Cannot restart a completed match"}), 400
+
+    # Get player list
+    cursor.execute(
+        "SELECT player_id FROM match_players WHERE match_id = %s ORDER BY turn_order ASC",
+        (match_id,)
+    )
+    player_ids = [r["player_id"] for r in cursor.fetchall()]
+
+    # Get the shanghai_game record
+    cursor.execute(
+        "SELECT id, num_rounds FROM shanghai_games WHERE match_id = %s",
+        (match_id,)
+    )
+    game = cursor.fetchone()
+    if not game:
+        return jsonify({"error": "Shanghai game record not found"}), 404
+
+    game_id = game["id"]
+
+    # Wipe all throws and rounds
+    cursor.execute("DELETE FROM shanghai_throws WHERE game_id = %s", (game_id,))
+    cursor.execute("DELETE FROM shanghai_rounds WHERE game_id = %s", (game_id,))
+
+    # Reset game status
+    cursor.execute(
+        "UPDATE shanghai_games SET status = 'active', winner_id = NULL, tiebreak = 0 WHERE id = %s",
+        (game_id,)
+    )
+
+    # Reset match
+    cursor.execute(
+        "UPDATE matches SET status = 'active', winner_id = NULL, ended_at = NULL WHERE id = %s",
+        (match_id,)
+    )
+
+    db.commit()
+    return jsonify({
+        "match_id":   match_id,
+        "game_id":    game_id,
+        "num_rounds": game["num_rounds"],
+        "player_ids": player_ids,
+    }), 200
+
+
 @shanghai_bp.route("/shanghai/matches/<int:match_id>/end", methods=["POST"])
 def end_shanghai_match(match_id):
     """Abandon a Shanghai match."""

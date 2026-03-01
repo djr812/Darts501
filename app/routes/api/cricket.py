@@ -397,6 +397,56 @@ def undo_cricket_throw(match_id):
     return jsonify(_get_state(db, match_id)), 200
 
 
+@cricket_bp.route("/cricket/matches/<int:match_id>/restart", methods=["POST"])
+def restart_cricket_match(match_id):
+    """Restart a cricket match — wipe all throws/marks/scores and reset to fresh state."""
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute(
+        "SELECT id, status FROM matches WHERE id = %s",
+        (match_id,)
+    )
+    match = cursor.fetchone()
+    if not match:
+        return jsonify({"error": "Match not found"}), 404
+    if match["status"] not in ("active", "cancelled"):
+        return jsonify({"error": "Cannot restart a completed match"}), 400
+
+    # Get player list
+    cursor.execute(
+        "SELECT player_id FROM match_players WHERE match_id = %s ORDER BY turn_order ASC",
+        (match_id,)
+    )
+    player_ids = [r["player_id"] for r in cursor.fetchall()]
+
+    # Wipe all cricket data for this match
+    cursor.execute("DELETE FROM cricket_throws WHERE match_id = %s", (match_id,))
+    cursor.execute("DELETE FROM cricket_marks  WHERE match_id = %s", (match_id,))
+    cursor.execute("DELETE FROM cricket_scores WHERE match_id = %s", (match_id,))
+
+    # Ensure match is active again
+    cursor.execute(
+        "UPDATE matches SET status = 'active', winner_id = NULL, ended_at = NULL WHERE id = %s",
+        (match_id,)
+    )
+
+    # Re-insert fresh marks and scores rows for each player
+    for pid in player_ids:
+        for number in [15, 16, 17, 18, 19, 20, 25]:
+            cursor.execute(
+                "INSERT INTO cricket_marks (match_id, player_id, number, marks) VALUES (%s, %s, %s, 0)",
+                (match_id, pid, number)
+            )
+        cursor.execute(
+            "INSERT INTO cricket_scores (match_id, player_id, points) VALUES (%s, %s, 0)",
+            (match_id, pid)
+        )
+
+    db.commit()
+    return jsonify({"match_id": match_id, "player_ids": player_ids}), 200
+
+
 @cricket_bp.route("/cricket/matches/<int:match_id>/end", methods=["POST"])
 def end_cricket_match(match_id):
     """Abandon a cricket match."""

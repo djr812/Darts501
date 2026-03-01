@@ -200,7 +200,14 @@ var SHANGHAI_GAME = (function () {
         endBtn.type = 'button';
         endBtn.textContent = '✕ END';
         endBtn.addEventListener('click', _onEnd);
+        var restartBtn = document.createElement('button');
+        restartBtn.id = 'sh-restart-btn';
+        restartBtn.className = 'gh-btn gh-btn-red';
+        restartBtn.type = 'button';
+        restartBtn.textContent = '↺ RESTART';
+        restartBtn.addEventListener('click', _onRestart);
         centreSlot.appendChild(endBtn);
+        centreSlot.appendChild(restartBtn);
         header.appendChild(centreSlot);
 
         // ── Right: Undo + Next ──
@@ -712,6 +719,36 @@ var SHANGHAI_GAME = (function () {
     // ─────────────────────────────────────────────────────────────────
     // End
     // ─────────────────────────────────────────────────────────────────
+
+    function _onRestart() {
+        UI.showConfirmModal({
+            title:        'RESTART MATCH?',
+            message:      'All scores will be wiped and the match will restart from scratch. This cannot be undone.',
+            confirmLabel: 'YES, RESTART',
+            confirmClass: 'confirm-btn-danger',
+            onConfirm:    _doRestart,
+        });
+    }
+
+    function _doRestart() {
+        UI.setLoading(true);
+        API.restartShanghaiMatch(_state.matchId)
+            .then(function() {
+                return API.getShanghaiMatch(_state.matchId);
+            })
+            .then(function(state) {
+                _applyState(state);
+                _buildScreen();
+                _beginTurn();
+                UI.showToast('MATCH RESTARTED', 'info', 2000);
+            })
+            .catch(function(err) {
+                UI.showToast('RESTART FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
+            })
+            .finally(function() {
+                UI.setLoading(false);
+            });
+    }
 
     function _onEnd() {
         UI.showConfirmModal({

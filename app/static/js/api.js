@@ -239,6 +239,14 @@ const API = (() => {
         return request('POST', '/api/cricket/matches', data);
     }
 
+    async function getCricketMatch(matchId) {
+        return request('GET', '/api/cricket/matches/' + matchId);
+    }
+
+    async function getShanghaiMatch(matchId) {
+        return request('GET', '/api/shanghai/matches/' + matchId);
+    }
+
     async function recordCricketThrow(matchId, data) {
         return request('POST', `/api/cricket/matches/${matchId}/throw`, data);
     }
@@ -267,6 +275,7 @@ const API = (() => {
         const params = new URLSearchParams();
         if (scope.gameType)  params.set('game_type',  scope.gameType);
         if (scope.doubleOut !== undefined) params.set('double_out', scope.doubleOut);
+        if (scope.matchId)   params.set('match_id',   scope.matchId);
         return request('GET', `/api/players/${playerId}/stats/heatmap?${params}`);
     }
 
@@ -313,6 +322,14 @@ const API = (() => {
         return request('POST', '/api/matches/' + matchId + '/restart', {});
     }
 
+    async function restartCricketMatch(matchId) {
+        return request('POST', '/api/cricket/matches/' + matchId + '/restart', {});
+    }
+
+    async function restartShanghaiMatch(matchId) {
+        return request('POST', '/api/shanghai/matches/' + matchId + '/restart', {});
+    }
+
     // Expose public interface
     return {
         recordThrow,
@@ -340,6 +357,10 @@ const API = (() => {
         getMatchScorecard,
         cancelMatch,
         restartMatch,
+        restartCricketMatch,
+        restartShanghaiMatch,
+        getCricketMatch,
+        getShanghaiMatch,
         flushQueue,
     };
 
