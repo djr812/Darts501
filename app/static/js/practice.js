@@ -2575,51 +2575,79 @@ var PRACTICE = (function() {
 
         _baseballUpdateDisplay();
 
-        // After 3 darts — lock and show NEXT
-        if (_state.baseballDarts >= 3) {
-            _state.baseballInningComplete = true;
-            _baseballLockBoard(true);
-            var nb = document.getElementById('bb-next-btn');
-            if (nb) nb.disabled = false;
-            _baseballAnnounceInningEnd(onEnd);
+        // End of a set of 3 darts?
+        var dartsInSet = _state.baseballDarts % 3;
+        if (dartsInSet === 0) {
+            // Completed a set — check if inning is over (3+ outs)
+            if (_state.baseballOuts >= 3) {
+                _state.baseballInningComplete = true;
+                _baseballLockBoard(true);
+                var nb = document.getElementById('bb-next-btn');
+                if (nb) nb.disabled = false;
+                _baseballAnnounceInningEnd(onEnd);
+            } else {
+                // Set of 3 done, inning continues — lock board, show NEXT
+                // so player can undo any of the 3 darts before proceeding
+                _baseballLockBoard(true);
+                var nb2 = document.getElementById('bb-next-btn');
+                if (nb2) nb2.disabled = false;
+                // Announce outs remaining
+                if (SPEECH.isEnabled()) {
+                    var outsLeft = 3 - _state.baseballOuts;
+                    setTimeout(function() {
+                        window.speechSynthesis && window.speechSynthesis.speak(
+                            Object.assign(new SpeechSynthesisUtterance(
+                                outsLeft + (outsLeft === 1 ? ' out' : ' outs') + ' remaining.'
+                            ), { rate: 1.0, pitch: 1.0 })
+                        );
+                    }, 700);
+                }
+            }
         }
     }
 
     function _baseballNext(onEnd) {
-        if (_state.baseballInning >= 9) {
-            // Game over
-            _baseballFinish(onEnd);
-            return;
-        }
-
-        // Advance to next inning
-        _state.baseballInning++;
-        _state.baseballTarget    = _state.baseballStartNum + _state.baseballInning - 1;
-        _state.baseballOuts      = 0;
-        _state.baseballInningRuns= 0;
-        _state.baseballDarts     = 0;
-        _state.baseballInningComplete = false;
-        _bbHistory = [];
-
-        // Clear pills, unlock
+        // Common: clear pills, reset undo, disable buttons
         var pills = document.getElementById('practice-pills');
         if (pills) pills.innerHTML = '';
         var nb = document.getElementById('bb-next-btn');
         if (nb) nb.disabled = true;
         var ub = document.getElementById('bb-undo-btn');
         if (ub) ub.disabled = true;
+        _bbHistory = [];
         _baseballLockBoard(false);
 
-        _baseballUpdateDisplay();
-        _baseballApplyHighlight();
+        if (_state.baseballInningComplete) {
+            // Inning is over — check for game end or advance inning
+            if (_state.baseballInning >= 9) {
+                _baseballFinish(onEnd);
+                return;
+            }
+            _state.baseballInning++;
+            _state.baseballTarget     = _state.baseballStartNum + _state.baseballInning - 1;
+            _state.baseballOuts       = 0;
+            _state.baseballInningRuns = 0;
+            _state.baseballDarts      = 0;
+            _state.baseballInningComplete = false;
 
-        var statusEl = document.getElementById('bb-status');
-        if (statusEl) {
-            statusEl.textContent = 'INNING ' + _state.baseballInning + '  —  TARGET: ' + _state.baseballTarget;
-            statusEl.className = 'bb-status';
+            _baseballUpdateDisplay();
+            _baseballApplyHighlight();
+
+            var statusEl = document.getElementById('bb-status');
+            if (statusEl) {
+                statusEl.textContent = 'INNING ' + _state.baseballInning + '  —  TARGET: ' + _state.baseballTarget;
+                statusEl.className = 'bb-status';
+            }
+            _baseballAnnounceInning(false);
+        } else {
+            // Mid-inning set complete — just continue throwing, same inning
+            var statusEl2 = document.getElementById('bb-status');
+            if (statusEl2) {
+                var outsLeft2 = 3 - _state.baseballOuts;
+                statusEl2.textContent = 'INNING ' + _state.baseballInning +
+                    '  —  ' + outsLeft2 + (outsLeft2 === 1 ? ' OUT' : ' OUTS') + ' REMAINING';
+            }
         }
-
-        _baseballAnnounceInning(false);
     }
 
     function _baseballUndo() {
@@ -2630,13 +2658,12 @@ var PRACTICE = (function() {
         _state.baseballInningRuns = snap.inningRuns;
         _state.baseballDarts      = snap.darts;
         _state.dartsThrown        = snap.dartsThrown;
+        _state.baseballInningComplete = snap.inningComplete;
 
-        if (_state.baseballInningComplete) {
-            _state.baseballInningComplete = false;
-            _baseballLockBoard(false);
-            var nb = document.getElementById('bb-next-btn');
-            if (nb) nb.disabled = true;
-        }
+        // After undo we're always back mid-set — unlock board, disable NEXT
+        _baseballLockBoard(false);
+        var nb = document.getElementById('bb-next-btn');
+        if (nb) nb.disabled = true;
 
         // Remove last pill
         var pills = document.getElementById('practice-pills');
