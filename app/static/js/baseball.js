@@ -98,10 +98,8 @@ var BASEBALL_GAME = (function () {
         _state.winnerIds          = s.winner_ids || null;
         _state.highScoreResults   = s.high_score_results || null;
 
-        // Derive local UI state
-        var inn = _currentInningData();
-        _state.inningComplete = inn ? (inn.outs >= 3 && (inn.darts % 3 === 0)) : false;
-        _state.setComplete    = inn ? (inn.darts > 0 && inn.darts % 3 === 0) : false;
+        // NOTE: setComplete / inningComplete are driven by _endSet and _onNext,
+        // not derived from server state, to avoid re-locking after NEXT is pressed.
     }
 
     function _currentInningData() {
@@ -566,9 +564,10 @@ var BASEBALL_GAME = (function () {
             .then(function (s) {
                 _throwHistory  = [];
                 _pendingThrows = [];
+                _applyState(s);
+                // Must reset AFTER _applyState so it doesn't re-derive them
                 _state.setComplete    = false;
                 _state.inningComplete = false;
-                _applyState(s);
                 UI.setLoading(false);
 
                 // Clear pills & reset buttons
