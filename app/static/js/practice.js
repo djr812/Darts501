@@ -1436,7 +1436,15 @@ var PRACTICE = (function() {
         undoBtn.textContent = '⟵ UNDO';
         undoBtn.disabled = true;
         undoBtn.addEventListener('click', _bobs27Undo);
+        var nextBtn = document.createElement('button');
+        nextBtn.id = 'b27-next-btn';
+        nextBtn.className = 'gh-btn gh-btn-next';
+        nextBtn.type = 'button';
+        nextBtn.textContent = 'NEXT ▶';
+        nextBtn.disabled = true;
+        nextBtn.addEventListener('click', function() { _bobs27Next(onEnd); });
         rightSlot.appendChild(undoBtn);
+        rightSlot.appendChild(nextBtn);
         header.appendChild(rightSlot);
         app.appendChild(header);
 
@@ -1641,16 +1649,46 @@ var PRACTICE = (function() {
             // Miss — check if 3 darts thrown on this double
             if (_state.turnDarts % 3 === 0) {
                 _state.bobs27Rounds++;
-                _state.turnDarts = 0;
-                _state.turnComplete = false;
-                // Clear pills for next set
-                if (pills) pills.innerHTML = '';
-                _updateBobs27Display();
-                _bobs27Announce();
-            } else {
-                _updateBobs27Display();
+                _state.turnComplete = true;
+                _bobs27LockBoard(true);
+                var nb = document.getElementById('b27-next-btn');
+                if (nb) nb.disabled = false;
+                if (SPEECH.isEnabled()) {
+                    setTimeout(function() {
+                        var msg = 'Score is ' + _state.bobs27Score + '.';
+                        window.speechSynthesis && window.speechSynthesis.speak(
+                            Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
+                        );
+                    }, 600);
+                }
             }
+            _updateBobs27Display();
         }
+    }
+
+    function _bobs27Next(onEnd) {
+        _state.turnDarts    = 0;
+        _state.turnComplete = false;
+        _bobs27LockBoard(false);
+        var nb = document.getElementById('b27-next-btn');
+        if (nb) nb.disabled = true;
+        var ub = document.getElementById('b27-undo-btn');
+        if (ub) ub.disabled = true;
+        _b27History = []; // clear undo history at turn boundary
+        var pills = document.getElementById('practice-pills');
+        if (pills) pills.innerHTML = '';
+        _bobs27Announce();
+    }
+
+    function _bobs27LockBoard(locked) {
+        var board = document.getElementById('practice-board');
+        if (board) board.querySelectorAll('.seg-btn').forEach(function(btn) {
+            btn.disabled = locked;
+        });
+        var tabs = document.getElementById('multiplier-tabs');
+        if (tabs) tabs.querySelectorAll('.tab-btn').forEach(function(btn) {
+            btn.disabled = locked;
+        });
     }
 
     function _updateBobs27Display() {
@@ -1676,6 +1714,13 @@ var PRACTICE = (function() {
         _state.bobs27Double = snap.double;
         _state.dartsThrown  = snap.dartsThrown;
         _state.turnDarts    = (_state.turnDarts > 0) ? _state.turnDarts - 1 : 0;
+        // If board was locked after 3rd dart, unlock it
+        if (_state.turnComplete) {
+            _state.turnComplete = false;
+            _bobs27LockBoard(false);
+            var nb = document.getElementById('b27-next-btn');
+            if (nb) nb.disabled = true;
+        }
         _updateBobs27Display();
         var pills = document.getElementById('practice-pills');
         if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
