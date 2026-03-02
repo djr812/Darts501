@@ -2066,6 +2066,16 @@ body.mode-practice #app {
     text-align: center;
 }
 
+/* Timer sits inside gh-match-info in the header — override the small subtitle size */
+.practice-timer-inline {
+    font-family: var(--font-mono);
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    line-height: 1;
+}
+
 .practice-timer.timer-warning {
     color: var(--bust-color);
     -webkit-animation: timerPulse 1s ease infinite;

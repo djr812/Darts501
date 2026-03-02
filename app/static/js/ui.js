@@ -31,6 +31,12 @@ const UI = (() => {
     }
 
     function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai) {
+        // Clear any lingering modal overlays from the previous game screen
+        ['confirm-modal', 'rules-modal'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.remove();
+        });
+
         const app = document.getElementById('app');
         app.innerHTML = '';
         app.style.cssText = '';

@@ -111,6 +111,12 @@ var CRICKET_GAME = (function () {
     // ─────────────────────────────────────────────────────────────────
 
     function _buildScreen() {
+        // Clear any lingering modals that might block touch events
+        ['confirm-modal', 'rules-modal'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.remove();
+        });
+
         var app = document.getElementById('app');
         app.innerHTML = '';
         app.style.cssText = '';
@@ -594,9 +600,16 @@ var CRICKET_GAME = (function () {
     }
 
     function _onEnd() {
-        if (!confirm('Abandon this Cricket match?')) return;
-        API.endCricketMatch(_state.matchId).catch(function(){});
-        if (_state.onEnd) _state.onEnd();
+        UI.showConfirmModal({
+            title:        'ABANDON MATCH?',
+            message:      'This Cricket match will be cancelled and you will return to the home screen.',
+            confirmLabel: 'YES, END MATCH',
+            confirmClass: 'confirm-btn-danger',
+            onConfirm:    function() {
+                API.endCricketMatch(_state.matchId).catch(function(){});
+                if (_state.onEnd) _state.onEnd();
+            },
+        });
     }
 
     // ─────────────────────────────────────────────────────────────────
