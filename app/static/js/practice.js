@@ -83,6 +83,8 @@ var PRACTICE = (function() {
         targetModeBtn.type = 'button';
         targetModeBtn.textContent = 'TARGET';
 
+        var TIMERLESS_MODES = ['bobs27', 'checkout121'];
+
         freeModeBtn.addEventListener('click', function() {
             freeModeBtn.classList.add('selected');
             targetModeBtn.classList.remove('selected');
@@ -90,6 +92,7 @@ var PRACTICE = (function() {
             selectedTarget = null;
             targetBadge.className = 'practice-target-badge hidden';
             targetBadge.textContent = '';
+            durationSection.style.display = '';
         });
 
         targetModeBtn.addEventListener('click', function() {
@@ -100,6 +103,9 @@ var PRACTICE = (function() {
                 targetModeBtn.classList.add('selected');
                 targetBadge.className = 'practice-target-badge';
                 targetBadge.textContent = target.label;
+                // Hide duration picker for timer-free games
+                durationSection.style.display =
+                    TIMERLESS_MODES.indexOf(target.type) !== -1 ? 'none' : '';
             });
         });
 
@@ -278,6 +284,18 @@ var PRACTICE = (function() {
         targetHits:    0,
         targetAttempts:0,
         clockIndex:    0,        // 0-19, which number we're aiming at in clock mode
+        // Bob's 27 state
+        bobs27Score:   27,
+        bobs27Double:  1,        // 1-20, 25 = Bull
+        bobs27Rounds:  0,
+        // 121 Checkouts state
+        c121Target:    121,
+        c121DartLimit: 9,
+        c121DartsUsed: 0,
+        c121Score:     121,
+        c121ScoreAtTurnStart: 121,
+        c121Attempts:  0,
+        c121Successes: 0,
     };
 
     /**
@@ -294,7 +312,10 @@ var PRACTICE = (function() {
             .then(function(player) {
                 _state.playerId   = player.id;
                 _state.playerName = player.name;
-                _state.timerSeconds = config.durationMinutes * 60;
+                var TIMERLESS = ['bobs27', 'checkout121'];
+                _state.timerSeconds = TIMERLESS.indexOf(config.targetMode) !== -1
+                    ? 0
+                    : config.durationMinutes * 60;
                 _state.dartsThrown   = 0;
                 _state.totalScore    = 0;
                 _state.turnScore     = 0;
@@ -306,6 +327,18 @@ var PRACTICE = (function() {
                 _state.targetHits    = 0;
                 _state.targetAttempts = 0;
                 _state.clockIndex    = 0;
+                // Bob's 27
+                _state.bobs27Score   = 27;
+                _state.bobs27Double  = 1;
+                _state.bobs27Rounds  = 0;
+                // 121 Checkouts
+                _state.c121Target    = 121;
+                _state.c121DartLimit = config.targetConfig ? (config.targetConfig.dartLimit || 9) : 9;
+                _state.c121DartsUsed = 0;
+                _state.c121Score     = 121;
+                _state.c121ScoreAtTurnStart = 121;
+                _state.c121Attempts  = 0;
+                _state.c121Successes = 0;
                 _state.onEnd         = onEnd;
 
                 // Create a practice match + leg + turn in the DB
@@ -316,10 +349,16 @@ var PRACTICE = (function() {
                 _state.legId   = session.legId;
                 _state.turnId  = session.turnId;
                 UI.setLoading(false);
-                _buildPracticeScreen(onEnd);
-                _startTimer(onEnd);
-                if (SPEECH.isEnabled()) {
-                    SPEECH.announcePlayer(_state.playerName);
+                if (_state.targetMode === 'bobs27') {
+                    _startBobs27(onEnd);
+                } else if (_state.targetMode === 'checkout121') {
+                    _startCheckout121(onEnd);
+                } else {
+                    _buildPracticeScreen(onEnd);
+                    _startTimer(onEnd);
+                    if (SPEECH.isEnabled()) {
+                        SPEECH.announcePlayer(_state.playerName);
+                    }
                 }
             })
             .catch(function(err) {
@@ -1064,6 +1103,10 @@ var PRACTICE = (function() {
               desc: 'D20 D16 D10 D8 D4 D2 D1 Bull — the key finishing doubles' },
             { type: 'clock',    label: 'AROUND THE CLOCK',
               desc: 'Hit 1 through 20 in order — any multiplier counts' },
+            { type: 'bobs27',   label: "BOB'S 27",
+              desc: 'Doubles practice — start at 27 pts, hit each double to advance, miss costs points' },
+            { type: 'checkout121', label: '121 CHECKOUTS',
+              desc: 'Start at 121, check out in 9 or 12 darts — double finish required' },
         ];
 
         groups.forEach(function(g) {
@@ -1074,6 +1117,11 @@ var PRACTICE = (function() {
                 '<span class="target-group-label">' + g.label + '</span>' +
                 '<span class="target-group-desc">'  + g.desc  + '</span>';
             card.addEventListener('click', function() {
+                if (g.type === 'checkout121') {
+                    // Ask dart limit before closing modal
+                    _show121DartPicker(overlay, onSelect);
+                    return;
+                }
                 overlay.remove();
                 onSelect({
                     type:  g.type,
@@ -1097,6 +1145,47 @@ var PRACTICE = (function() {
         overlay.appendChild(box);
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         document.body.appendChild(overlay);
+    }
+
+    // ------------------------------------------------------------------
+    // 121 Checkouts — dart limit picker (sub-panel inside target modal)
+    // ------------------------------------------------------------------
+
+    function _show121DartPicker(overlay, onSelect) {
+        // Replace modal box content with a simple picker
+        var box = overlay.querySelector('.modal-box');
+        box.innerHTML =
+            '<div class="modal-title">121 CHECKOUTS</div>' +
+            '<div class="target-121-subtitle">How many darts to attempt each checkout?</div>';
+
+        [9, 12].forEach(function(n) {
+            var btn = document.createElement('button');
+            btn.className = 'target-group-card';
+            btn.type = 'button';
+            btn.innerHTML =
+                '<span class="target-group-label">' + n + ' DARTS</span>' +
+                '<span class="target-group-desc">' +
+                    (n === 9 ? 'Standard — 3 visits of 3 darts' : 'Extended — 4 visits of 3 darts') +
+                '</span>';
+            btn.addEventListener('click', function() {
+                overlay.remove();
+                onSelect({
+                    type:       'checkout121',
+                    label:      '121 CHECKOUTS (' + n + ' darts)',
+                    segment:    null,
+                    multiplier: null,
+                    dartLimit:  n,
+                });
+            });
+            box.appendChild(btn);
+        });
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'stats-cancel-btn';
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = '✕  CANCEL';
+        cancelBtn.addEventListener('click', function() { overlay.remove(); });
+        box.appendChild(cancelBtn);
     }
 
     // ------------------------------------------------------------------
@@ -1263,6 +1352,882 @@ var PRACTICE = (function() {
 
         overlay.appendChild(box);
         document.body.appendChild(overlay);
+    }
+
+    // ------------------------------------------------------------------
+    // BOB'S 27 — doubles ladder practice game
+    // ------------------------------------------------------------------
+
+    var BOBS27_SEQUENCE = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,25];
+
+    function _startBobs27(onEnd) {
+        _state.bobs27Score  = 27;
+        _state.bobs27Double = 1;
+        _state.bobs27Rounds = 0;
+        _buildBobs27Screen(onEnd);
+        _bobs27Announce();
+    }
+
+    function _bobs27CurrentDouble() {
+        return BOBS27_SEQUENCE[BOBS27_SEQUENCE.indexOf(_state.bobs27Double)];
+    }
+
+    function _bobs27Announce() {
+        if (!SPEECH.isEnabled()) return;
+        var d = _state.bobs27Double;
+        var label = d === 25 ? 'Double Bull' : 'Double ' + d;
+        var msg = _state.playerName + ', you are targeting ' + label +
+                  '. Your current score is ' + _state.bobs27Score + '.';
+        setTimeout(function() {
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
+            );
+        }, 300);
+    }
+
+    function _buildBobs27Screen(onEnd) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-practice';
+
+        // Header
+        var header = document.createElement('header');
+        header.className = 'game-header';
+
+        var leftSlot = document.createElement('div');
+        leftSlot.className = 'gh-left';
+        var titleWrap = document.createElement('div');
+        titleWrap.className = 'gh-title-wrap';
+        var titleEl = document.createElement('div');
+        titleEl.className = 'gh-game-name';
+        titleEl.textContent = "BOB'S 27";
+        var timerEl = document.createElement('div');
+        timerEl.id = 'practice-timer';
+        timerEl.className = 'gh-match-info practice-timer-inline';
+        timerEl.textContent = _formatTime(_state.timerSeconds);
+        titleWrap.appendChild(titleEl);
+        titleWrap.appendChild(timerEl);
+        leftSlot.appendChild(titleWrap);
+        var rulesBtn = document.createElement('button');
+        rulesBtn.type = 'button';
+        rulesBtn.className = 'rules-btn';
+        rulesBtn.textContent = '📖 RULES';
+        rulesBtn.addEventListener('click', function() { if (typeof UI !== 'undefined') UI.showRulesModal('bobs27'); });
+        leftSlot.appendChild(rulesBtn);
+        header.appendChild(leftSlot);
+
+        var centreSlot = document.createElement('div');
+        centreSlot.className = 'gh-centre';
+        var endBtn = document.createElement('button');
+        endBtn.className = 'gh-btn gh-btn-red';
+        endBtn.type = 'button';
+        endBtn.textContent = '✕ END';
+        endBtn.addEventListener('click', function() { _bobs27End(onEnd, false); });
+        centreSlot.appendChild(endBtn);
+        header.appendChild(centreSlot);
+
+        var rightSlot = document.createElement('div');
+        rightSlot.className = 'gh-right';
+        var undoBtn = document.createElement('button');
+        undoBtn.id = 'b27-undo-btn';
+        undoBtn.className = 'gh-btn gh-btn-undo';
+        undoBtn.type = 'button';
+        undoBtn.textContent = '⟵ UNDO';
+        undoBtn.disabled = true;
+        undoBtn.addEventListener('click', _bobs27Undo);
+        rightSlot.appendChild(undoBtn);
+        header.appendChild(rightSlot);
+        app.appendChild(header);
+
+        // Score display
+        var scoreWrap = document.createElement('div');
+        scoreWrap.className = 'b27-score-wrap';
+        scoreWrap.innerHTML =
+            '<div class="b27-score-label">SCORE</div>' +
+            '<div class="b27-score-value" id="b27-score">' + _state.bobs27Score + '</div>' +
+            '<div class="b27-target-label">TARGET</div>' +
+            '<div class="b27-target-value" id="b27-target">' +
+                (_state.bobs27Double === 25 ? 'D-BULL' : 'D' + _state.bobs27Double) +
+            '</div>';
+        app.appendChild(scoreWrap);
+
+        // Dart pills
+        var pillRow = document.createElement('div');
+        pillRow.id = 'practice-pills';
+        pillRow.className = 'practice-pills';
+        app.appendChild(pillRow);
+
+        // Progress row — show which doubles remain
+        var progressWrap = document.createElement('div');
+        progressWrap.className = 'b27-progress-wrap';
+        _buildBobs27Progress(progressWrap);
+        app.appendChild(progressWrap);
+
+        // Multiplier tabs — fully interactive; selected multiplier used in _bobs27Throw
+        _state.multiplier = 2; // default to Double
+        var tabs = document.createElement('div');
+        tabs.id = 'multiplier-tabs';
+        [
+            { label: 'Single', mul: 1, cls: 'active-single' },
+            { label: 'Double', mul: 2, cls: 'active-double' },
+            { label: 'Treble', mul: 3, cls: 'active-treble' },
+        ].forEach(function(tab) {
+            var btn = document.createElement('button');
+            btn.className = 'tab-btn' + (tab.mul === 2 ? ' active-double' : '');
+            btn.dataset.multiplier = tab.mul;
+            btn.dataset.activeClass = tab.cls;
+            btn.type = 'button';
+            btn.textContent = tab.label;
+            UI.addTouchSafeListener(btn, function() {
+                _state.multiplier = tab.mul;
+                tabs.querySelectorAll('.tab-btn').forEach(function(b) {
+                    b.classList.remove('active-single', 'active-double', 'active-treble');
+                });
+                btn.classList.add(tab.cls);
+                document.body.dataset.multiplier = tab.mul;
+            });
+            tabs.appendChild(btn);
+        });
+        app.appendChild(tabs);
+        document.body.dataset.multiplier = 2;
+
+        // Segment grid — highlight current target
+        var board = document.createElement('main');
+        board.id = 'practice-board';
+        board.appendChild(_buildBobs27Grid(onEnd));
+        board.appendChild(_buildBobs27BullRow(onEnd));
+        app.appendChild(board);
+
+        // No timer for Bob's 27 — hide timer display
+        var b27Timer = document.getElementById('practice-timer');
+        if (b27Timer) { b27Timer.textContent = ''; b27Timer.style.display = 'none'; }
+    }
+
+    function _buildBobs27Progress(wrap) {
+        wrap.innerHTML = '';
+        wrap.className = 'b27-progress-wrap';
+        var idx = BOBS27_SEQUENCE.indexOf(_state.bobs27Double);
+        BOBS27_SEQUENCE.forEach(function(d, i) {
+            var pip = document.createElement('span');
+            pip.className = 'b27-pip';
+            if (i < idx) pip.classList.add('b27-pip-done');
+            else if (i === idx) pip.classList.add('b27-pip-current');
+            pip.textContent = d === 25 ? 'B' : d;
+            wrap.appendChild(pip);
+        });
+    }
+
+    function _buildBobs27Grid(onEnd) {
+        var grid = document.createElement('div');
+        grid.id = 'segment-grid';
+        grid.className = 'segment-grid';
+        [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].forEach(function(seg) {
+            var btn = document.createElement('button');
+            btn.className = 'seg-btn' + (seg === _state.bobs27Double ? ' target-highlight' : '');
+            btn.dataset.segment = seg;
+            btn.type = 'button';
+            btn.textContent = seg;
+            btn.addEventListener('click', function() { _bobs27Throw(seg, _state.multiplier, onEnd); });
+            grid.appendChild(btn);
+        });
+        return grid;
+    }
+
+    function _buildBobs27BullRow(onEnd) {
+        var row = document.createElement('div');
+        row.id = 'bull-row';
+        row.className = 'bull-row';
+
+        // MISS button
+        var miss = document.createElement('button');
+        miss.className = 'seg-btn bull-btn';
+        miss.type = 'button';
+        miss.textContent = 'MISS';
+        miss.addEventListener('click', function() { _bobs27Throw(0, 0, onEnd); });
+        row.appendChild(miss);
+
+        // Outer Bull (S25) — counts as a miss for Bob's 27
+        var outer = document.createElement('button');
+        outer.className = 'seg-btn bull-btn';
+        outer.type = 'button';
+        outer.textContent = 'OUTER';
+        outer.dataset.segment = 25;
+        outer.addEventListener('click', function() { _bobs27Throw(25, 1, onEnd); });
+        row.appendChild(outer);
+
+        // Inner Bull (D25) — counts as a hit if targeting Bull
+        var bull = document.createElement('button');
+        bull.className = 'seg-btn bull-btn bull-btn-inner' +
+            (_state.bobs27Double === 25 ? ' target-highlight' : '');
+        bull.type = 'button';
+        bull.textContent = 'BULL';
+        bull.dataset.segment = 25;
+        bull.addEventListener('click', function() { _bobs27Throw(25, 2, onEnd); });
+        row.appendChild(bull);
+
+        return row;
+    }
+
+    // Each throw is immediate (no 3-dart buffering) — every dart has instant effect
+    var _b27History = []; // stack of { score, double } for undo
+
+    function _bobs27Throw(segment, multiplier, onEnd) {
+        // No turn-complete locking in Bob's 27 — every dart is always live
+
+        var target = _state.bobs27Double;
+        var targetValue = target === 25 ? 50 : target * 2;
+        var isHit = (multiplier === 2 && segment === target);
+        // Outer bull counts as miss when targeting D-Bull
+        var change = isHit ? targetValue : -targetValue;
+
+        // Push undo snapshot
+        _b27History.push({ score: _state.bobs27Score, double: target, dartsThrown: _state.dartsThrown });
+
+        _state.bobs27Score += change;
+        _state.dartsThrown++;
+        _state.turnDarts++;
+
+        // Enable undo
+        var undoBtn = document.getElementById('b27-undo-btn');
+        if (undoBtn) undoBtn.disabled = false;
+
+        // Pill
+        var pills = document.getElementById('practice-pills');
+        if (pills) {
+            var pill = document.createElement('div');
+            pill.className = 'dart-pill' + (isHit ? ' pill-hot' : ' pill-miss');
+            var dLabel = target === 25 ? 'D-BULL' : 'D' + target;
+            pill.textContent = isHit ? ('HIT ' + dLabel + ' (+' + targetValue + ')') :
+                                       ('MISS ' + dLabel + ' (-' + targetValue + ')');
+            pills.appendChild(pill);
+        }
+
+        // Sound
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) SOUNDS.dart();
+
+        // Check bust
+        if (_state.bobs27Score <= 0) {
+            _state.bobs27Score = 0;
+            _updateBobs27Display();
+            setTimeout(function() { _bobs27GameOver(onEnd); }, 600);
+            return;
+        }
+
+        // Advance if hit — clear pills and move to next double
+        if (isHit) {
+            _state.turnDarts = 0;
+            _state.turnComplete = false;
+            var idx = BOBS27_SEQUENCE.indexOf(target);
+            if (idx < BOBS27_SEQUENCE.length - 1) {
+                _state.bobs27Double = BOBS27_SEQUENCE[idx + 1];
+                _updateBobs27Display();
+                if (pills) pills.innerHTML = '';
+                _bobs27Announce();
+                if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+                    setTimeout(function() { SOUNDS.checkout(); }, 200);
+                }
+                // Check if all 21 doubles completed
+                if (_state.bobs27Double === BOBS27_SEQUENCE[BOBS27_SEQUENCE.length - 1] && idx === BOBS27_SEQUENCE.length - 2) {
+                    // Just advanced past D20 — will hit Bull next, keep going
+                }
+            } else {
+                // Completed D-Bull — game won!
+                _updateBobs27Display();
+                setTimeout(function() { _bobs27Win(onEnd); }, 400);
+                return;
+            }
+        } else {
+            // Miss — check if 3 darts thrown on this double
+            if (_state.turnDarts % 3 === 0) {
+                _state.bobs27Rounds++;
+                _state.turnDarts = 0;
+                _state.turnComplete = false;
+                // Clear pills for next set
+                if (pills) pills.innerHTML = '';
+                _updateBobs27Display();
+                _bobs27Announce();
+            } else {
+                _updateBobs27Display();
+            }
+        }
+    }
+
+    function _updateBobs27Display() {
+        var scoreEl = document.getElementById('b27-score');
+        if (scoreEl) scoreEl.textContent = _state.bobs27Score;
+        var targetEl = document.getElementById('b27-target');
+        if (targetEl) targetEl.textContent = _state.bobs27Double === 25 ? 'D-BULL' : 'D' + _state.bobs27Double;
+        // Refresh progress pips
+        var progressWrap = document.querySelector('.b27-progress-wrap');
+        if (progressWrap) _buildBobs27Progress(progressWrap);
+        // Refresh segment highlights
+        document.querySelectorAll('.seg-btn').forEach(function(btn) {
+            btn.classList.remove('target-highlight');
+            var seg = parseInt(btn.dataset.segment);
+            if (seg === _state.bobs27Double) btn.classList.add('target-highlight');
+        });
+    }
+
+    function _bobs27Undo() {
+        if (_b27History.length === 0) return;
+        var snap = _b27History.pop();
+        _state.bobs27Score  = snap.score;
+        _state.bobs27Double = snap.double;
+        _state.dartsThrown  = snap.dartsThrown;
+        _state.turnDarts    = (_state.turnDarts > 0) ? _state.turnDarts - 1 : 0;
+        _updateBobs27Display();
+        var pills = document.getElementById('practice-pills');
+        if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
+        var undoBtn = document.getElementById('b27-undo-btn');
+        if (undoBtn) undoBtn.disabled = (_b27History.length === 0);
+    }
+
+    function _bobs27End(onEnd, timedOut) {
+        clearInterval(_state.timerInterval);
+        API.endPracticeSession(_state.matchId).catch(function() {});
+        _showBobs27Summary(onEnd);
+    }
+
+    function _bobs27GameOver(onEnd) {
+        clearInterval(_state.timerInterval);
+        API.endPracticeSession(_state.matchId).catch(function() {});
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) SOUNDS.bust && SOUNDS.bust();
+        _showBobs27Summary(onEnd, true);
+    }
+
+    function _bobs27Win(onEnd) {
+        clearInterval(_state.timerInterval);
+        API.endPracticeSession(_state.matchId).catch(function() {});
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) SOUNDS.checkout();
+        _showBobs27Summary(onEnd, false, true);
+    }
+
+    function _showBobs27Summary(onEnd, busted, won) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        document.body.className = 'mode-setup';
+
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        var lastDoubleIdx = BOBS27_SEQUENCE.indexOf(_state.bobs27Double);
+        var lastDoubleLabel = _state.bobs27Double === 25 ? 'D-Bull' : 'D' + _state.bobs27Double;
+        var doublesHit = lastDoubleIdx; // number of doubles successfully cleared
+
+        var titleText = won ? 'LEGEND!' : busted ? 'BUSTED!' : 'SESSION DONE';
+        var subtitleText = won ? 'All 21 doubles completed!' :
+                           busted ? 'Score hit zero on ' + lastDoubleLabel :
+                           'Reached ' + lastDoubleLabel;
+
+        inner.innerHTML =
+            '<div id="setup-title"><div class="setup-logo">' + titleText + '</div>' +
+            '<div class="setup-subtitle">' + _state.playerName.toUpperCase() + '</div></div>';
+
+        var summaryEl = document.createElement('div');
+        summaryEl.className = 'practice-summary';
+        [
+            { label: 'REACHED',       value: lastDoubleLabel },
+            { label: 'DOUBLES HIT',   value: doublesHit + ' / 21' },
+            { label: 'FINAL SCORE',   value: _state.bobs27Score },
+            { label: 'DARTS THROWN',  value: _state.dartsThrown },
+        ].forEach(function(row) {
+            var item = document.createElement('div');
+            item.className = 'practice-summary-row';
+            item.innerHTML = '<span class="practice-summary-label">' + row.label + '</span>' +
+                             '<span class="practice-summary-value">' + row.value + '</span>';
+            summaryEl.appendChild(item);
+        });
+        inner.appendChild(summaryEl);
+
+        var doneBtn = document.createElement('button');
+        doneBtn.className = 'start-btn';
+        doneBtn.textContent = 'BACK TO SETUP';
+        doneBtn.type = 'button';
+        doneBtn.addEventListener('click', onEnd);
+        inner.appendChild(doneBtn);
+    }
+
+    // ------------------------------------------------------------------
+    // 121 CHECKOUTS — solo checkout practice game
+    // ------------------------------------------------------------------
+
+    function _startCheckout121(onEnd) {
+        _state.c121Target    = 121;
+        _state.c121DartsUsed = 0;
+        _state.c121Score     = 121;
+        _state.c121ScoreAtTurnStart = 121;
+        _state.c121Attempts  = 0;
+        _state.c121Successes = 0;
+        _b27History = []; // reuse history stack for 121 undo
+        _buildCheckout121Screen(onEnd);
+        // No timer for 121 Checkouts — hide timer display
+        var c121Timer = document.getElementById('practice-timer');
+        if (c121Timer) { c121Timer.textContent = ''; c121Timer.style.display = 'none'; }
+        _c121Announce();
+    }
+
+    function _c121Announce() {
+        if (!SPEECH.isEnabled()) return;
+        var dartsLeft = _state.c121DartLimit - _state.c121DartsUsed;
+        var msg = _state.playerName + ', you need ' + _state.c121Score + '. ' +
+                  dartsLeft + ' darts remaining.';
+        setTimeout(function() {
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
+            );
+        }, 300);
+    }
+
+    function _buildCheckout121Screen(onEnd) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-practice';
+
+        // Header
+        var header = document.createElement('header');
+        header.className = 'game-header';
+
+        var leftSlot = document.createElement('div');
+        leftSlot.className = 'gh-left';
+        var titleWrap = document.createElement('div');
+        titleWrap.className = 'gh-title-wrap';
+        var titleEl = document.createElement('div');
+        titleEl.className = 'gh-game-name';
+        titleEl.textContent = '121 CHECKOUTS';
+        var timerEl = document.createElement('div');
+        timerEl.id = 'practice-timer';
+        timerEl.className = 'gh-match-info practice-timer-inline';
+        timerEl.textContent = _formatTime(_state.timerSeconds);
+        titleWrap.appendChild(titleEl);
+        titleWrap.appendChild(timerEl);
+        leftSlot.appendChild(titleWrap);
+        var rulesBtn = document.createElement('button');
+        rulesBtn.type = 'button';
+        rulesBtn.className = 'rules-btn';
+        rulesBtn.textContent = '📖 RULES';
+        rulesBtn.addEventListener('click', function() { if (typeof UI !== 'undefined') UI.showRulesModal('checkout121'); });
+        leftSlot.appendChild(rulesBtn);
+        header.appendChild(leftSlot);
+
+        var centreSlot = document.createElement('div');
+        centreSlot.className = 'gh-centre';
+        var endBtn = document.createElement('button');
+        endBtn.className = 'gh-btn gh-btn-red';
+        endBtn.type = 'button';
+        endBtn.textContent = '✕ END';
+        endBtn.addEventListener('click', function() { _c121End(onEnd); });
+        centreSlot.appendChild(endBtn);
+        header.appendChild(centreSlot);
+
+        var rightSlot = document.createElement('div');
+        rightSlot.className = 'gh-right';
+        var undoBtn = document.createElement('button');
+        undoBtn.id = 'c121-undo-btn';
+        undoBtn.className = 'gh-btn gh-btn-undo';
+        undoBtn.type = 'button';
+        undoBtn.textContent = '⟵ UNDO';
+        undoBtn.disabled = true;
+        undoBtn.addEventListener('click', _c121Undo);
+        var nextBtn = document.createElement('button');
+        nextBtn.id = 'c121-next-btn';
+        nextBtn.className = 'gh-btn gh-btn-next';
+        nextBtn.type = 'button';
+        nextBtn.textContent = 'NEXT ▶';
+        nextBtn.disabled = true;
+        nextBtn.addEventListener('click', function() { _c121AdvanceTurn(onEnd); });
+        rightSlot.appendChild(undoBtn);
+        rightSlot.appendChild(nextBtn);
+        header.appendChild(rightSlot);
+        app.appendChild(header);
+
+        // Score / info display
+        var scoreWrap = document.createElement('div');
+        scoreWrap.className = 'c121-score-wrap';
+        scoreWrap.innerHTML =
+            '<div class="c121-score-block"><div class="c121-score-label">TARGET</div>' +
+            '<div class="c121-score-value" id="c121-score">' + _state.c121Score + '</div></div>' +
+            '<div class="c121-score-block"><div class="c121-score-label">DARTS LEFT</div>' +
+            '<div class="c121-score-value" id="c121-darts-left">' + _state.c121DartLimit + '</div></div>' +
+            '<div class="c121-score-block"><div class="c121-score-label">ATTEMPTS</div>' +
+            '<div class="c121-score-value" id="c121-attempts">' + _state.c121Attempts + '</div></div>' +
+            '<div class="c121-score-block"><div class="c121-score-label">HITS</div>' +
+            '<div class="c121-score-value" id="c121-successes">' + _state.c121Successes + '</div></div>';
+        app.appendChild(scoreWrap);
+
+        // Status message
+        var statusEl = document.createElement('div');
+        statusEl.id = 'c121-status';
+        statusEl.className = 'c121-status';
+        statusEl.textContent = 'CHECKOUT IN ' + _state.c121DartLimit + ' DARTS';
+        app.appendChild(statusEl);
+
+        // Dart pills
+        var pillRow = document.createElement('div');
+        pillRow.id = 'practice-pills';
+        pillRow.className = 'practice-pills';
+        app.appendChild(pillRow);
+
+        // Multiplier tabs
+        var tabs = document.createElement('div');
+        tabs.id = 'multiplier-tabs';
+        [
+            { label: 'Single', multiplier: 1, cls: 'active-single' },
+            { label: 'Double', multiplier: 2, cls: 'active-double' },
+            { label: 'Treble', multiplier: 3, cls: 'active-treble' },
+        ].forEach(function(tab) {
+            var btn = document.createElement('button');
+            btn.className = 'tab-btn';
+            btn.textContent = tab.label;
+            btn.dataset.multiplier = tab.multiplier;
+            btn.dataset.activeClass = tab.cls;
+            btn.type = 'button';
+            UI.addTouchSafeListener(btn, function() {
+                _state.multiplier = tab.multiplier;
+                document.querySelectorAll('.tab-btn').forEach(function(b) {
+                    b.classList.remove('active-single', 'active-double', 'active-treble');
+                });
+                btn.classList.add(tab.cls);
+                document.body.dataset.multiplier = tab.multiplier;
+            });
+            tabs.appendChild(btn);
+        });
+        tabs.querySelector('[data-multiplier="1"]').classList.add('active-single');
+        document.body.dataset.multiplier = 1;
+        app.appendChild(tabs);
+
+        // Segment grid
+        var board = document.createElement('main');
+        board.id = 'practice-board';
+        board.appendChild(_buildC121Grid(onEnd));
+        board.appendChild(_buildC121BullRow(onEnd));
+        app.appendChild(board);
+
+        _c121UpdateCheckoutHint();
+    }
+
+    function _buildC121Grid(onEnd) {
+        var grid = document.createElement('div');
+        grid.id = 'segment-grid';
+        grid.className = 'segment-grid';
+        [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].forEach(function(seg) {
+            var btn = document.createElement('button');
+            btn.className = 'seg-btn';
+            btn.dataset.segment = seg;
+            btn.type = 'button';
+            btn.textContent = seg;
+            btn.addEventListener('click', function() { _c121Throw(seg, _state.multiplier, onEnd); });
+            grid.appendChild(btn);
+        });
+        return grid;
+    }
+
+    function _buildC121BullRow(onEnd) {
+        var row = document.createElement('div');
+        row.id = 'bull-row';
+        row.className = 'bull-row';
+
+        var miss = document.createElement('button');
+        miss.className = 'seg-btn bull-btn';
+        miss.type = 'button';
+        miss.textContent = 'MISS';
+        miss.addEventListener('click', function() { _c121Throw(0, 0, onEnd); });
+        row.appendChild(miss);
+
+        var outer = document.createElement('button');
+        outer.className = 'seg-btn bull-btn';
+        outer.type = 'button';
+        outer.textContent = 'OUTER';
+        outer.dataset.segment = 25;
+        outer.addEventListener('click', function() { _c121Throw(25, 1, onEnd); });
+        row.appendChild(outer);
+
+        var bull = document.createElement('button');
+        bull.className = 'seg-btn bull-btn bull-btn-inner';
+        bull.type = 'button';
+        bull.textContent = 'BULL';
+        bull.dataset.segment = 25;
+        bull.addEventListener('click', function() { _c121Throw(25, 2, onEnd); });
+        row.appendChild(bull);
+
+        return row;
+    }
+
+    // c121 throw history for undo
+    var _c121ThrowHistory = [];
+
+    function _c121Throw(segment, multiplier, onEnd) {
+        if (_state.turnComplete) return;
+
+        var points   = segment === 0 ? 0 : segment * multiplier;
+        var newScore = _state.c121Score - points;
+        var dartsUsed = _state.c121DartsUsed + 1;
+
+        // Bust conditions: gone negative, exact 1 (no double possible), or
+        // overshot to 0 without a double finish
+        var isBust = false;
+        if (newScore < 0) {
+            isBust = true;
+        } else if (newScore === 1) {
+            isBust = true; // can't finish on a double from 1
+        } else if (newScore === 0 && multiplier !== 2) {
+            isBust = true; // must finish on a double
+        }
+
+        // Push undo snapshot before mutating state
+        _c121ThrowHistory.push({
+            score:     _state.c121Score,
+            dartsUsed: _state.c121DartsUsed,
+            turnDarts: _state.turnDarts,
+            turnComplete: _state.turnComplete,
+            scoreAtTurnStart: _state.c121ScoreAtTurnStart,
+        });
+
+        // Enable undo
+        var undoBtn = document.getElementById('c121-undo-btn');
+        if (undoBtn) undoBtn.disabled = false;
+
+        if (isBust) {
+            // Show bust pill then reset score to turn-start value
+            _state.c121DartsUsed = dartsUsed;
+            _state.turnDarts++;
+            _addC121Pill(segment, multiplier, points, true);
+            if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) SOUNDS.bust && SOUNDS.bust();
+            var statusEl = document.getElementById('c121-status');
+            if (statusEl) { statusEl.textContent = 'BUST!'; statusEl.className = 'c121-status c121-bust'; }
+            // Reset score to what it was at start of this turn
+            _state.c121Score = _state.c121ScoreAtTurnStart;
+            _c121UpdateDisplay(onEnd);
+            // Lock board, force NEXT
+            _lockBoard(true);
+            _state.turnComplete = true;
+            var nextBtn = document.getElementById('c121-next-btn');
+            if (nextBtn) nextBtn.disabled = false;
+            return;
+        }
+
+        // Normal throw
+        _state.c121Score  = newScore;
+        _state.c121DartsUsed = dartsUsed;
+        _state.turnDarts++;
+        _state.dartsThrown++;
+
+        _addC121Pill(segment, multiplier, points, false);
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) SOUNDS.dart();
+        if (SPEECH.isEnabled()) SPEECH.announceDartScore(segment, multiplier, points);
+
+        // Checkout!
+        if (newScore === 0) {
+            _state.c121Successes++;
+            _state.c121Attempts++;
+            if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) SOUNDS.checkout();
+            // Advance target
+            _state.c121Target = _state.c121Target + 1;
+            _state.c121Score  = _state.c121Target;
+            _state.c121ScoreAtTurnStart = _state.c121Target;
+            _state.c121DartsUsed = 0;
+            _state.turnDarts  = 0;
+            _state.turnComplete = false;
+            var pills = document.getElementById('practice-pills');
+            if (pills) pills.innerHTML = '';
+            _c121UpdateDisplay(onEnd);
+            var statusEl2 = document.getElementById('c121-status');
+            if (statusEl2) { statusEl2.textContent = 'CHECKOUT! NOW ' + _state.c121Target; statusEl2.className = 'c121-status c121-success'; }
+            _lockBoard(false);
+            if (SPEECH.isEnabled()) {
+                setTimeout(function() {
+                    window.speechSynthesis && window.speechSynthesis.speak(
+                        Object.assign(new SpeechSynthesisUtterance(
+                            'Checkout! Next target: ' + _state.c121Target
+                        ), { rate: 1.0 })
+                    );
+                }, 600);
+            }
+            return;
+        }
+
+        _c121UpdateDisplay(onEnd);
+        _c121UpdateCheckoutHint();
+
+        // After 3 darts: lock + NEXT — or auto-fail if darts exhausted
+        var dartsInTurn = _state.turnDarts % 3;
+        if (dartsInTurn === 0) {
+            _state.turnComplete = true;
+            _lockBoard(true);
+            var nb = document.getElementById('c121-next-btn');
+            if (nb) nb.disabled = false;
+            if (SPEECH.isEnabled()) {
+                var left = _state.c121DartLimit - _state.c121DartsUsed;
+                setTimeout(function() {
+                    window.speechSynthesis && window.speechSynthesis.speak(
+                        Object.assign(new SpeechSynthesisUtterance(
+                            _state.c121Score + ' left. ' + left + ' darts remaining.'
+                        ), { rate: 1.0 })
+                    );
+                }, 900);
+            }
+            // If all darts used and not checked out — fail
+            if (_state.c121DartsUsed >= _state.c121DartLimit) {
+                _c121Fail(onEnd);
+            }
+        }
+    }
+
+    function _c121Fail(onEnd) {
+        // Attempt failed — drop target by 1 (minimum 121), reset
+        _state.c121Attempts++;
+        _state.c121Target = Math.max(121, _state.c121Target - 1);
+        _state.c121Score  = _state.c121Target;
+        _state.c121ScoreAtTurnStart = _state.c121Target;
+        _state.c121DartsUsed = 0;
+        _state.turnDarts  = 0;
+        _state.turnComplete = true; // keep board locked until NEXT pressed
+        var statusEl = document.getElementById('c121-status');
+        if (statusEl) {
+            statusEl.textContent = 'FAILED — BACK TO ' + _state.c121Target;
+            statusEl.className = 'c121-status c121-bust';
+        }
+        _c121UpdateDisplay(onEnd);
+        var nextBtn = document.getElementById('c121-next-btn');
+        if (nextBtn) nextBtn.disabled = false;
+    }
+
+    function _c121AdvanceTurn(onEnd) {
+        _state.turnComplete  = false;
+        _state.turnDarts     = 0;
+        _state.c121DartsUsed = 0;
+        _state.c121ScoreAtTurnStart = _state.c121Score;
+        _c121ThrowHistory    = [];
+        var pills = document.getElementById('practice-pills');
+        if (pills) pills.innerHTML = '';
+        var nextBtn = document.getElementById('c121-next-btn');
+        if (nextBtn) nextBtn.disabled = true;
+        var undoBtn = document.getElementById('c121-undo-btn');
+        if (undoBtn) undoBtn.disabled = true;
+        var statusEl = document.getElementById('c121-status');
+        if (statusEl) {
+            statusEl.textContent = 'CHECKOUT IN ' + _state.c121DartLimit + ' DARTS';
+            statusEl.className = 'c121-status';
+        }
+        _lockBoard(false);
+        _c121UpdateDisplay(onEnd);
+        _c121UpdateCheckoutHint();
+        _c121Announce();
+    }
+
+    function _c121Undo() {
+        if (_c121ThrowHistory.length === 0) return;
+        var snap = _c121ThrowHistory.pop();
+        _state.c121Score     = snap.score;
+        _state.c121DartsUsed = snap.dartsUsed;
+        _state.turnDarts     = snap.turnDarts;
+        _state.c121ScoreAtTurnStart = snap.scoreAtTurnStart;
+        if (_state.turnComplete) {
+            _state.turnComplete = false;
+            _lockBoard(false);
+            var nextBtn = document.getElementById('c121-next-btn');
+            if (nextBtn) nextBtn.disabled = true;
+        }
+        _state.dartsThrown = Math.max(0, _state.dartsThrown - 1);
+        var pills = document.getElementById('practice-pills');
+        if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
+        var undoBtn = document.getElementById('c121-undo-btn');
+        if (undoBtn) undoBtn.disabled = (_c121ThrowHistory.length === 0);
+        var statusEl = document.getElementById('c121-status');
+        if (statusEl) { statusEl.textContent = 'CHECKOUT IN ' + _state.c121DartLimit + ' DARTS'; statusEl.className = 'c121-status'; }
+        _c121UpdateDisplay(null);
+        _c121UpdateCheckoutHint();
+    }
+
+    function _addC121Pill(segment, multiplier, points, isBust) {
+        var pills = document.getElementById('practice-pills');
+        if (!pills) return;
+        var pill = document.createElement('div');
+        pill.className = 'dart-pill' + (isBust ? ' pill-miss' :
+            points === 0 ? ' pill-miss' : points >= 60 ? ' pill-hot' : '');
+        var label = segment === 0 ? 'MISS' :
+            (multiplier === 3 ? 'T' : multiplier === 2 ? 'D' : 'S') + segment;
+        pill.textContent = isBust ? label + ' BUST' : label + ' (' + points + ')';
+        pills.appendChild(pill);
+    }
+
+    function _c121UpdateDisplay(onEnd) {
+        var scoreEl = document.getElementById('c121-score');
+        if (scoreEl) scoreEl.textContent = _state.c121Score;
+        var dartsLeftEl = document.getElementById('c121-darts-left');
+        if (dartsLeftEl) dartsLeftEl.textContent = Math.max(0, _state.c121DartLimit - _state.c121DartsUsed);
+        var attemptsEl = document.getElementById('c121-attempts');
+        if (attemptsEl) attemptsEl.textContent = _state.c121Attempts;
+        var successEl = document.getElementById('c121-successes');
+        if (successEl) successEl.textContent = _state.c121Successes;
+    }
+
+    function _c121UpdateCheckoutHint() {
+        // Highlight doubles on the board when score is a valid checkout
+        document.querySelectorAll('.seg-btn').forEach(function(btn) {
+            btn.classList.remove('target-highlight');
+        });
+        var score = _state.c121Score;
+        if (score <= 50 && score % 2 === 0 && score >= 2) {
+            // Highlight the finishing double
+            var d = score / 2;
+            if (d <= 20) {
+                var btn = document.querySelector('#segment-grid .seg-btn[data-segment="' + d + '"]');
+                if (btn) btn.classList.add('target-highlight');
+            } else if (d === 25) {
+                var bullBtn = document.querySelector('#bull-row .bull-btn-inner');
+                if (bullBtn) bullBtn.classList.add('target-highlight');
+            }
+        }
+    }
+
+    function _c121End(onEnd) {
+        clearInterval(_state.timerInterval);
+        API.endPracticeSession(_state.matchId).catch(function() {});
+        _showCheckout121Summary(onEnd);
+    }
+
+    function _showCheckout121Summary(onEnd) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        document.body.className = 'mode-setup';
+
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        var rate = _state.c121Attempts > 0
+            ? Math.round((_state.c121Successes / _state.c121Attempts) * 100) + '%' : '0%';
+
+        inner.innerHTML =
+            '<div id="setup-title"><div class="setup-logo">SESSION DONE</div>' +
+            '<div class="setup-subtitle">' + _state.playerName.toUpperCase() + '</div></div>';
+
+        var summaryEl = document.createElement('div');
+        summaryEl.className = 'practice-summary';
+        [
+            { label: 'HIGHEST REACHED', value: _state.c121Target },
+            { label: 'ATTEMPTS',        value: _state.c121Attempts },
+            { label: 'CHECKOUTS HIT',   value: _state.c121Successes },
+            { label: 'SUCCESS RATE',    value: rate },
+            { label: 'DARTS THROWN',    value: _state.dartsThrown },
+        ].forEach(function(row) {
+            var item = document.createElement('div');
+            item.className = 'practice-summary-row';
+            item.innerHTML = '<span class="practice-summary-label">' + row.label + '</span>' +
+                             '<span class="practice-summary-value">' + row.value + '</span>';
+            summaryEl.appendChild(item);
+        });
+        inner.appendChild(summaryEl);
+
+        var doneBtn = document.createElement('button');
+        doneBtn.className = 'start-btn';
+        doneBtn.textContent = 'BACK TO SETUP';
+        doneBtn.type = 'button';
+        doneBtn.addEventListener('click', onEnd);
+        inner.appendChild(doneBtn);
     }
 
     // ------------------------------------------------------------------

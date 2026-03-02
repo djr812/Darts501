@@ -1299,6 +1299,36 @@ const UI = (() => {
                 },
             ]
         },
+        'bobs27': {
+            title: "Bob's 27",
+            sections: [
+                { heading: 'Objective',
+                  body: 'A doubles ladder game. Start with 27 points and work your way from Double 1 up to Double Bull. Your score rises when you hit and falls when you miss.' },
+                { heading: 'Scoring',
+                  body: 'Each round you throw at the current target double. Hit it and you add the double\'s value to your score (e.g. D3 = +6). Miss and that same value is subtracted (D3 = -6). You must hit the double before moving on — misses keep you on the same double.' },
+                { heading: 'Sequence',
+                  body: 'D1 → D2 → D3 ... → D20 → D-Bull. Three darts per round. Any dart that hits the correct double advances you; the remaining darts in that round are not thrown.' },
+                { heading: 'Game Over',
+                  body: 'If your score reaches zero or goes negative, the game ends immediately. Your final double reached and score are shown on the summary screen.' },
+                { heading: 'Winning',
+                  body: 'Successfully hit all 21 doubles including D-Bull to complete the ladder. A perfect game finishes with a score well above 27.' },
+            ]
+        },
+        'checkout121': {
+            title: '121 Checkouts',
+            sections: [
+                { heading: 'Objective',
+                  body: 'Practice high checkouts under pressure. Start at 121 and attempt to finish in a set number of darts using a double to check out, just like in 501.' },
+                { heading: 'Turn Structure',
+                  body: 'You have 9 (or 12) darts to finish each target. Darts are entered 3 at a time. After each set of 3, press NEXT to continue or wait for the board to auto-advance when darts are exhausted.' },
+                { heading: 'Bust Rules',
+                  body: 'Going below 2, hitting exactly 1, or finishing without a double is a bust. Your score resets to what it was at the start of that visit (set of 3 darts).' },
+                { heading: 'Progression',
+                  body: 'Check out successfully and the target increases by 1 (121 → 122 → 123 ...). Fail to finish in the allotted darts and the target drops by 1, with a minimum of 121.' },
+                { heading: 'Session End',
+                  body: 'The session ends when the timer runs out or you press END. The summary shows your highest checkout reached, total attempts, successes, and hit rate.' },
+            ]
+        },
         'practice': {
             title: 'Practice',
             sections: [
