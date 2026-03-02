@@ -1576,10 +1576,10 @@ var PRACTICE = (function() {
         // No turn-complete locking in Bob's 27 — every dart is always live
 
         var target = _state.bobs27Double;
-        var targetValue = target === 25 ? 50 : target * 2;
+        var hitValue  = target === 25 ? 50 : target * 2; // points scored on a hit (double value)
+        var missValue = target === 25 ? 25 : target;     // points deducted on a miss (segment value)
         var isHit = (multiplier === 2 && segment === target);
-        // Outer bull counts as miss when targeting D-Bull
-        var change = isHit ? targetValue : -targetValue;
+        var change = isHit ? hitValue : -missValue;
 
         // Push undo snapshot
         _b27History.push({ score: _state.bobs27Score, double: target, dartsThrown: _state.dartsThrown });
@@ -1598,8 +1598,8 @@ var PRACTICE = (function() {
             var pill = document.createElement('div');
             pill.className = 'dart-pill' + (isHit ? ' pill-hot' : ' pill-miss');
             var dLabel = target === 25 ? 'D-BULL' : 'D' + target;
-            pill.textContent = isHit ? ('HIT ' + dLabel + ' (+' + targetValue + ')') :
-                                       ('MISS ' + dLabel + ' (-' + targetValue + ')');
+            pill.textContent = isHit ? ('HIT ' + dLabel + ' (+' + hitValue + ')') :
+                                       ('MISS ' + dLabel + ' (-' + missValue + ')');
             pills.appendChild(pill);
         }
 
