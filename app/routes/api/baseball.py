@@ -282,15 +282,14 @@ def get_baseball_match(match_id):
 @baseball_bp.route("/baseball/matches/<int:match_id>/throw", methods=["POST"])
 def record_baseball_throw(match_id):
     """
-    Record a single dart throw.
-    Payload: { "segment": 8, "multiplier": 1 }
+    Record a batch of up to 3 dart throws for the current set.
+    Payload: { "throws": [ {"segment": 8, "multiplier": 1}, ... ] }
     """
     data = request.get_json(silent=True)
-    if not data:
-        return jsonify({"error": "payload required"}), 400
+    if not data or not data.get("throws"):
+        return jsonify({"error": "throws array required"}), 400
 
-    segment    = int(data.get("segment", 0))
-    multiplier = int(data.get("multiplier", 1))
+    throws = data["throws"]
 
     db = get_db()
     cursor = db.cursor()
@@ -314,42 +313,43 @@ def record_baseball_throw(match_id):
     players     = [r["player_id"] for r in player_rows]
     current_pid = players[game["current_player_index"]]
 
-    # Ensure inning row exists
+    # Ensure inning row exists and get current state
     inning_id = _ensure_inning_row(
         db, game_id, match_id, current_pid, current_inning, target_number
     )
-
-    # Get current inning state
     cursor.execute(
         "SELECT runs, outs, darts_thrown FROM baseball_innings WHERE id=%s",
         (inning_id,)
     )
-    inn = cursor.fetchone()
-    current_outs  = inn["outs"]
-    current_darts = inn["darts_thrown"]
+    inn          = cursor.fetchone()
+    total_runs   = inn["runs"]
+    total_outs   = inn["outs"]
+    total_darts  = inn["darts_thrown"]
 
-    dart_number = (current_darts % 3) + 1
-    is_hit      = (segment == target_number)
-    runs        = multiplier if is_hit else 0
-    is_out      = not is_hit
+    # Insert each throw
+    for t in throws:
+        segment    = int(t.get("segment", 0))
+        multiplier = int(t.get("multiplier", 1))
+        is_hit     = (segment == target_number)
+        runs       = multiplier if is_hit else 0
+        is_out     = not is_hit
+        dart_num   = (total_darts % 3) + 1
 
-    # Record throw
-    cursor.execute(
-        "INSERT INTO baseball_throws "
-        "(game_id, inning_id, match_id, player_id, inning_number, "
-        " dart_number, segment, multiplier, runs, is_out) "
-        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-        (game_id, inning_id, match_id, current_pid, current_inning,
-         dart_number, segment, multiplier, runs, int(is_out))
-    )
-
-    new_runs  = inn["runs"] + runs
-    new_outs  = current_outs + (1 if is_out else 0)
-    new_darts = current_darts + 1
+        cursor.execute(
+            "INSERT INTO baseball_throws "
+            "(game_id, inning_id, match_id, player_id, inning_number, "
+            " dart_number, segment, multiplier, runs, is_out) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            (game_id, inning_id, match_id, current_pid, current_inning,
+             dart_num, segment, multiplier, runs, int(is_out))
+        )
+        total_runs  += runs
+        total_outs  += 1 if is_out else 0
+        total_darts += 1
 
     cursor.execute(
         "UPDATE baseball_innings SET runs=%s, outs=%s, darts_thrown=%s WHERE id=%s",
-        (new_runs, new_outs, new_darts, inning_id)
+        (total_runs, total_outs, total_darts, inning_id)
     )
     db.commit()
 

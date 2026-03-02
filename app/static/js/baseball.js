@@ -32,7 +32,8 @@ var BASEBALL_GAME = (function () {
         inningComplete:     false,  // 3 outs reached — inning is over
     };
 
-    var _throwHistory = []; // local undo stack (cleared on NEXT)
+    var _throwHistory  = []; // local undo stack (cleared on NEXT)
+    var _pendingThrows = []; // buffered throws for current set, submitted on NEXT
 
     // ─────────────────────────────────────────────────────────────────
     // Public: start
@@ -467,46 +468,53 @@ var BASEBALL_GAME = (function () {
 
     function _onThrow(segment, multiplier) {
         if (_state.setComplete || _state.status !== 'active') return;
+        // Enforce max 3 darts per set locally
+        if (_pendingThrows.length >= 3) return;
 
-        UI.setLoading(true);
-        API.recordBaseballThrow(_state.matchId, { segment: segment, multiplier: multiplier })
-            .then(function (s) {
-                _throwHistory.push(true); // mark one throw recorded
-                _applyState(s);
-                UI.setLoading(false);
+        var target = _targetNumber();
+        var isHit  = (segment === target);
+        var runs   = isHit ? multiplier : 0;
+        var isOut  = !isHit;
 
-                var inn    = _currentInningData();
-                var isHit  = (segment === _targetNumber());
-                var runs   = isHit ? multiplier : 0;
+        // Buffer the throw
+        _pendingThrows.push({ segment: segment, multiplier: multiplier, runs: runs, isOut: isOut });
+        _throwHistory.push({ segment: segment, multiplier: multiplier, runs: runs, isOut: isOut });
 
-                // Sound
-                if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
-                    isHit ? SOUNDS.dart() : (SOUNDS.bust && SOUNDS.bust());
-                }
+        // Update local display state
+        if (!_state.innings[String(_state.currentPlayerId)]) {
+            _state.innings[String(_state.currentPlayerId)] = {};
+        }
+        var pid = String(_state.currentPlayerId);
+        if (!_state.innings[pid][_state.currentInning]) {
+            _state.innings[pid][_state.currentInning] = { runs: 0, outs: 0, darts: 0, complete: false };
+        }
+        var inn = _state.innings[pid][_state.currentInning];
+        inn.runs  += runs;
+        inn.outs  += isOut ? 1 : 0;
+        inn.darts += 1;
+        _state.totalRuns[pid] = (_state.totalRuns[pid] || 0) + runs;
 
-                // Pill
-                _addPill(segment, multiplier, runs, isHit);
+        // Sound
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+            isHit ? SOUNDS.dart() : (SOUNDS.bust && SOUNDS.bust());
+        }
 
-                // Speech for individual dart
-                _speakDart(isHit, runs);
+        // Pill
+        _addPill(segment, multiplier, runs, isHit);
 
-                _updateScoreboard();
-                _updateStatus();
+        // Speech
+        _speakDart(isHit, runs);
 
-                // After 3 darts in set — lock board, enable NEXT/UNDO
-                if (s.darts_in_set === 0 && inn && inn.darts > 0) {
-                    // darts_in_set wraps to 0 after 3rd dart
-                    _endSet(inn);
-                }
+        _updateScoreboard();
+        _updateStatus();
 
-                var undoBtn = document.getElementById('bbmp-undo-btn');
-                if (undoBtn) undoBtn.disabled = (_throwHistory.length === 0);
-            })
-            .catch(function (err) {
-                UI.setLoading(false);
-                UI.showToast('ERROR RECORDING THROW', 'bust', 3000);
-                console.error('[baseball] throw error:', err);
-            });
+        var undoBtn = document.getElementById('bbmp-undo-btn');
+        if (undoBtn) undoBtn.disabled = false;
+
+        // After 3 darts — lock board, enable NEXT
+        if (_pendingThrows.length >= 3) {
+            _endSet(inn);
+        }
     }
 
     function _endSet(inn) {
@@ -543,9 +551,21 @@ var BASEBALL_GAME = (function () {
 
     function _onNext() {
         UI.setLoading(true);
-        API.baseballNext(_state.matchId, { inning_complete: _state.inningComplete })
+        var inningComplete = _state.inningComplete;
+        var throwsToSubmit = _pendingThrows.slice(); // copy before clearing
+
+        // Submit buffered throws first, then advance
+        var submitPromise = throwsToSubmit.length > 0
+            ? API.recordBaseballThrow(_state.matchId, { throws: throwsToSubmit })
+            : Promise.resolve(null);
+
+        submitPromise
+            .then(function () {
+                return API.baseballNext(_state.matchId, { inning_complete: inningComplete });
+            })
             .then(function (s) {
-                _throwHistory = [];
+                _throwHistory  = [];
+                _pendingThrows = [];
                 _state.setComplete    = false;
                 _state.inningComplete = false;
                 _applyState(s);
@@ -595,36 +615,38 @@ var BASEBALL_GAME = (function () {
 
     function _onUndo() {
         if (_throwHistory.length === 0) return;
-        UI.setLoading(true);
-        API.baseballUndo(_state.matchId)
-            .then(function (s) {
-                _throwHistory.pop();
-                _applyState(s);
-                UI.setLoading(false);
 
-                // If board was locked, unlock it
-                if (_state.setComplete) {
-                    _state.setComplete    = false;
-                    _state.inningComplete = false;
-                    _lockBoard(false);
-                    var nb = document.getElementById('bbmp-next-btn');
-                    if (nb) nb.disabled = true;
-                }
+        var last = _throwHistory.pop();
+        _pendingThrows.pop();
 
-                // Remove last pill
-                var pills = document.getElementById('bbmp-pills');
-                if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
+        // Reverse the local state update
+        var pid = String(_state.currentPlayerId);
+        var inn = _state.innings[pid] && _state.innings[pid][_state.currentInning];
+        if (inn) {
+            inn.runs  -= last.runs;
+            inn.outs  -= last.isOut ? 1 : 0;
+            inn.darts -= 1;
+        }
+        _state.totalRuns[pid] = (_state.totalRuns[pid] || 0) - last.runs;
 
-                var ub = document.getElementById('bbmp-undo-btn');
-                if (ub) ub.disabled = (_throwHistory.length === 0);
+        // If board was locked after 3rd dart, unlock it
+        if (_state.setComplete) {
+            _state.setComplete    = false;
+            _state.inningComplete = false;
+            _lockBoard(false);
+            var nb = document.getElementById('bbmp-next-btn');
+            if (nb) nb.disabled = true;
+        }
 
-                _updateScoreboard();
-                _updateStatus();
-            })
-            .catch(function (err) {
-                UI.setLoading(false);
-                UI.showToast('UNDO FAILED', 'bust', 2000);
-            });
+        // Remove last pill
+        var pills = document.getElementById('bbmp-pills');
+        if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
+
+        var ub = document.getElementById('bbmp-undo-btn');
+        if (ub) ub.disabled = (_throwHistory.length === 0);
+
+        _updateScoreboard();
+        _updateStatus();
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -632,17 +654,21 @@ var BASEBALL_GAME = (function () {
     // ─────────────────────────────────────────────────────────────────
 
     function _onEnd() {
-        UI.showConfirm('END GAME?', 'Abandon this Baseball match?', function () {
-            UI.setLoading(true);
-            API.endBaseballMatch(_state.matchId)
-                .then(function () {
-                    UI.setLoading(false);
-                    if (_state.onEnd) _state.onEnd();
-                })
-                .catch(function () {
-                    UI.setLoading(false);
-                    if (_state.onEnd) _state.onEnd();
-                });
+        UI.showConfirmModal({
+            title:    'END GAME?',
+            message:  'Abandon this Baseball match?',
+            onConfirm: function () {
+                UI.setLoading(true);
+                API.endBaseballMatch(_state.matchId)
+                    .then(function () {
+                        UI.setLoading(false);
+                        if (_state.onEnd) _state.onEnd();
+                    })
+                    .catch(function () {
+                        UI.setLoading(false);
+                        if (_state.onEnd) _state.onEnd();
+                    });
+            }
         });
     }
 
