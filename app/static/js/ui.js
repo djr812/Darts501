@@ -30,7 +30,7 @@ const UI = (() => {
         });
     }
 
-    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai) {
+    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball) {
         // Clear any lingering modal overlays from the previous game screen
         ['confirm-modal', 'rules-modal'].forEach(function(id) {
             var el = document.getElementById(id);
@@ -67,6 +67,7 @@ const UI = (() => {
             { value: 'Shanghai', label: 'Shanghai',  sub: '7 or 20 rounds', icon: '🀄' },
             { value: 'Killer',   label: 'Killer',    sub: 'Coming Soon',   icon: '☠️',  comingSoon: true },
             { value: 'Practice', label: 'Practice',  sub: 'Solo training', icon: '🎪' },
+            { value: 'Baseball', label: 'Baseball',  sub: '9 innings',     icon: '⚾' },
         ];
 
         gameTypes.forEach(gt => {
@@ -86,6 +87,8 @@ const UI = (() => {
                 tile.addEventListener('click', () => { if (onPractice) onPractice(); });
             } else if (gt.value === 'Cricket') {
                 tile.addEventListener('click', () => { if (onCricket) onCricket(); });
+            } else if (gt.value === 'Baseball') {
+                tile.addEventListener('click', () => { if (onBaseball) onBaseball(); });
             } else {
                 tile.addEventListener('click', () => {
                     _buildMatchSetupScreen(
@@ -290,7 +293,7 @@ const UI = (() => {
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', () => {
             API.getPlayers().then(p => {
-                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai);
+                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball);
             });
         });
         _appTarget.appendChild(backLink);

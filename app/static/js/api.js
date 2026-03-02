@@ -330,6 +330,30 @@ const API = (() => {
         return request('POST', '/api/shanghai/matches/' + matchId + '/restart', {});
     }
 
+    async function createBaseballMatch(data) {
+        return request('POST', '/api/baseball/matches', data);
+    }
+
+    async function getBaseballMatch(matchId) {
+        return request('GET', '/api/baseball/matches/' + matchId);
+    }
+
+    async function recordBaseballThrow(matchId, data) {
+        return request('POST', '/api/baseball/matches/' + matchId + '/throw', data);
+    }
+
+    async function baseballNext(matchId, data) {
+        return request('POST', '/api/baseball/matches/' + matchId + '/next', data);
+    }
+
+    async function baseballUndo(matchId) {
+        return request('POST', '/api/baseball/matches/' + matchId + '/undo', {});
+    }
+
+    async function endBaseballMatch(matchId) {
+        return request('POST', '/api/baseball/matches/' + matchId + '/end', {});
+    }
+
     async function getBaseballHighScore(playerId) {
         return request('GET', '/api/baseball/highscore/' + playerId);
     }
@@ -369,6 +393,12 @@ const API = (() => {
         restartShanghaiMatch,
         getCricketMatch,
         getShanghaiMatch,
+        createBaseballMatch,
+        getBaseballMatch,
+        recordBaseballThrow,
+        baseballNext,
+        baseballUndo,
+        endBaseballMatch,
         getBaseballHighScore,
         submitBaseballScore,
         flushQueue,
