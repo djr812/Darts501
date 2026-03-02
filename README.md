@@ -33,7 +33,7 @@ A full-stack darts scoring application built for iPad, designed to be hosted on 
 - **Checkout suggestions** — optimal finishing routes shown in real time
 - **Player statistics** — per-player dashboards with averages, hit rates, trends, and session history
 - **SVG dartboard heatmap** — colour-coded throw distribution across all segments
-- **AI performance analysis** — Claude-powered written analysis of player strengths and weaknesses
+- **AI performance analysis** — Llama-powered written analysis of player strengths and weaknesses
 - **Restart & Undo** — full undo support and match restart across all game modes
 - **Multiplayer** — multiple human players with per-player turn management
 - **iOS-optimised** — touch-safe event handling for iPad/iPhone (iOS 12.5.7+), installable as a PWA
@@ -51,7 +51,7 @@ A full-stack darts scoring application built for iPad, designed to be hosted on 
 | **Web Server** | Apache2 + mod_wsgi |
 | **Speech** | Web Speech API (browser-native) |
 | **Audio** | Web Audio API (browser-native, synthesised) |
-| **AI Analysis** | Anthropic Claude API |
+| **AI Analysis** | Llama 3.1 API |
 
 > No frontend build step or JavaScript bundler is required. All JS is served as plain files.
 
@@ -157,7 +157,6 @@ DB_PORT=3306
 DB_USER=your_mysql_user
 DB_PASSWORD=your_mysql_password
 DB_NAME=darts
-ANTHROPIC_API_KEY=your_anthropic_api_key   # Optional — required for AI analysis only
 ```
 
 Flask will automatically load this file on startup. In production, the `.wsgi` file handles loading `.env` before the app is created (since mod_wsgi daemon processes do not inherit shell environment variables).
