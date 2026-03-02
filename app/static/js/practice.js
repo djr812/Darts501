@@ -83,7 +83,7 @@ var PRACTICE = (function() {
         targetModeBtn.type = 'button';
         targetModeBtn.textContent = 'TARGET';
 
-        var TIMERLESS_MODES = ['bobs27', 'checkout121'];
+        var TIMERLESS_MODES = ['bobs27', 'checkout121', 'baseball'];
 
         freeModeBtn.addEventListener('click', function() {
             freeModeBtn.classList.add('selected');
@@ -288,6 +288,16 @@ var PRACTICE = (function() {
         bobs27Score:   27,
         bobs27Double:  1,        // 1-20, 25 = Bull
         bobs27Rounds:  0,
+        // Baseball Darts state
+        baseballInning:    1,
+        baseballTarget:    1,      // current target number (start + inning - 1)
+        baseballStartNum:  1,      // randomly chosen start
+        baseballRuns:      0,      // total runs this game
+        baseballOuts:      0,      // outs in current inning
+        baseballInningRuns:0,      // runs in current inning
+        baseballDarts:     0,      // darts thrown in current inning
+        baseballHighScore: 0,      // loaded from DB at game start
+        baseballInningComplete: false,
         // 121 Checkouts state
         c121Target:    121,
         c121DartLimit: 9,
@@ -312,7 +322,7 @@ var PRACTICE = (function() {
             .then(function(player) {
                 _state.playerId   = player.id;
                 _state.playerName = player.name;
-                var TIMERLESS = ['bobs27', 'checkout121'];
+                var TIMERLESS = ['bobs27', 'checkout121', 'baseball'];
                 _state.timerSeconds = TIMERLESS.indexOf(config.targetMode) !== -1
                     ? 0
                     : config.durationMinutes * 60;
@@ -339,6 +349,17 @@ var PRACTICE = (function() {
                 _state.c121ScoreAtTurnStart = 121;
                 _state.c121Attempts  = 0;
                 _state.c121Successes = 0;
+                // Baseball
+                var _bbStart = Math.floor(Math.random() * 11) + 1;
+                _state.baseballInning    = 1;
+                _state.baseballStartNum  = _bbStart;
+                _state.baseballTarget    = _bbStart;
+                _state.baseballRuns      = 0;
+                _state.baseballOuts      = 0;
+                _state.baseballInningRuns= 0;
+                _state.baseballDarts     = 0;
+                _state.baseballHighScore = 0;
+                _state.baseballInningComplete = false;
                 _state.onEnd         = onEnd;
 
                 // Create a practice match + leg + turn in the DB
@@ -353,6 +374,8 @@ var PRACTICE = (function() {
                     _startBobs27(onEnd);
                 } else if (_state.targetMode === 'checkout121') {
                     _startCheckout121(onEnd);
+                } else if (_state.targetMode === 'baseball') {
+                    _startBaseball(onEnd);
                 } else {
                     _buildPracticeScreen(onEnd);
                     _startTimer(onEnd);
@@ -1107,6 +1130,8 @@ var PRACTICE = (function() {
               desc: 'Doubles practice — start at 27 pts, hit each double to advance, miss costs points' },
             { type: 'checkout121', label: '121 CHECKOUTS',
               desc: 'Start at 121, check out in 9 or 12 darts — double finish required' },
+            { type: 'baseball',    label: 'BASEBALL DARTS',
+              desc: '9 innings, random starting number — score runs, avoid outs, beat your high score' },
         ];
 
         groups.forEach(function(g) {
@@ -2264,6 +2289,547 @@ var PRACTICE = (function() {
             item.className = 'practice-summary-row';
             item.innerHTML = '<span class="practice-summary-label">' + row.label + '</span>' +
                              '<span class="practice-summary-value">' + row.value + '</span>';
+            summaryEl.appendChild(item);
+        });
+        inner.appendChild(summaryEl);
+
+        var doneBtn = document.createElement('button');
+        doneBtn.className = 'start-btn';
+        doneBtn.textContent = 'BACK TO SETUP';
+        doneBtn.type = 'button';
+        doneBtn.addEventListener('click', onEnd);
+        inner.appendChild(doneBtn);
+    }
+
+    // ------------------------------------------------------------------
+    // BASEBALL DARTS
+    // ------------------------------------------------------------------
+
+    function _startBaseball(onEnd) {
+        // Fetch high score from DB, then build screen
+        API.getBaseballHighScore(_state.playerId)
+            .then(function(res) {
+                _state.baseballHighScore = res ? (res.score || 0) : 0;
+            })
+            .catch(function() { _state.baseballHighScore = 0; })
+            .then(function() {
+                _buildBaseballScreen(onEnd);
+                _baseballAnnounceInning(true);
+            });
+    }
+
+    function _buildBaseballScreen(onEnd) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-practice';
+
+        // ── Header ──────────────────────────────────────────────────────
+        var header = document.createElement('header');
+        header.className = 'game-header';
+
+        var leftSlot = document.createElement('div');
+        leftSlot.className = 'gh-left';
+        var titleWrap = document.createElement('div');
+        titleWrap.className = 'gh-title-wrap';
+        var titleEl = document.createElement('div');
+        titleEl.className = 'gh-game-name';
+        titleEl.textContent = 'BASEBALL';
+        var subtitleEl = document.createElement('div');
+        subtitleEl.className = 'gh-match-info';
+        subtitleEl.textContent = '9 INNINGS';
+        titleWrap.appendChild(titleEl);
+        titleWrap.appendChild(subtitleEl);
+        leftSlot.appendChild(titleWrap);
+        var rulesBtn = document.createElement('button');
+        rulesBtn.type = 'button';
+        rulesBtn.className = 'rules-btn';
+        rulesBtn.textContent = '📖 RULES';
+        rulesBtn.addEventListener('click', function() {
+            if (typeof UI !== 'undefined') UI.showRulesModal('baseball');
+        });
+        leftSlot.appendChild(rulesBtn);
+        header.appendChild(leftSlot);
+
+        var centreSlot = document.createElement('div');
+        centreSlot.className = 'gh-centre';
+        var endBtn = document.createElement('button');
+        endBtn.className = 'gh-btn gh-btn-red';
+        endBtn.type = 'button';
+        endBtn.textContent = '✕ END';
+        endBtn.addEventListener('click', function() { _baseballEnd(onEnd); });
+        centreSlot.appendChild(endBtn);
+        header.appendChild(centreSlot);
+
+        var rightSlot = document.createElement('div');
+        rightSlot.className = 'gh-right';
+        var undoBtn = document.createElement('button');
+        undoBtn.id = 'bb-undo-btn';
+        undoBtn.className = 'gh-btn gh-btn-undo';
+        undoBtn.type = 'button';
+        undoBtn.textContent = '⟵ UNDO';
+        undoBtn.disabled = true;
+        undoBtn.addEventListener('click', _baseballUndo);
+        var nextBtn = document.createElement('button');
+        nextBtn.id = 'bb-next-btn';
+        nextBtn.className = 'gh-btn gh-btn-next';
+        nextBtn.type = 'button';
+        nextBtn.textContent = 'NEXT ▶';
+        nextBtn.disabled = true;
+        nextBtn.addEventListener('click', function() { _baseballNext(onEnd); });
+        rightSlot.appendChild(undoBtn);
+        rightSlot.appendChild(nextBtn);
+        header.appendChild(rightSlot);
+        app.appendChild(header);
+
+        // ── Scoreboard ──────────────────────────────────────────────────
+        var board = document.createElement('div');
+        board.className = 'bb-board';
+        board.innerHTML =
+            '<div class="bb-stat-block">' +
+                '<div class="bb-stat-label">INNING</div>' +
+                '<div class="bb-stat-value" id="bb-inning">' + _state.baseballInning + ' / 9</div>' +
+            '</div>' +
+            '<div class="bb-stat-block">' +
+                '<div class="bb-stat-label">TARGET</div>' +
+                '<div class="bb-stat-value bb-target" id="bb-target">' + _state.baseballTarget + '</div>' +
+            '</div>' +
+            '<div class="bb-stat-block">' +
+                '<div class="bb-stat-label">RUNS</div>' +
+                '<div class="bb-stat-value bb-runs" id="bb-runs">' + _state.baseballRuns + '</div>' +
+            '</div>' +
+            '<div class="bb-stat-block">' +
+                '<div class="bb-stat-label">OUTS</div>' +
+                '<div class="bb-outs-row" id="bb-outs-row"></div>' +
+            '</div>';
+        app.appendChild(board);
+        _baseballRenderOuts();
+
+        // ── Inning runs strip ────────────────────────────────────────────
+        var inningStrip = document.createElement('div');
+        inningStrip.className = 'bb-inning-strip';
+        inningStrip.id = 'bb-inning-strip';
+        _baseballRenderInningStrip(inningStrip);
+        app.appendChild(inningStrip);
+
+        // ── Status ───────────────────────────────────────────────────────
+        var statusEl = document.createElement('div');
+        statusEl.id = 'bb-status';
+        statusEl.className = 'bb-status';
+        statusEl.textContent = 'INNING ' + _state.baseballInning + '  —  TARGET: ' + _state.baseballTarget;
+        app.appendChild(statusEl);
+
+        // ── Dart pills ───────────────────────────────────────────────────
+        var pillRow = document.createElement('div');
+        pillRow.id = 'practice-pills';
+        pillRow.className = 'practice-pills';
+        app.appendChild(pillRow);
+
+        // ── Multiplier tabs ──────────────────────────────────────────────
+        _state.multiplier = 1;
+        var tabs = document.createElement('div');
+        tabs.id = 'multiplier-tabs';
+        [
+            { label: 'Single', mul: 1, cls: 'active-single' },
+            { label: 'Double', mul: 2, cls: 'active-double' },
+            { label: 'Treble', mul: 3, cls: 'active-treble' },
+        ].forEach(function(tab) {
+            var btn = document.createElement('button');
+            btn.className = 'tab-btn' + (tab.mul === 1 ? ' active-single' : '');
+            btn.dataset.multiplier = tab.mul;
+            btn.dataset.activeClass = tab.cls;
+            btn.type = 'button';
+            btn.textContent = tab.label;
+            UI.addTouchSafeListener(btn, function() {
+                _state.multiplier = tab.mul;
+                tabs.querySelectorAll('.tab-btn').forEach(function(b) {
+                    b.classList.remove('active-single', 'active-double', 'active-treble');
+                });
+                btn.classList.add(tab.cls);
+                document.body.dataset.multiplier = tab.mul;
+            });
+            tabs.appendChild(btn);
+        });
+        document.body.dataset.multiplier = 1;
+        app.appendChild(tabs);
+
+        // ── Segment grid ─────────────────────────────────────────────────
+        var segBoard = document.createElement('main');
+        segBoard.id = 'practice-board';
+        segBoard.appendChild(_buildBaseballGrid(onEnd));
+        segBoard.appendChild(_buildBaseballBullRow(onEnd));
+        app.appendChild(segBoard);
+
+        _baseballApplyHighlight();
+    }
+
+    function _buildBaseballGrid(onEnd) {
+        var grid = document.createElement('div');
+        grid.id = 'segment-grid';
+        grid.className = 'segment-grid';
+        [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].forEach(function(seg) {
+            var btn = document.createElement('button');
+            btn.className = 'seg-btn';
+            btn.dataset.segment = seg;
+            btn.type = 'button';
+            btn.textContent = seg;
+            if (seg === _state.baseballTarget) btn.classList.add('target-highlight');
+            btn.addEventListener('click', function() { _baseballThrow(seg, _state.multiplier, onEnd); });
+            grid.appendChild(btn);
+        });
+        return grid;
+    }
+
+    function _buildBaseballBullRow(onEnd) {
+        var row = document.createElement('div');
+        row.id = 'bull-row';
+        row.className = 'bull-row';
+
+        var miss = document.createElement('button');
+        miss.className = 'seg-btn bull-btn';
+        miss.type = 'button';
+        miss.textContent = 'MISS';
+        miss.addEventListener('click', function() { _baseballThrow(0, 0, onEnd); });
+        row.appendChild(miss);
+
+        var outer = document.createElement('button');
+        outer.className = 'seg-btn bull-btn';
+        outer.type = 'button';
+        outer.textContent = 'OUTER';
+        outer.dataset.segment = 25;
+        outer.addEventListener('click', function() { _baseballThrow(25, 1, onEnd); });
+        row.appendChild(outer);
+
+        var bull = document.createElement('button');
+        bull.className = 'seg-btn bull-btn bull-btn-inner';
+        bull.type = 'button';
+        bull.textContent = 'BULL';
+        bull.dataset.segment = 25;
+        bull.addEventListener('click', function() { _baseballThrow(25, 2, onEnd); });
+        row.appendChild(bull);
+
+        return row;
+    }
+
+    // ── Throw history for undo ───────────────────────────────────────────────
+    var _bbHistory = [];
+
+    function _baseballThrow(segment, multiplier, onEnd) {
+        if (_state.baseballInningComplete) return;
+
+        var target  = _state.baseballTarget;
+        var isHit   = (segment === target);   // any multiplier on the target number
+        var runs    = isHit ? multiplier : 0; // single=1, double=2, treble=3
+        var isOut   = !isHit;
+
+        // Push undo snapshot
+        _bbHistory.push({
+            runs:          _state.baseballRuns,
+            outs:          _state.baseballOuts,
+            inningRuns:    _state.baseballInningRuns,
+            darts:         _state.baseballDarts,
+            inningComplete:_state.baseballInningComplete,
+            dartsThrown:   _state.dartsThrown,
+        });
+
+        _state.baseballDarts++;
+        _state.dartsThrown++;
+        if (isHit) {
+            _state.baseballRuns      += runs;
+            _state.baseballInningRuns += runs;
+        } else {
+            _state.baseballOuts++;
+        }
+
+        // Enable undo
+        var undoBtn = document.getElementById('bb-undo-btn');
+        if (undoBtn) undoBtn.disabled = false;
+
+        // Sound
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+            isHit ? SOUNDS.dart() : (SOUNDS.bust && SOUNDS.bust());
+        }
+
+        // Speech
+        if (SPEECH.isEnabled()) {
+            var msg = isHit
+                ? (runs === 1 ? 'Single. ' : runs === 2 ? 'Double. ' : 'Treble. ') + runs + (runs === 1 ? ' run.' : ' runs.')
+                : 'Out.';
+            setTimeout(function() {
+                window.speechSynthesis && window.speechSynthesis.speak(
+                    Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
+                );
+            }, 200);
+        }
+
+        // Pill
+        var pills = document.getElementById('practice-pills');
+        if (pills) {
+            var pill = document.createElement('div');
+            var mulStr = multiplier === 3 ? 'T' : multiplier === 2 ? 'D' : segment === 0 ? '' : 'S';
+            var segStr = segment === 0 ? 'MISS' : segment === 25 ? (multiplier === 2 ? 'BULL' : 'OUTER') : mulStr + segment;
+            pill.className = 'dart-pill' + (isHit ? (runs >= 3 ? ' pill-hot' : '') : ' pill-miss');
+            pill.textContent = isHit ? (segStr + ' — ' + runs + (runs === 1 ? ' RUN' : ' RUNS')) : (segStr + ' — OUT');
+            pills.appendChild(pill);
+        }
+
+        _baseballUpdateDisplay();
+
+        // After 3 darts — lock and show NEXT
+        if (_state.baseballDarts >= 3) {
+            _state.baseballInningComplete = true;
+            _baseballLockBoard(true);
+            var nb = document.getElementById('bb-next-btn');
+            if (nb) nb.disabled = false;
+            _baseballAnnounceInningEnd(onEnd);
+        }
+    }
+
+    function _baseballNext(onEnd) {
+        if (_state.baseballInning >= 9) {
+            // Game over
+            _baseballFinish(onEnd);
+            return;
+        }
+
+        // Advance to next inning
+        _state.baseballInning++;
+        _state.baseballTarget    = _state.baseballStartNum + _state.baseballInning - 1;
+        _state.baseballOuts      = 0;
+        _state.baseballInningRuns= 0;
+        _state.baseballDarts     = 0;
+        _state.baseballInningComplete = false;
+        _bbHistory = [];
+
+        // Clear pills, unlock
+        var pills = document.getElementById('practice-pills');
+        if (pills) pills.innerHTML = '';
+        var nb = document.getElementById('bb-next-btn');
+        if (nb) nb.disabled = true;
+        var ub = document.getElementById('bb-undo-btn');
+        if (ub) ub.disabled = true;
+        _baseballLockBoard(false);
+
+        _baseballUpdateDisplay();
+        _baseballApplyHighlight();
+
+        var statusEl = document.getElementById('bb-status');
+        if (statusEl) {
+            statusEl.textContent = 'INNING ' + _state.baseballInning + '  —  TARGET: ' + _state.baseballTarget;
+            statusEl.className = 'bb-status';
+        }
+
+        _baseballAnnounceInning(false);
+    }
+
+    function _baseballUndo() {
+        if (_bbHistory.length === 0) return;
+        var snap = _bbHistory.pop();
+        _state.baseballRuns       = snap.runs;
+        _state.baseballOuts       = snap.outs;
+        _state.baseballInningRuns = snap.inningRuns;
+        _state.baseballDarts      = snap.darts;
+        _state.dartsThrown        = snap.dartsThrown;
+
+        if (_state.baseballInningComplete) {
+            _state.baseballInningComplete = false;
+            _baseballLockBoard(false);
+            var nb = document.getElementById('bb-next-btn');
+            if (nb) nb.disabled = true;
+        }
+
+        // Remove last pill
+        var pills = document.getElementById('practice-pills');
+        if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
+
+        var undoBtn = document.getElementById('bb-undo-btn');
+        if (undoBtn) undoBtn.disabled = (_bbHistory.length === 0);
+
+        _baseballUpdateDisplay();
+    }
+
+    function _baseballLockBoard(locked) {
+        var board = document.getElementById('practice-board');
+        if (board) board.querySelectorAll('.seg-btn').forEach(function(btn) {
+            btn.disabled = locked;
+        });
+        var tabs = document.getElementById('multiplier-tabs');
+        if (tabs) tabs.querySelectorAll('.tab-btn').forEach(function(btn) {
+            btn.disabled = locked;
+        });
+    }
+
+    function _baseballApplyHighlight() {
+        document.querySelectorAll('.seg-btn').forEach(function(btn) {
+            btn.classList.remove('target-highlight');
+        });
+        var t = _state.baseballTarget;
+        var btn = document.querySelector('#segment-grid .seg-btn[data-segment="' + t + '"]');
+        if (btn) btn.classList.add('target-highlight');
+    }
+
+    function _baseballUpdateDisplay() {
+        var inningEl = document.getElementById('bb-inning');
+        if (inningEl) inningEl.textContent = _state.baseballInning + ' / 9';
+        var targetEl = document.getElementById('bb-target');
+        if (targetEl) targetEl.textContent = _state.baseballTarget;
+        var runsEl = document.getElementById('bb-runs');
+        if (runsEl) runsEl.textContent = _state.baseballRuns;
+        _baseballRenderOuts();
+        var strip = document.getElementById('bb-inning-strip');
+        if (strip) _baseballRenderInningStrip(strip);
+    }
+
+    function _baseballRenderOuts() {
+        var outsRow = document.getElementById('bb-outs-row');
+        if (!outsRow) return;
+        outsRow.innerHTML = '';
+        for (var i = 0; i < 3; i++) {
+            var pip = document.createElement('span');
+            pip.className = 'bb-out-pip' + (i < _state.baseballOuts ? ' bb-out-pip-on' : '');
+            outsRow.appendChild(pip);
+        }
+    }
+
+    // Inning-by-inning runs strip (shows run total per inning)
+    var _bbInningScores = [];   // runs per inning, 0-indexed
+
+    function _baseballRenderInningStrip(container) {
+        // Sync _bbInningScores length with current inning
+        while (_bbInningScores.length < _state.baseballInning) {
+            _bbInningScores.push(0);
+        }
+        // Update the current inning slot
+        _bbInningScores[_state.baseballInning - 1] = _state.baseballInningRuns;
+
+        container.innerHTML = '';
+        for (var i = 0; i < 9; i++) {
+            var cell = document.createElement('div');
+            cell.className = 'bb-inning-cell' + (i === _state.baseballInning - 1 ? ' bb-inning-cell-current' : '');
+            var num = document.createElement('div');
+            num.className = 'bb-inning-cell-num';
+            num.textContent = _state.baseballStartNum + i;
+            var score = document.createElement('div');
+            score.className = 'bb-inning-cell-score';
+            score.textContent = i < _state.baseballInning ? String(_bbInningScores[i]) :
+                               (i === _state.baseballInning - 1 ? String(_state.baseballInningRuns) : '—');
+            cell.appendChild(num);
+            cell.appendChild(score);
+            container.appendChild(cell);
+        }
+    }
+
+    function _baseballAnnounceInning(isFirst) {
+        if (!SPEECH.isEnabled()) return;
+        var msg = isFirst
+            ? _state.playerName + ', welcome to Baseball Darts. In this inning you are targeting number ' + _state.baseballTarget + '.'
+            : 'New innings! The new target number is ' + _state.baseballTarget + '.';
+        setTimeout(function() {
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
+            );
+        }, 400);
+    }
+
+    function _baseballAnnounceInningEnd(onEnd) {
+        if (!SPEECH.isEnabled()) return;
+        var runs = _state.baseballInningRuns;
+        var msg = 'Inning ' + _state.baseballInning + ' over. ' +
+                  runs + (runs === 1 ? ' run' : ' runs') + ' this inning. ' +
+                  _state.baseballRuns + ' total runs.';
+        setTimeout(function() {
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
+            );
+        }, 500);
+    }
+
+    function _baseballEnd(onEnd) {
+        API.endPracticeSession(_state.matchId).catch(function() {});
+        _showBaseballSummary(onEnd, false);
+    }
+
+    function _baseballFinish(onEnd) {
+        var totalRuns = _state.baseballRuns;
+        API.endPracticeSession(_state.matchId).catch(function() {});
+
+        // Submit score to DB, then show summary
+        API.submitBaseballScore(_state.playerId, totalRuns)
+            .then(function(res) {
+                var isNewHigh  = res && res.is_new_high;
+                var highScore  = res ? res.high_score : Math.max(totalRuns, _state.baseballHighScore);
+                _state.baseballHighScore = highScore;
+                _baseballAnnounceGameEnd(totalRuns, isNewHigh, highScore);
+                _showBaseballSummary(onEnd, true, isNewHigh, highScore);
+            })
+            .catch(function() {
+                _showBaseballSummary(onEnd, true, false, _state.baseballHighScore);
+            });
+    }
+
+    function _baseballAnnounceGameEnd(runs, isNewHigh, highScore) {
+        if (!SPEECH.isEnabled()) return;
+        var msg = 'Match over. You made ' + runs + (runs === 1 ? ' run' : ' runs') + ' in 9 innings. ';
+        msg += isNewHigh
+            ? 'You made a new high score of ' + runs + '!'
+            : 'Your current high score is ' + highScore + '.';
+        setTimeout(function() {
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
+            );
+        }, 600);
+    }
+
+    function _showBaseballSummary(onEnd, completed, isNewHigh, highScore) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        document.body.className = 'mode-setup';
+
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        var titleText = completed ? (isNewHigh ? 'NEW HIGH SCORE!' : 'GAME OVER') : 'SESSION ENDED';
+        inner.innerHTML =
+            '<div id="setup-title">' +
+            '<div class="setup-logo">' + titleText + '</div>' +
+            '<div class="setup-subtitle">' + _state.playerName.toUpperCase() + '</div>' +
+            '</div>';
+
+        // Inning-by-inning scorecard
+        if (completed || _state.baseballInning > 1) {
+            var scorecard = document.createElement('div');
+            scorecard.className = 'bb-summary-scorecard';
+            var headerRow = document.createElement('div');
+            headerRow.className = 'bb-summary-row bb-summary-header';
+            headerRow.innerHTML = '<span>INN</span><span>TGT</span><span>RUNS</span>';
+            scorecard.appendChild(headerRow);
+            for (var i = 0; i < Math.min(_state.baseballInning, 9); i++) {
+                var row = document.createElement('div');
+                row.className = 'bb-summary-row';
+                var r = _bbInningScores[i] !== undefined ? _bbInningScores[i] : 0;
+                row.innerHTML = '<span>' + (i + 1) + '</span>' +
+                                '<span>' + (_state.baseballStartNum + i) + '</span>' +
+                                '<span>' + r + '</span>';
+                scorecard.appendChild(row);
+            }
+            inner.appendChild(scorecard);
+        }
+
+        var summaryEl = document.createElement('div');
+        summaryEl.className = 'practice-summary';
+        var rows = [
+            { label: 'INNINGS PLAYED', value: Math.min(_state.baseballInning, 9) },
+            { label: 'TOTAL RUNS',     value: _state.baseballRuns },
+        ];
+        if (completed) {
+            rows.push({ label: isNewHigh ? '🏆 NEW HIGH SCORE' : 'HIGH SCORE', value: highScore || _state.baseballHighScore });
+        }
+        rows.forEach(function(r) {
+            var item = document.createElement('div');
+            item.className = 'practice-summary-row';
+            item.innerHTML = '<span class="practice-summary-label">' + r.label + '</span>' +
+                             '<span class="practice-summary-value">' + r.value + '</span>';
             summaryEl.appendChild(item);
         });
         inner.appendChild(summaryEl);

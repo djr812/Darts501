@@ -1299,6 +1299,23 @@ const UI = (() => {
                 },
             ]
         },
+        'baseball': {
+            title: 'Baseball Darts',
+            sections: [
+                { heading: 'Objective',
+                  body: 'Score as many runs as possible across 9 innings and beat your personal high score. Each inning has a target number — hit it to score runs, miss it to earn outs.' },
+                { heading: 'Target Numbers',
+                  body: 'The game starts on a random number between 1 and 11. Each subsequent inning increments by 1 (e.g. start 8 → 9 → 10 ... → 16). After 9 innings your final target will be at most 20.' },
+                { heading: 'Scoring Runs',
+                  body: 'Throw all 3 darts at the current target number. A Single scores 1 run, a Double scores 2 runs, and a Treble scores 3 runs. Any multiplier on the target number counts.' },
+                { heading: 'Outs',
+                  body: 'Any dart that does not hit the target number — including complete misses, Outer Bull, and Bull — counts as 1 out. Three outs end the inning regardless of how many runs were scored.' },
+                { heading: 'Turn Structure',
+                  body: 'You always throw all 3 darts in an inning. After the 3rd dart press NEXT to advance to the next inning. You can undo a mis-entered dart before pressing NEXT.' },
+                { heading: 'High Score',
+                  body: 'Your best score is saved to the database against your player profile. The caller announces whether you beat your high score at the end of each completed game.' },
+            ]
+        },
         'bobs27': {
             title: "Bob's 27",
             sections: [

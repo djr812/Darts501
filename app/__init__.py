@@ -78,7 +78,8 @@ def _register_blueprints(app: Flask) -> None:
     from app.routes.api.stats    import stats_bp
     from app.routes.api.analysis import analysis_bp
     from app.routes.api.cricket  import cricket_bp
-    from app.routes.api.shanghai import shanghai_bp
+    from app.routes.api.shanghai  import shanghai_bp
+    from app.routes.api.baseball  import baseball_bp
 
     api_blueprints = [
         throws_bp,
@@ -90,6 +91,7 @@ def _register_blueprints(app: Flask) -> None:
         analysis_bp,
         cricket_bp,
         shanghai_bp,
+        baseball_bp,
     ]
 
     for bp in api_blueprints:

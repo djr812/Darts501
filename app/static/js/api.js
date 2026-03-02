@@ -330,6 +330,14 @@ const API = (() => {
         return request('POST', '/api/shanghai/matches/' + matchId + '/restart', {});
     }
 
+    async function getBaseballHighScore(playerId) {
+        return request('GET', '/api/baseball/highscore/' + playerId);
+    }
+
+    async function submitBaseballScore(playerId, score) {
+        return request('POST', '/api/baseball/highscore/' + playerId, { score: score });
+    }
+
     // Expose public interface
     return {
         recordThrow,
@@ -361,6 +369,8 @@ const API = (() => {
         restartShanghaiMatch,
         getCricketMatch,
         getShanghaiMatch,
+        getBaseballHighScore,
+        submitBaseballScore,
         flushQueue,
     };
 
