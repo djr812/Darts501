@@ -2142,7 +2142,7 @@ var PRACTICE = (function() {
     function _c121AdvanceTurn(onEnd) {
         _state.turnComplete  = false;
         _state.turnDarts     = 0;
-        _state.c121DartsUsed = 0;
+        // c121DartsUsed intentionally NOT reset here — it accumulates across visits
         _state.c121ScoreAtTurnStart = _state.c121Score;
         _c121ThrowHistory    = [];
         var pills = document.getElementById('practice-pills');
@@ -2153,7 +2153,8 @@ var PRACTICE = (function() {
         if (undoBtn) undoBtn.disabled = true;
         var statusEl = document.getElementById('c121-status');
         if (statusEl) {
-            statusEl.textContent = 'CHECKOUT IN ' + _state.c121DartLimit + ' DARTS';
+            var remaining = _state.c121DartLimit - _state.c121DartsUsed;
+            statusEl.textContent = remaining + ' DART' + (remaining === 1 ? '' : 'S') + ' REMAINING';
             statusEl.className = 'c121-status';
         }
         _lockBoard(false);
