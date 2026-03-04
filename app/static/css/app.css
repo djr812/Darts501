@@ -3790,6 +3790,10 @@ body.mode-cricket #app {
     max-width: 600px;
 }
 
+.home-tile-centred {
+    grid-column: 2;
+}
+
 .home-tile {
     display: -webkit-box;
     display: flex;

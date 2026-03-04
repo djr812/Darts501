@@ -61,18 +61,18 @@ const UI = (() => {
         inner.appendChild(tilesSection);
 
         const gameTypes = [
-            { value: '501',      label: '501',      sub: 'Classic',       icon: '🎯' },
-            { value: '201',      label: '201',       sub: 'Short game',    icon: '⚡' },
-            { value: 'Cricket',  label: 'Cricket',   sub: 'Strategic',     icon: '🏏' },
-            { value: 'Shanghai', label: 'Shanghai',  sub: '7 or 20 rounds', icon: '🀄' },
-            { value: 'Killer',   label: 'Killer',    sub: 'Coming Soon',   icon: '☠️',  comingSoon: true },
-            { value: 'Practice', label: 'Practice',  sub: 'Solo training', icon: '🎪' },
-            { value: 'Baseball', label: 'Baseball',  sub: '9 innings',     icon: '⚾' },
+            { value: '501',      label: '501',      sub: 'Classic',        icon: '🎯' },
+            { value: '201',      label: '201',      sub: 'Short game',     icon: '⚡' },
+            { value: 'Cricket',  label: 'Cricket',  sub: 'Strategic',      icon: '🏏' },
+            { value: 'Shanghai', label: 'Shanghai', sub: '7 or 20 rounds', icon: '🀄' },
+            { value: 'Killer',   label: 'Killer',   sub: 'Coming Soon',    icon: '☠️', comingSoon: true },
+            { value: 'Baseball', label: 'Baseball', sub: '9 innings',      icon: '⚾' },
+            { value: 'Practice', label: 'Practice', sub: 'Solo training',  icon: '🎪', centred: true },
         ];
 
         gameTypes.forEach(gt => {
             const tile = document.createElement('button');
-            tile.className = 'home-tile' + (gt.comingSoon ? ' home-tile-soon' : '');
+            tile.className = 'home-tile' + (gt.comingSoon ? ' home-tile-soon' : '') + (gt.centred ? ' home-tile-centred' : '');
             tile.type = 'button';
             tile.innerHTML =
                 `<span class="home-tile-icon">${gt.icon}</span>` +
