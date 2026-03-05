@@ -67,7 +67,10 @@ const UI = (() => {
             { value: 'Shanghai', label: 'Shanghai', sub: '7 or 20 rounds', icon: '🀄' },
             { value: 'Killer',   label: 'Killer',   sub: 'A game of doubles', icon: '☠️' },
             { value: 'Baseball', label: 'Baseball', sub: '9 innings',      icon: '⚾' },
-            { value: 'Practice', label: 'Practice', sub: 'Solo training',  icon: '🎪', centred: true },
+            { value: 'NineLives',       label: 'Nine Lives',       sub: 'Coming Soon',    icon: '🐱', comingSoon: true },
+            { value: 'RaceTo1000',      label: 'Race to 1000',     sub: 'Coming Soon',    icon: '🏁', comingSoon: true },
+            { value: 'BermudaTriangle', label: 'Bermuda Triangle', sub: 'Coming Soon',    icon: '🔺', comingSoon: true },
+            { value: 'Practice',        label: 'Practice',         sub: 'Solo training',  icon: '🎪', centred: true },
         ];
 
         gameTypes.forEach(gt => {
