@@ -30,7 +30,7 @@ const UI = (() => {
         });
     }
 
-    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball) {
+    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller) {
         // Clear any lingering modal overlays from the previous game screen
         ['confirm-modal', 'rules-modal'].forEach(function(id) {
             var el = document.getElementById(id);
@@ -65,7 +65,7 @@ const UI = (() => {
             { value: '201',      label: '201',      sub: 'Short game',     icon: '⚡' },
             { value: 'Cricket',  label: 'Cricket',  sub: 'Strategic',      icon: '🏏' },
             { value: 'Shanghai', label: 'Shanghai', sub: '7 or 20 rounds', icon: '🀄' },
-            { value: 'Killer',   label: 'Killer',   sub: 'Coming Soon',    icon: '☠️', comingSoon: true },
+            { value: 'Killer',   label: 'Killer',   sub: 'A game of doubles', icon: '☠️' },
             { value: 'Baseball', label: 'Baseball', sub: '9 innings',      icon: '⚾' },
             { value: 'Practice', label: 'Practice', sub: 'Solo training',  icon: '🎪', centred: true },
         ];
@@ -89,6 +89,8 @@ const UI = (() => {
                 tile.addEventListener('click', () => { if (onCricket) onCricket(); });
             } else if (gt.value === 'Baseball') {
                 tile.addEventListener('click', () => { if (onBaseball) onBaseball(); });
+            } else if (gt.value === 'Killer') {
+                tile.addEventListener('click', () => { if (onKiller) onKiller(); });
             } else {
                 tile.addEventListener('click', () => {
                     _buildMatchSetupScreen(
@@ -293,7 +295,7 @@ const UI = (() => {
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', () => {
             API.getPlayers().then(p => {
-                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball);
+                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller);
             });
         });
         _appTarget.appendChild(backLink);
@@ -1299,6 +1301,39 @@ const UI = (() => {
                 {
                     heading: 'Strategy',
                     body: 'Close numbers quickly to stop opponents scoring on them, and build points on numbers you\'ve closed that opponents haven\'t. The Bull is often the key battleground.'
+                },
+            ]
+        },
+        'killer': {
+            title: 'Killer Darts',
+            sections: [
+                {
+                    heading: 'Objective',
+                    body: 'Be the last player standing. Eliminate all opponents by hitting the double (or treble in the Triples variant) of their assigned number.'
+                },
+                {
+                    heading: 'Assigned Numbers',
+                    body: 'Each player is randomly assigned a unique number between 1 and 20. Numbers are shown on the scoreboard next to each player\u2019s name. Turn order is also randomised at the start.'
+                },
+                {
+                    heading: 'Becoming a Killer',
+                    body: 'Your first goal is to score 3 hits on your own number\u2019s double (or treble). Single = 1 hit, Double = 2 hits (doubles variant), Treble = 3 hits. Once you reach 3 hits you become a Killer \u2014 marked with a K on the scoreboard.'
+                },
+                {
+                    heading: 'Eliminating Opponents',
+                    body: 'Once a Killer, aim for opponent doubles (or trebles). Each hit removes one life from that opponent. A player is eliminated when all 3 lives are gone and their number is hit again. You can eliminate multiple opponents in a single turn.'
+                },
+                {
+                    heading: 'Self-Hits',
+                    body: 'If a Killer hits their own double (or treble), they lose a life. This can eliminate themselves, so be careful!'
+                },
+                {
+                    heading: 'Turn Structure',
+                    body: 'Each player throws 3 darts per turn. After the 3rd dart the board locks. Press NEXT to submit scores and pass to the next active player. Undo is available within the current turn.'
+                },
+                {
+                    heading: 'Winning',
+                    body: 'The last player with any lives remaining wins. If only one player survives, the game ends immediately — even mid-turn.'
                 },
             ]
         },

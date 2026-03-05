@@ -431,7 +431,7 @@
 
     async function _returnToSetup() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
     }
 
     // ------------------------------------------------------------------
@@ -591,7 +591,7 @@
         try {
             await API.cancelMatch(state.matchId);
             var existing = await API.getPlayers().catch(function() { return []; });
-            UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+            UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
         } catch (err) {
             UI.showToast('CANCEL FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
         } finally {
@@ -645,7 +645,7 @@
                 // onBack — return to setup screen
                 function() {
                     API.getPlayers().then(function(p) {
-                        UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+                        UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
                     });
                 },
                 // onStart — begin the practice session
@@ -653,7 +653,7 @@
                     PRACTICE.start(config, function() {
                         // onEnd — back to setup after session
                         API.getPlayers().then(function(p) {
-                            UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+                            UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
                         });
                     });
                 }
@@ -671,6 +671,110 @@
         API.getPlayers().then(function(existing) {
             _showShanghaiSetup(existing);
         });
+    }
+
+    function _onKiller() {
+        API.getPlayers().then(function(existing) {
+            _showKillerSetup(existing);
+        });
+    }
+
+    function _showKillerSetup(existingPlayers) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-setup';
+
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        UI.appendSetupHeader(inner, 'Killer');
+
+        // Variant selection
+        var variantSection = document.createElement('div');
+        variantSection.className = 'setup-section';
+        variantSection.innerHTML = '<div class="setup-label">VARIANT</div>';
+        var variantRow = document.createElement('div');
+        variantRow.className = 'setup-option-row';
+        var selectedVariant = 'doubles';
+        [
+            { value: 'doubles', label: 'DOUBLES', hint: 'Standard' },
+            { value: 'triples', label: 'TRIPLES', hint: 'Advanced' },
+        ].forEach(function(v) {
+            var btn = document.createElement('button');
+            btn.className = 'option-btn' + (v.value === 'doubles' ? ' selected' : '');
+            btn.dataset.value = v.value;
+            btn.type = 'button';
+            btn.innerHTML = v.label + '<span class="option-hint">' + v.hint + '</span>';
+            btn.addEventListener('click', function() {
+                variantRow.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
+                btn.classList.add('selected');
+                selectedVariant = v.value;
+            });
+            variantRow.appendChild(btn);
+        });
+        variantSection.appendChild(variantRow);
+        inner.appendChild(variantSection);
+
+        // Player count
+        var countSection = document.createElement('div');
+        countSection.className = 'setup-section';
+        countSection.innerHTML = '<div class="setup-label">NUMBER OF PLAYERS</div>';
+        var countRow = document.createElement('div');
+        countRow.className = 'setup-option-row';
+        var selectedCount = 2;
+        [2, 3, 4, 5, 6].forEach(function(n) {
+            var btn = document.createElement('button');
+            btn.className = 'option-btn' + (n === 2 ? ' selected' : '');
+            btn.dataset.value = n;
+            btn.type = 'button';
+            btn.textContent = n;
+            btn.addEventListener('click', function() {
+                countRow.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
+                btn.classList.add('selected');
+                selectedCount = n;
+                UI.renderCricketPlayerSlots(existingPlayers, selectedCount, namesSection);
+            });
+            countRow.appendChild(btn);
+        });
+        countSection.appendChild(countRow);
+        inner.appendChild(countSection);
+
+        // Player slots
+        var namesSection = document.createElement('div');
+        namesSection.className = 'setup-section';
+        inner.appendChild(namesSection);
+        UI.renderCricketPlayerSlots(existingPlayers, 2, namesSection);
+
+        // Start button
+        var startBtn = document.createElement('button');
+        startBtn.className = 'start-btn';
+        startBtn.textContent = 'START MATCH';
+        startBtn.type = 'button';
+        startBtn.addEventListener('click', function() {
+            var players = UI.collectCricketPlayers(namesSection);
+            if (!players) return;
+            SPEECH.unlock();
+            if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
+            KILLER_GAME.start({ players: players, variant: selectedVariant }, function() {
+                API.getPlayers().then(function(p) {
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
+                });
+            });
+        });
+        inner.appendChild(startBtn);
+
+        var backLink = document.createElement('button');
+        backLink.className = 'setup-back-link';
+        backLink.type = 'button';
+        backLink.textContent = '← BACK TO HOME';
+        backLink.addEventListener('click', function() {
+            API.getPlayers().then(function(p) {
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
+            });
+        });
+        inner.appendChild(backLink);
     }
 
     function _onBaseball() {
@@ -733,7 +837,7 @@
             if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
             BASEBALL_GAME.start({ players: players }, function() {
                 API.getPlayers().then(function(p) {
-                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
                 });
             });
         });
@@ -745,7 +849,7 @@
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', function() {
             API.getPlayers().then(function(p) {
-                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
             });
         });
         inner.appendChild(backLink);
@@ -806,7 +910,7 @@
             if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
             CRICKET_GAME.start({ players: players }, function() {
                 API.getPlayers().then(function(p) {
-                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
                 });
             });
         });
@@ -819,7 +923,7 @@
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', function() {
             API.getPlayers().then(function(p) {
-                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
             });
         });
         inner.appendChild(backLink);
@@ -918,7 +1022,7 @@
                 cpuDifficulty: cpuDifficulty,
             }, function() {
                 API.getPlayers().then(function(p) {
-                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
                 });
             });
         });
@@ -930,7 +1034,7 @@
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', function() {
             API.getPlayers().then(function(p) {
-                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
             });
         });
         inner.appendChild(backLink);
@@ -947,7 +1051,7 @@
             STATS.showStatsScreen(player, async () => {
                 // Back button → return to setup screen
                 const existing = await API.getPlayers().catch(() => []);
-                UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+                UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
             });
         });
     }
@@ -958,7 +1062,7 @@
 
     async function init() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller);
     }
 
     if (document.readyState === 'loading') {

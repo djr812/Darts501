@@ -354,6 +354,25 @@ const API = (() => {
         return request('POST', '/api/baseball/matches/' + matchId + '/end', {});
     }
 
+    async function createKillerMatch(data) {
+        return request('POST', '/api/killer/matches', data);
+    }
+    async function getKillerMatch(matchId) {
+        return request('GET', '/api/killer/matches/' + matchId);
+    }
+    async function killerThrow(matchId, data) {
+        return request('POST', '/api/killer/matches/' + matchId + '/throw', data);
+    }
+    async function killerNext(matchId) {
+        return request('POST', '/api/killer/matches/' + matchId + '/next', {});
+    }
+    async function killerUndo(matchId) {
+        return request('POST', '/api/killer/matches/' + matchId + '/undo', {});
+    }
+    async function endKillerMatch(matchId) {
+        return request('POST', '/api/killer/matches/' + matchId + '/end', {});
+    }
+
     async function getWarmupHighScore(playerId) {
         return request('GET', '/api/baseball/highscore/' + playerId + '?game_type=warmup');
     }
@@ -407,6 +426,12 @@ const API = (() => {
         baseballNext,
         baseballUndo,
         endBaseballMatch,
+        createKillerMatch,
+        getKillerMatch,
+        killerThrow,
+        killerNext,
+        killerUndo,
+        endKillerMatch,
         getWarmupHighScore,
         submitWarmupScore,
         getBaseballHighScore,
