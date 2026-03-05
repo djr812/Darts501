@@ -2590,6 +2590,15 @@ var PRACTICE = (function() {
             points > 0 ? SOUNDS.dart() : null;
         }
 
+        // Per-dart speech (confirmation only — no segment total)
+        if (SPEECH.isEnabled()) {
+            var dartMsg = points === 2 ? '2 points' : points === 1 ? '1 point' : 'Miss';
+            window.speechSynthesis && window.speechSynthesis.cancel();
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance(dartMsg), { rate: 1.0, pitch: 1.0 })
+            );
+        }
+
         // Pill
         var pills = document.getElementById('practice-pills');
         if (pills) {
@@ -2603,23 +2612,24 @@ var PRACTICE = (function() {
 
         _warmupUpdateDisplay();
 
-        // After 3 darts — lock and show NEXT
+        // After 3 darts — lock and show NEXT, then announce turn total
         if (_state.warmupTurnDarts >= 3) {
             _state.warmupSetComplete = true;
             _warmupLockBoard(true);
             var nb = document.getElementById('warmup-next-btn');
             if (nb) nb.disabled = false;
 
-            // Announce turn score
+            // Announce turn total after a short pause (lets per-dart call finish)
             if (SPEECH.isEnabled()) {
                 var ts = _state.warmupTurnScore;
                 setTimeout(function() {
+                    window.speechSynthesis && window.speechSynthesis.cancel();
                     window.speechSynthesis && window.speechSynthesis.speak(
                         Object.assign(new SpeechSynthesisUtterance(
-                            ts + (ts === 1 ? ' point.' : ' points.')
+                            ts + (ts === 1 ? ' point this turn.' : ' points this turn.')
                         ), { rate: 1.0, pitch: 1.0 })
                     );
-                }, 400);
+                }, 900);
             }
         }
     }
