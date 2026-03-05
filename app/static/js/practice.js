@@ -1291,6 +1291,19 @@ var PRACTICE = (function() {
         _updatePracticeStats();
     }
 
+    function _resetMultiplierTabs() {
+        _state.multiplier = 1;
+        var tabs = document.getElementById('multiplier-tabs');
+        if (tabs) {
+            tabs.querySelectorAll('.tab-btn').forEach(function(b) {
+                b.classList.remove('active-single', 'active-double', 'active-treble');
+            });
+            var s1 = tabs.querySelector('[data-multiplier="1"]');
+            if (s1) s1.classList.add('active-single');
+        }
+        document.body.dataset.multiplier = 1;
+    }
+
     function _advanceToNextTurn() {
         // Submit buffered darts to server, then clear and unlock
         var darts = _state.pendingDarts.slice();
@@ -1322,6 +1335,7 @@ var PRACTICE = (function() {
 
         _state.turnComplete = false;
         _state.turnScore    = 0;
+        _resetMultiplierTabs();
         _lockBoard(false);
     }
 
@@ -1719,6 +1733,7 @@ var PRACTICE = (function() {
         _state.turnDarts    = 0;
         _state.turnComplete = false;
         _bobs27LockBoard(false);
+        _resetMultiplierTabs();
         var nb = document.getElementById('b27-next-btn');
         if (nb) nb.disabled = true;
         var ub = document.getElementById('b27-undo-btn');
@@ -2206,6 +2221,7 @@ var PRACTICE = (function() {
             statusEl.textContent = remaining + ' DART' + (remaining === 1 ? '' : 'S') + ' REMAINING';
             statusEl.className = 'c121-status';
         }
+        _resetMultiplierTabs();
         _lockBoard(false);
         _c121UpdateDisplay(onEnd);
         _c121UpdateCheckoutHint();
@@ -2640,6 +2656,7 @@ var PRACTICE = (function() {
         _state.warmupTurnDarts   = 0;
         _wuHistory = [];
         _warmupLockBoard(false);
+        _resetMultiplierTabs();
         var nb = document.getElementById('warmup-next-btn');
         if (nb) nb.disabled = true;
         var ub = document.getElementById('warmup-undo-btn');
@@ -3185,6 +3202,7 @@ var PRACTICE = (function() {
         if (ub) ub.disabled = true;
         _bbHistory = [];
         _baseballLockBoard(false);
+        _resetMultiplierTabs();
 
         if (_state.baseballInningComplete) {
             // Inning is over — check for game end or advance inning
