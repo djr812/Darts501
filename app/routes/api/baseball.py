@@ -182,11 +182,13 @@ def _submit_high_scores(db, match_id):
 
 @baseball_bp.route("/baseball/highscore/<int:player_id>", methods=["GET"])
 def get_high_score(player_id):
+    from flask import request as _req
+    game_type = _req.args.get("game_type", "baseball")
     db = get_db()
     cursor = db.cursor()
     cursor.execute(
-        "SELECT score FROM player_high_scores WHERE player_id = %s AND game_type = 'baseball'",
-        (player_id,)
+        "SELECT score FROM player_high_scores WHERE player_id = %s AND game_type = %s",
+        (player_id, game_type)
     )
     row = cursor.fetchone()
     return jsonify({"player_id": player_id, "score": row["score"] if row else 0}), 200
@@ -194,15 +196,17 @@ def get_high_score(player_id):
 
 @baseball_bp.route("/baseball/highscore/<int:player_id>", methods=["POST"])
 def submit_score(player_id):
-    data = request.get_json(silent=True)
+    from flask import request as _req
+    game_type = _req.args.get("game_type", "baseball")
+    data = _req.get_json(silent=True)
     if not data or "score" not in data:
         return jsonify({"error": "score is required"}), 400
     submitted = int(data["score"])
     db = get_db()
     cursor = db.cursor()
     cursor.execute(
-        "SELECT score FROM player_high_scores WHERE player_id = %s AND game_type = 'baseball'",
-        (player_id,)
+        "SELECT score FROM player_high_scores WHERE player_id = %s AND game_type = %s",
+        (player_id, game_type)
     )
     existing = cursor.fetchone()
     current_best = existing["score"] if existing else 0
@@ -211,11 +215,11 @@ def submit_score(player_id):
         if existing:
             cursor.execute(
                 "UPDATE player_high_scores SET score=%s, achieved_at=NOW() "
-                "WHERE player_id=%s AND game_type='baseball'", (submitted, player_id))
+                "WHERE player_id=%s AND game_type=%s", (submitted, player_id, game_type))
         else:
             cursor.execute(
-                "INSERT INTO player_high_scores (player_id, game_type, score) VALUES (%s,'baseball',%s)",
-                (player_id, submitted))
+                "INSERT INTO player_high_scores (player_id, game_type, score) VALUES (%s,%s,%s)",
+                (player_id, game_type, submitted))
         db.commit()
     return jsonify({
         "player_id": player_id, "submitted_score": submitted,

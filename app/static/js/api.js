@@ -354,6 +354,14 @@ const API = (() => {
         return request('POST', '/api/baseball/matches/' + matchId + '/end', {});
     }
 
+    async function getWarmupHighScore(playerId) {
+        return request('GET', '/api/baseball/highscore/' + playerId + '?game_type=warmup');
+    }
+
+    async function submitWarmupScore(playerId, score) {
+        return request('POST', '/api/baseball/highscore/' + playerId + '?game_type=warmup', { score: score });
+    }
+
     async function getBaseballHighScore(playerId) {
         return request('GET', '/api/baseball/highscore/' + playerId);
     }
@@ -399,6 +407,8 @@ const API = (() => {
         baseballNext,
         baseballUndo,
         endBaseballMatch,
+        getWarmupHighScore,
+        submitWarmupScore,
         getBaseballHighScore,
         submitBaseballScore,
         flushQueue,

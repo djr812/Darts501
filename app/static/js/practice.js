@@ -83,7 +83,7 @@ var PRACTICE = (function() {
         targetModeBtn.type = 'button';
         targetModeBtn.textContent = 'TARGET';
 
-        var TIMERLESS_MODES = ['bobs27', 'checkout121', 'baseball'];
+        var TIMERLESS_MODES = ['bobs27', 'checkout121', 'baseball', 'warmup'];
 
         freeModeBtn.addEventListener('click', function() {
             freeModeBtn.classList.add('selected');
@@ -288,6 +288,16 @@ var PRACTICE = (function() {
         bobs27Score:   27,
         bobs27Double:  1,        // 1-20, 25 = Bull
         bobs27Rounds:  0,
+        // Warm Up Routine state
+        warmupSegmentIndex: 0,    // 0=20, 1=11, 2=3, 3=6
+        warmupScore:        0,    // total across all 4 segments
+        warmupSegScores:    [0,0,0,0], // per-segment scores
+        warmupTimerSec:     300,  // 5 min per segment
+        warmupHighScore:    0,
+        warmupTurnScore:    0,    // points in current set of 3 darts
+        warmupTurnDarts:    0,    // darts in current set
+        warmupSetComplete:  false,
+        warmupInterval:     null,
         // Baseball Darts state
         baseballInning:    1,
         baseballTarget:    1,      // current target number (start + inning - 1)
@@ -322,7 +332,7 @@ var PRACTICE = (function() {
             .then(function(player) {
                 _state.playerId   = player.id;
                 _state.playerName = player.name;
-                var TIMERLESS = ['bobs27', 'checkout121', 'baseball'];
+                var TIMERLESS = ['bobs27', 'checkout121', 'baseball', 'warmup'];
                 _state.timerSeconds = TIMERLESS.indexOf(config.targetMode) !== -1
                     ? 0
                     : config.durationMinutes * 60;
@@ -349,6 +359,16 @@ var PRACTICE = (function() {
                 _state.c121ScoreAtTurnStart = 121;
                 _state.c121Attempts  = 0;
                 _state.c121Successes = 0;
+                // Warm Up Routine
+                _state.warmupSegmentIndex = 0;
+                _state.warmupScore        = 0;
+                _state.warmupSegScores    = [0,0,0,0];
+                _state.warmupTimerSec     = 300;
+                _state.warmupHighScore    = 0;
+                _state.warmupTurnScore    = 0;
+                _state.warmupTurnDarts    = 0;
+                _state.warmupSetComplete  = false;
+                _state.warmupInterval     = null;
                 // Baseball
                 var _bbStart = Math.floor(Math.random() * 11) + 1;
                 _state.baseballInning    = 1;
@@ -376,6 +396,8 @@ var PRACTICE = (function() {
                     _startCheckout121(onEnd);
                 } else if (_state.targetMode === 'baseball') {
                     _startBaseball(onEnd);
+                } else if (_state.targetMode === 'warmup') {
+                    _startWarmup(onEnd);
                 } else {
                     _buildPracticeScreen(onEnd);
                     _startTimer(onEnd);
@@ -1118,6 +1140,8 @@ var PRACTICE = (function() {
         panels['group'] = groupPanel;
 
         var groups = [
+            { type: 'warmup', label: 'WARM UP ROUTINE',
+              desc: 'N→E→S→W compass points (20→11→3→6) — 5 mins each, score for target & neighbours' },
             { type: 'trebles',  label: 'ALL TREBLES',
               desc: 'Hit any treble — tracks treble rate across all segments' },
             { type: 'doubles',  label: 'ALL DOUBLES',
@@ -2289,6 +2313,541 @@ var PRACTICE = (function() {
             item.className = 'practice-summary-row';
             item.innerHTML = '<span class="practice-summary-label">' + row.label + '</span>' +
                              '<span class="practice-summary-value">' + row.value + '</span>';
+            summaryEl.appendChild(item);
+        });
+        inner.appendChild(summaryEl);
+
+        var doneBtn = document.createElement('button');
+        doneBtn.className = 'start-btn';
+        doneBtn.textContent = 'BACK TO SETUP';
+        doneBtn.type = 'button';
+        doneBtn.addEventListener('click', onEnd);
+        inner.appendChild(doneBtn);
+    }
+
+    // ------------------------------------------------------------------
+    // WARM UP ROUTINE  (N→E→S→W: 20→11→3→6, 5 min each)
+    // ------------------------------------------------------------------
+
+    var WARMUP_SEGMENTS  = [20, 11, 3, 6];
+    var WARMUP_LABELS    = { 20: 'NORTH (20)', 11: 'EAST (11)', 3: 'SOUTH (3)', 6: 'WEST (6)' };
+    // Neighbours: segment → [left, right] (either side on the board)
+    var WARMUP_NEIGHBOURS = {
+        20: [1,  5],
+        11: [14, 8],
+        3:  [17, 19],
+        6:  [13, 10],
+    };
+
+    function _startWarmup(onEnd) {
+        API.getWarmupHighScore(_state.playerId)
+            .then(function(res) {
+                _state.warmupHighScore = res ? (res.score || 0) : 0;
+            })
+            .catch(function() { _state.warmupHighScore = 0; })
+            .then(function() {
+                _buildWarmupScreen(onEnd);
+                _warmupAnnounceStart();
+                _warmupStartSegmentTimer(onEnd);
+            });
+    }
+
+    function _buildWarmupScreen(onEnd) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-practice';
+
+        // ── Header ──────────────────────────────────────────────────
+        var header = document.createElement('header');
+        header.className = 'game-header';
+
+        var leftSlot = document.createElement('div');
+        leftSlot.className = 'gh-left';
+        var titleWrap = document.createElement('div');
+        titleWrap.className = 'gh-title-wrap';
+        var titleEl = document.createElement('div');
+        titleEl.className = 'gh-game-name';
+        titleEl.textContent = 'WARM UP';
+        var timerEl = document.createElement('div');
+        timerEl.id = 'warmup-timer';
+        timerEl.className = 'gh-match-info practice-timer-inline';
+        timerEl.textContent = '5:00';
+        titleWrap.appendChild(titleEl);
+        titleWrap.appendChild(timerEl);
+        leftSlot.appendChild(titleWrap);
+        var rulesBtn = document.createElement('button');
+        rulesBtn.type = 'button';
+        rulesBtn.className = 'rules-btn';
+        rulesBtn.textContent = '📖 RULES';
+        rulesBtn.addEventListener('click', function() { if (typeof UI !== 'undefined') UI.showRulesModal('warmup'); });
+        leftSlot.appendChild(rulesBtn);
+        header.appendChild(leftSlot);
+
+        var centreSlot = document.createElement('div');
+        centreSlot.className = 'gh-centre';
+        var endBtn = document.createElement('button');
+        endBtn.className = 'gh-btn gh-btn-red';
+        endBtn.type = 'button';
+        endBtn.textContent = '✕ END';
+        endBtn.addEventListener('click', function() { _warmupEnd(onEnd); });
+        centreSlot.appendChild(endBtn);
+        header.appendChild(centreSlot);
+
+        var rightSlot = document.createElement('div');
+        rightSlot.className = 'gh-right';
+        var undoBtn = document.createElement('button');
+        undoBtn.id = 'warmup-undo-btn';
+        undoBtn.className = 'gh-btn gh-btn-undo';
+        undoBtn.type = 'button';
+        undoBtn.textContent = '⟵ UNDO';
+        undoBtn.disabled = true;
+        undoBtn.addEventListener('click', _warmupUndo);
+        var nextBtn = document.createElement('button');
+        nextBtn.id = 'warmup-next-btn';
+        nextBtn.className = 'gh-btn gh-btn-next';
+        nextBtn.type = 'button';
+        nextBtn.textContent = 'NEXT ▶';
+        nextBtn.disabled = true;
+        nextBtn.addEventListener('click', function() { _warmupNext(onEnd); });
+        rightSlot.appendChild(undoBtn);
+        rightSlot.appendChild(nextBtn);
+        header.appendChild(rightSlot);
+        app.appendChild(header);
+
+        // ── Score display ────────────────────────────────────────────
+        var scoreWrap = document.createElement('div');
+        scoreWrap.className = 'wu-score-wrap';
+        scoreWrap.innerHTML =
+            '<div class="wu-stat-block">' +
+                '<div class="wu-stat-label">SEGMENT</div>' +
+                '<div class="wu-stat-value wu-target" id="wu-target">' +
+                    WARMUP_SEGMENTS[_state.warmupSegmentIndex] + '</div>' +
+            '</div>' +
+            '<div class="wu-stat-block">' +
+                '<div class="wu-stat-label">SCORE</div>' +
+                '<div class="wu-stat-value" id="wu-score">' + _state.warmupScore + '</div>' +
+            '</div>' +
+            '<div class="wu-stat-block">' +
+                '<div class="wu-stat-label">HIGH SCORE</div>' +
+                '<div class="wu-stat-value wu-hs" id="wu-hs">' + _state.warmupHighScore + '</div>' +
+            '</div>';
+        app.appendChild(scoreWrap);
+
+        // ── Compass progress strip ────────────────────────────────────
+        var compassWrap = document.createElement('div');
+        compassWrap.className = 'wu-compass-wrap';
+        compassWrap.id = 'wu-compass';
+        _warmupRenderCompass(compassWrap);
+        app.appendChild(compassWrap);
+
+        // ── Status ───────────────────────────────────────────────────
+        var statusEl = document.createElement('div');
+        statusEl.id = 'wu-status';
+        statusEl.className = 'wu-status';
+        statusEl.textContent = _warmupStatusText();
+        app.appendChild(statusEl);
+
+        // ── Dart pills ───────────────────────────────────────────────
+        var pillRow = document.createElement('div');
+        pillRow.id = 'practice-pills';
+        pillRow.className = 'practice-pills';
+        app.appendChild(pillRow);
+
+        // ── Multiplier tabs ──────────────────────────────────────────
+        _state.multiplier = 1;
+        var tabs = document.createElement('div');
+        tabs.id = 'multiplier-tabs';
+        [
+            { label: 'Single', mul: 1, cls: 'active-single' },
+            { label: 'Double', mul: 2, cls: 'active-double' },
+            { label: 'Treble', mul: 3, cls: 'active-treble' },
+        ].forEach(function(tab) {
+            var btn = document.createElement('button');
+            btn.className = 'tab-btn' + (tab.mul === 1 ? ' active-single' : '');
+            btn.dataset.multiplier = tab.mul;
+            btn.dataset.activeClass = tab.cls;
+            btn.type = 'button';
+            btn.textContent = tab.label;
+            UI.addTouchSafeListener(btn, function() {
+                if (_state.warmupSetComplete) return;
+                _state.multiplier = tab.mul;
+                tabs.querySelectorAll('.tab-btn').forEach(function(b) {
+                    b.classList.remove('active-single', 'active-double', 'active-treble');
+                });
+                btn.classList.add(tab.cls);
+                document.body.dataset.multiplier = tab.mul;
+            });
+            tabs.appendChild(btn);
+        });
+        document.body.dataset.multiplier = 1;
+        app.appendChild(tabs);
+
+        // ── Segment grid ─────────────────────────────────────────────
+        var segBoard = document.createElement('main');
+        segBoard.id = 'practice-board';
+        var grid = document.createElement('div');
+        grid.id = 'segment-grid';
+        grid.className = 'segment-grid';
+        for (var s = 1; s <= 20; s++) {
+            (function(seg) {
+                var btn = document.createElement('button');
+                btn.className = 'seg-btn';
+                btn.dataset.segment = seg;
+                btn.type = 'button';
+                btn.textContent = seg;
+                btn.addEventListener('click', function() { _warmupThrow(seg, _state.multiplier, onEnd); });
+                grid.appendChild(btn);
+            })(s);
+        }
+        segBoard.appendChild(grid);
+
+        // Bull row
+        var bullRow = document.createElement('div');
+        bullRow.id = 'bull-row';
+        bullRow.className = 'bull-row';
+        var miss = document.createElement('button');
+        miss.className = 'seg-btn bull-btn'; miss.type = 'button'; miss.textContent = 'MISS';
+        miss.addEventListener('click', function() { _warmupThrow(0, 0, onEnd); });
+        var outer = document.createElement('button');
+        outer.className = 'seg-btn bull-btn'; outer.type = 'button'; outer.textContent = 'OUTER';
+        outer.addEventListener('click', function() { _warmupThrow(25, 1, onEnd); });
+        var bull = document.createElement('button');
+        bull.className = 'seg-btn bull-btn bull-btn-inner'; bull.type = 'button'; bull.textContent = 'BULL';
+        bull.addEventListener('click', function() { _warmupThrow(25, 2, onEnd); });
+        bullRow.appendChild(miss); bullRow.appendChild(outer); bullRow.appendChild(bull);
+        segBoard.appendChild(bullRow);
+        app.appendChild(segBoard);
+
+        _warmupApplyHighlight();
+    }
+
+    function _warmupStatusText() {
+        var seg = WARMUP_SEGMENTS[_state.warmupSegmentIndex];
+        var neighbours = WARMUP_NEIGHBOURS[seg];
+        return WARMUP_LABELS[seg] + '  ·  Neighbours: ' + neighbours[0] + ' & ' + neighbours[1] +
+               '  ·  Turn: ' + _state.warmupTurnScore + ' pts';
+    }
+
+    function _warmupRenderCompass(container) {
+        container.innerHTML = '';
+        var dirs = ['N','E','S','W'];
+        WARMUP_SEGMENTS.forEach(function(seg, idx) {
+            var pip = document.createElement('div');
+            var state = idx < _state.warmupSegmentIndex ? 'done' :
+                        idx === _state.warmupSegmentIndex ? 'current' : 'pending';
+            pip.className = 'wu-compass-pip wu-pip-' + state;
+            pip.innerHTML = '<span class="wu-pip-dir">' + dirs[idx] + '</span>' +
+                            '<span class="wu-pip-seg">' + seg + '</span>';
+            container.appendChild(pip);
+        });
+    }
+
+    function _warmupApplyHighlight() {
+        var target = WARMUP_SEGMENTS[_state.warmupSegmentIndex];
+        var neighbours = WARMUP_NEIGHBOURS[target];
+        document.querySelectorAll('#segment-grid .seg-btn').forEach(function(btn) {
+            var seg = parseInt(btn.dataset.segment);
+            btn.classList.remove('target-highlight', 'wu-neighbour-highlight');
+            if (seg === target) btn.classList.add('target-highlight');
+            else if (neighbours.indexOf(seg) !== -1) btn.classList.add('wu-neighbour-highlight');
+        });
+    }
+
+    // ── Undo history ─────────────────────────────────────────────────────────
+    var _wuHistory = [];
+
+    function _warmupThrow(segment, multiplier, onEnd) {
+        if (_state.warmupSetComplete) return;
+
+        var target     = WARMUP_SEGMENTS[_state.warmupSegmentIndex];
+        var neighbours = WARMUP_NEIGHBOURS[target];
+        var points = 0;
+        if (segment === target)                    points = 2;
+        else if (neighbours.indexOf(segment) !== -1) points = 1;
+
+        _wuHistory.push({
+            score:      _state.warmupScore,
+            segScore:   _state.warmupSegScores[_state.warmupSegmentIndex],
+            turnScore:  _state.warmupTurnScore,
+            turnDarts:  _state.warmupTurnDarts,
+            dartsThrown:_state.dartsThrown,
+            setComplete:false,
+        });
+
+        _state.warmupScore += points;
+        _state.warmupSegScores[_state.warmupSegmentIndex] += points;
+        _state.warmupTurnScore  += points;
+        _state.warmupTurnDarts++;
+        _state.dartsThrown++;
+
+        // Enable undo
+        var ub = document.getElementById('warmup-undo-btn');
+        if (ub) ub.disabled = false;
+
+        // Sound
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+            points > 0 ? SOUNDS.dart() : null;
+        }
+
+        // Pill
+        var pills = document.getElementById('practice-pills');
+        if (pills) {
+            var mulStr = multiplier === 3 ? 'T' : multiplier === 2 ? 'D' : segment === 0 ? '' : 'S';
+            var segStr = segment === 0 ? 'MISS' : segment === 25 ? (multiplier === 2 ? 'BULL' : 'OUTER') : mulStr + segment;
+            var pill = document.createElement('div');
+            pill.className = 'dart-pill' + (points === 2 ? ' pill-hot' : points === 1 ? '' : ' pill-miss');
+            pill.textContent = segStr + ' — ' + points + (points === 1 ? ' pt' : ' pts');
+            pills.appendChild(pill);
+        }
+
+        _warmupUpdateDisplay();
+
+        // After 3 darts — lock and show NEXT
+        if (_state.warmupTurnDarts >= 3) {
+            _state.warmupSetComplete = true;
+            _warmupLockBoard(true);
+            var nb = document.getElementById('warmup-next-btn');
+            if (nb) nb.disabled = false;
+
+            // Announce turn score
+            if (SPEECH.isEnabled()) {
+                var ts = _state.warmupTurnScore;
+                setTimeout(function() {
+                    window.speechSynthesis && window.speechSynthesis.speak(
+                        Object.assign(new SpeechSynthesisUtterance(
+                            ts + (ts === 1 ? ' point.' : ' points.')
+                        ), { rate: 1.0, pitch: 1.0 })
+                    );
+                }, 400);
+            }
+        }
+    }
+
+    function _warmupNext(onEnd) {
+        _state.warmupSetComplete = false;
+        _state.warmupTurnScore   = 0;
+        _state.warmupTurnDarts   = 0;
+        _wuHistory = [];
+        _warmupLockBoard(false);
+        var nb = document.getElementById('warmup-next-btn');
+        if (nb) nb.disabled = true;
+        var ub = document.getElementById('warmup-undo-btn');
+        if (ub) ub.disabled = true;
+        var pills = document.getElementById('practice-pills');
+        if (pills) pills.innerHTML = '';
+        var statusEl = document.getElementById('wu-status');
+        if (statusEl) statusEl.textContent = _warmupStatusText();
+    }
+
+    function _warmupUndo() {
+        if (_wuHistory.length === 0) return;
+        var snap = _wuHistory.pop();
+        _state.warmupScore = snap.score;
+        _state.warmupSegScores[_state.warmupSegmentIndex] = snap.segScore;
+        _state.warmupTurnScore  = snap.turnScore;
+        _state.warmupTurnDarts  = snap.turnDarts;
+        _state.dartsThrown      = snap.dartsThrown;
+
+        if (_state.warmupSetComplete) {
+            _state.warmupSetComplete = false;
+            _warmupLockBoard(false);
+            var nb = document.getElementById('warmup-next-btn');
+            if (nb) nb.disabled = true;
+        }
+
+        var pills = document.getElementById('practice-pills');
+        if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
+
+        var ub = document.getElementById('warmup-undo-btn');
+        if (ub) ub.disabled = (_wuHistory.length === 0);
+
+        _warmupUpdateDisplay();
+    }
+
+    function _warmupLockBoard(locked) {
+        var board = document.getElementById('practice-board');
+        if (board) board.querySelectorAll('.seg-btn').forEach(function(b) { b.disabled = locked; });
+        var tabs = document.getElementById('multiplier-tabs');
+        if (tabs) tabs.querySelectorAll('.tab-btn').forEach(function(b) { b.disabled = locked; });
+    }
+
+    function _warmupUpdateDisplay() {
+        var scoreEl = document.getElementById('wu-score');
+        if (scoreEl) scoreEl.textContent = _state.warmupScore;
+        var statusEl = document.getElementById('wu-status');
+        if (statusEl) statusEl.textContent = _warmupStatusText();
+    }
+
+    // ── Per-segment timer ────────────────────────────────────────────────────
+
+    function _warmupStartSegmentTimer(onEnd) {
+        _state.warmupTimerSec = 300;
+        _warmupTickTimer(onEnd);
+        _state.warmupInterval = setInterval(function() { _warmupTickTimer(onEnd); }, 1000);
+    }
+
+    function _warmupTickTimer(onEnd) {
+        _state.warmupTimerSec--;
+        var el = document.getElementById('warmup-timer');
+        if (el) {
+            el.textContent = _formatTime(Math.max(0, _state.warmupTimerSec));
+            el.classList.toggle('timer-warning', _state.warmupTimerSec <= 60);
+        }
+
+        if (_state.warmupTimerSec === 30 && SPEECH.isEnabled()) {
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance('30 seconds remaining.'), { rate: 1.0, pitch: 1.0 })
+            );
+        }
+
+        if (_state.warmupTimerSec <= 0) {
+            clearInterval(_state.warmupInterval);
+            _warmupSegmentEnd(onEnd);
+        }
+    }
+
+    function _warmupSegmentEnd(onEnd) {
+        // Force-complete any open set so board is clean
+        _state.warmupSetComplete = false;
+        _state.warmupTurnScore   = 0;
+        _state.warmupTurnDarts   = 0;
+        _wuHistory = [];
+        _warmupLockBoard(true);
+        var nb = document.getElementById('warmup-next-btn');
+        if (nb) nb.disabled = true;
+        var ub = document.getElementById('warmup-undo-btn');
+        if (ub) ub.disabled = true;
+
+        var segScore = _state.warmupSegScores[_state.warmupSegmentIndex];
+
+        if (SPEECH.isEnabled()) {
+            var seg = WARMUP_SEGMENTS[_state.warmupSegmentIndex];
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance(
+                    'Time up on ' + seg + '. You scored ' + segScore + ' points.'
+                ), { rate: 1.0, pitch: 1.0 })
+            );
+        }
+
+        // Advance to next segment or finish
+        _state.warmupSegmentIndex++;
+        if (_state.warmupSegmentIndex >= WARMUP_SEGMENTS.length) {
+            setTimeout(function() { _warmupFinish(onEnd); }, 1500);
+            return;
+        }
+
+        // Next segment — rebuild screen fresh
+        setTimeout(function() {
+            _buildWarmupScreen(onEnd);
+            _warmupApplyHighlight();
+            _warmupAnnounceSegment();
+            _warmupStartSegmentTimer(onEnd);
+        }, 1200);
+    }
+
+    function _warmupFinish(onEnd) {
+        var total = _state.warmupScore;
+        API.endPracticeSession(_state.matchId).catch(function() {});
+        API.submitWarmupScore(_state.playerId, total)
+            .then(function(res) {
+                var isNew = res && res.is_new_high;
+                var hs    = res ? res.high_score : Math.max(total, _state.warmupHighScore);
+                _warmupAnnounceEnd(total, isNew, hs);
+                _showWarmupSummary(onEnd, total, isNew, hs);
+            })
+            .catch(function() {
+                _showWarmupSummary(onEnd, total, false, _state.warmupHighScore);
+            });
+    }
+
+    function _warmupEnd(onEnd) {
+        clearInterval(_state.warmupInterval);
+        API.endPracticeSession(_state.matchId).catch(function() {});
+        _showWarmupSummary(onEnd, _state.warmupScore, false, _state.warmupHighScore);
+    }
+
+    function _warmupAnnounceStart() {
+        if (!SPEECH.isEnabled()) return;
+        var hs  = _state.warmupHighScore;
+        var seg = WARMUP_SEGMENTS[0];
+        setTimeout(function() {
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance(
+                    _state.playerName + ', your current high score is ' + hs + '. ' +
+                    'You are targeting segment ' + seg + '.'
+                ), { rate: 1.0, pitch: 1.0 })
+            );
+        }, 400);
+    }
+
+    function _warmupAnnounceSegment() {
+        if (!SPEECH.isEnabled()) return;
+        var seg = WARMUP_SEGMENTS[_state.warmupSegmentIndex];
+        setTimeout(function() {
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance(
+                    'You are targeting segment ' + seg + '.'
+                ), { rate: 1.0, pitch: 1.0 })
+            );
+        }, 400);
+    }
+
+    function _warmupAnnounceEnd(total, isNew, hs) {
+        if (!SPEECH.isEnabled()) return;
+        var msg = _state.playerName + ', your total score was ' + total + '. ';
+        msg += isNew
+            ? 'New high score of ' + hs + '!'
+            : 'Your current high score is ' + hs + '.';
+        setTimeout(function() {
+            window.speechSynthesis && window.speechSynthesis.speak(
+                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
+            );
+        }, 800);
+    }
+
+    function _showWarmupSummary(onEnd, total, isNew, hs) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        document.body.className = 'mode-setup';
+
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        inner.innerHTML =
+            '<div id="setup-title">' +
+            '<div class="setup-logo">' + (isNew ? 'NEW HIGH SCORE!' : 'WARM UP COMPLETE') + '</div>' +
+            '<div class="setup-subtitle">' + _state.playerName.toUpperCase() + '</div>' +
+            '</div>';
+
+        // Per-segment breakdown
+        var scorecard = document.createElement('div');
+        scorecard.className = 'wu-summary-scorecard';
+        var dirs = ['N','E','S','W'];
+        WARMUP_SEGMENTS.forEach(function(seg, idx) {
+            var row = document.createElement('div');
+            row.className = 'wu-summary-row';
+            row.innerHTML =
+                '<span class="wu-summary-dir">' + dirs[idx] + '</span>' +
+                '<span class="wu-summary-seg">Segment ' + seg + '</span>' +
+                '<span class="wu-summary-pts">' + (_state.warmupSegScores[idx] || 0) + ' pts</span>';
+            scorecard.appendChild(row);
+        });
+        inner.appendChild(scorecard);
+
+        var summaryEl = document.createElement('div');
+        summaryEl.className = 'practice-summary';
+        [
+            { label: 'TOTAL SCORE', value: total },
+            { label: isNew ? '🏆 NEW HIGH SCORE' : 'HIGH SCORE', value: hs },
+            { label: 'DARTS THROWN', value: _state.dartsThrown },
+        ].forEach(function(r) {
+            var item = document.createElement('div');
+            item.className = 'practice-summary-row';
+            item.innerHTML =
+                '<span class="practice-summary-label">' + r.label + '</span>' +
+                '<span class="practice-summary-value">' + r.value + '</span>';
             summaryEl.appendChild(item);
         });
         inner.appendChild(summaryEl);

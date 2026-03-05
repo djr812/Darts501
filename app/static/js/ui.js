@@ -1302,6 +1302,39 @@ const UI = (() => {
                 },
             ]
         },
+        'warmup': {
+            title: 'Warm Up Routine',
+            sections: [
+                {
+                    heading: 'Objective',
+                    body: 'Train all four compass points of the board — North (20), East (11), South (3), West (6) — spending 5 minutes on each. Score as many points as possible and beat your personal high score.'
+                },
+                {
+                    heading: 'Segment Order',
+                    body: 'Segments are played in compass order: N→E→S→W (20→11→3→6). You cannot skip or reorder segments.'
+                },
+                {
+                    heading: 'Scoring',
+                    body: 'A dart landing in the target segment (single, double, or treble) scores 2 points. A dart landing in either neighbouring segment (either side of the target on the board) scores 1 point regardless of multiplier. Any other hit scores 0 points.'
+                },
+                {
+                    heading: 'Neighbours',
+                    body: 'North (20): neighbours are 1 and 5. East (11): neighbours are 14 and 8. South (3): neighbours are 17 and 19. West (6): neighbours are 13 and 10. Neighbour segments are highlighted on the board.'
+                },
+                {
+                    heading: 'Turn Structure',
+                    body: 'Throw 3 darts per turn. After the 3rd dart the board locks and the caller announces the points scored that turn. Press NEXT to continue throwing. Undo is available within the current turn of 3 darts.'
+                },
+                {
+                    heading: 'Timer',
+                    body: 'Each segment has a 5-minute timer. A 30-second warning is called before the segment ends. When time expires the game automatically advances to the next segment.'
+                },
+                {
+                    heading: 'High Score',
+                    body: 'Your total score across all four segments is saved to the database. At the start the caller announces your current high score. At the end the caller announces your total and whether you set a new high score.'
+                },
+            ]
+        },
         'baseball': {
             title: 'Baseball Darts',
             sections: [
