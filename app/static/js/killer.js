@@ -27,13 +27,32 @@ var KILLER_GAME = (function () {
         setComplete:        false,    // board locked after 3rd dart
     };
 
-    var _pendingThrows = [];  // buffered for current set
-    var _throwHistory  = [];  // for undo (local copy mirrors pending)
-    var _pendingEvents = [];  // accumulated events from buffered throws
+    var _pendingThrows  = [];   // buffered for current set
+    var _throwHistory   = [];   // for undo (local copy mirrors pending)
+    var _pendingEvents  = [];   // accumulated events from buffered throws
+    var _pendingWinner  = null; // set when a win is detected locally; confirmed on NEXT
 
     // ── Public: start ─────────────────────────────────────────────────────────
 
     function start(config, onEnd) {
+        // Reset all module-level state so a second game starts clean
+        _state.matchId            = null;
+        _state.gameId             = null;
+        _state.variant            = 'doubles';
+        _state.players            = [];
+        _state.currentPlayerIndex = 0;
+        _state.currentPlayerId    = null;
+        _state.status             = 'active';
+        _state.winnerId           = null;
+        _state.onEnd              = null;
+        _state.multiplier         = 1;
+        _state.turnNumber         = 1;
+        _state.setComplete        = false;
+        _pendingThrows  = [];
+        _throwHistory   = [];
+        _pendingEvents  = [];
+        _pendingWinner  = null;
+
         SPEECH.unlock();
         if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
         UI.setLoading(true);
@@ -290,6 +309,39 @@ var KILLER_GAME = (function () {
         }
     }
 
+    // Build the player state as it stands after all pending throws
+    function _workingPlayerState() {
+        var p         = _currentPlayer();
+        if (!p) return _state.players.slice();
+        var targetMul = _state.variant === 'doubles' ? 2 : 3;
+        var working   = _state.players.map(function (pl) {
+            return { id: pl.id, hits: pl.hits, is_killer: pl.is_killer,
+                     lives: pl.lives, eliminated: pl.eliminated,
+                     assigned_number: pl.assigned_number };
+        });
+        _pendingThrows.forEach(function (t) {
+            _applyThrowToWorking(working, t.segment, t.multiplier,
+                                 String(p.id), targetMul);
+        });
+        return working;
+    }
+
+    function _updateBoardFromWorking() {
+        var working = _workingPlayerState();
+        working.forEach(function (wp) {
+            var row = document.getElementById('killer-row-' + wp.id);
+            if (row) {
+                row.className = 'killer-player-row' +
+                    (String(wp.id) === String(_state.currentPlayerId) ? ' killer-active' : '') +
+                    (wp.eliminated ? ' killer-eliminated' : '');
+            }
+            var hitsEl = document.getElementById('killer-hits-' + wp.id);
+            if (hitsEl) _renderHits(hitsEl, wp);
+            var livesEl = document.getElementById('killer-lives-' + wp.id);
+            if (livesEl) _renderLives(livesEl, wp);
+        });
+    }
+
     function _updateBoard() {
         _state.players.forEach(function (p) {
             var row = document.getElementById('killer-row-' + p.id);
@@ -395,97 +447,109 @@ var KILLER_GAME = (function () {
         if (_state.setComplete || _state.status !== 'active') return;
         if (_pendingThrows.length >= 3) return;
 
-        var p        = _currentPlayer();
-        var variant  = _state.variant;
+        var p         = _currentPlayer();
+        var variant   = _state.variant;
         var targetMul = variant === 'doubles' ? 2 : 3;
 
-        // Derive local effect
-        var hitsScored = 0;
+        // ── Calculate what this dart WOULD do, without touching _state.players ──
+        // We use a working copy built from the current pending throw history so
+        // that multiple darts in the same set compound correctly.
+        var workingPlayers = _state.players.map(function (pl) {
+            return { id: pl.id, hits: pl.hits, is_killer: pl.is_killer,
+                     lives: pl.lives, eliminated: pl.eliminated,
+                     assigned_number: pl.assigned_number };
+        });
+        // Replay all pending throws on the working copy first
+        _pendingThrows.forEach(function (t) {
+            _applyThrowToWorking(workingPlayers, t.segment, t.multiplier,
+                                 String(p.id), targetMul);
+        });
+        // Now calculate this dart's effect on the working copy
+        var before = workingPlayers.map(function (pl) {
+            return { id: pl.id, hits: pl.hits, is_killer: pl.is_killer,
+                     lives: pl.lives, eliminated: pl.eliminated };
+        });
+        _applyThrowToWorking(workingPlayers, segment, multiplier,
+                             String(p.id), targetMul);
+
+        // Derive what changed — for pill/speech only, NOT written to _state.players
+        var hitsScored  = 0;
         var localEvents = [];
-
-        if (segment !== 0 && multiplier >= targetMul) {
-            // Count hits (doubles game: D=1, T=2; triples game: T=1 only effectively)
-            var rawHits = multiplier === targetMul ? 1 :
-                          multiplier > targetMul ? (multiplier - targetMul + 1) : 0;
-
-            // Find whose number was hit
-            var targetPlayer = _state.players.find(function (pl) { return pl.assigned_number === segment; });
-
-            if (targetPlayer) {
-                var isSelf = String(targetPlayer.id) === String(_state.currentPlayerId);
-                if (!p.is_killer) {
-                    if (isSelf) {
-                        var prev = p.hits;
-                        p.hits = Math.min(p.hits + rawHits, 3);
-                        hitsScored = p.hits - prev;
-                        if (p.hits >= 3 && !p.is_killer) {
-                            p.is_killer = true;
-                            localEvents.push({ type: 'killer', player_id: p.id });
-                        }
-                    }
-                } else {
-                    if (!targetPlayer.eliminated) {
-                        var prevLives = targetPlayer.lives;
-                        targetPlayer.lives = Math.max(0, targetPlayer.lives - rawHits);
-                        hitsScored = prevLives - targetPlayer.lives;
-                        for (var i = 0; i < hitsScored; i++) {
-                            localEvents.push({ type: 'life_lost', player_id: targetPlayer.id });
-                        }
-                        if (targetPlayer.lives <= 0) {
-                            targetPlayer.eliminated = true;
-                            localEvents.push({ type: 'eliminated', player_id: targetPlayer.id });
-                        }
-                    }
+        workingPlayers.forEach(function (wp) {
+            var bef = before.find(function (b) { return String(b.id) === String(wp.id); });
+            if (!bef) return;
+            if (!bef.is_killer && wp.is_killer) {
+                localEvents.push({ type: 'killer', player_id: wp.id });
+            }
+            if (wp.lives < bef.lives) {
+                var lost = bef.lives - wp.lives;
+                hitsScored += lost;
+                for (var i = 0; i < lost; i++) {
+                    localEvents.push({ type: 'life_lost', player_id: wp.id });
                 }
             }
+            if (!bef.eliminated && wp.eliminated) {
+                localEvents.push({ type: 'eliminated', player_id: wp.id });
+            }
+            if (bef.hits < wp.hits && !bef.is_killer) {
+                hitsScored += (wp.hits - bef.hits);
+            }
+        });
+
+        // Check for win on working copy — deferred to NEXT
+        var workingSurvivors = workingPlayers.filter(function (wp) { return !wp.eliminated; });
+        if (workingSurvivors.length === 1) {
+            _pendingWinner = workingSurvivors[0].id;
         }
 
+        // Buffer the throw (state.players is NOT mutated)
         _pendingThrows.push({ segment: segment, multiplier: multiplier });
-        _throwHistory.push({
-            segment:     segment,
-            multiplier:  multiplier,
-            hitsScored:  hitsScored,
-            events:      localEvents,
-            // Snapshots for undo
-            playerSnaps: _state.players.map(function (pl) {
-                return { id: pl.id, hits: pl.hits, is_killer: pl.is_killer,
-                         lives: pl.lives, eliminated: pl.eliminated };
-            }),
-        });
-        _pendingEvents = _pendingEvents.concat(localEvents);
+        _throwHistory.push({ segment: segment, multiplier: multiplier });
 
         // Sound
         if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
             if (hitsScored > 0) SOUNDS.dart();
         }
 
-        // Pill
+        // Pill and speech — describes what the dart did in isolation
         _addPill(segment, multiplier, hitsScored);
-
-        // Per-dart speech
         _speakDart(segment, multiplier, hitsScored, localEvents);
-
-        // Update UI
-        _updateBoard();
-        _updateStatus();
-        _applyHighlights();
 
         var ub = document.getElementById('killer-undo-btn');
         if (ub) ub.disabled = false;
 
-        // Check for win locally
-        var survivors = _state.players.filter(function (pl) { return !pl.eliminated; });
-        if (survivors.length === 1) {
-            _state.status   = 'complete';
-            _state.winnerId = survivors[0].id;
-        }
+        // Update scoreboard to reflect pending throw state
+        _updateBoardFromWorking();
 
-        // After 3 darts — lock board
-        if (_pendingThrows.length >= 3 || _state.status === 'complete') {
+        // After 3 darts OR a potential killing dart — lock board, enable NEXT
+        if (_pendingThrows.length >= 3 || _pendingWinner !== null) {
             _state.setComplete = true;
             _lockBoard(true);
             var nb = document.getElementById('killer-next-btn');
             if (nb) nb.disabled = false;
+        }
+    }
+
+    // Apply a single throw to a working-copy players array (no _state mutation)
+    function _applyThrowToWorking(players, segment, multiplier, throwerIdStr, targetMul) {
+        if (segment === 0 || multiplier < targetMul) return;
+        var rawHits = multiplier === targetMul ? 1 : (multiplier - targetMul + 1);
+        var target  = players.find(function (pl) { return pl.assigned_number === segment; });
+        if (!target) return;
+        var thrower = players.find(function (pl) { return String(pl.id) === throwerIdStr; });
+        if (!thrower) return;
+        var isSelf = String(target.id) === throwerIdStr;
+
+        if (!thrower.is_killer) {
+            if (isSelf) {
+                target.hits = Math.min(target.hits + rawHits, 3);
+                if (target.hits >= 3) target.is_killer = true;
+            }
+        } else {
+            if (!target.eliminated) {
+                target.lives = Math.max(0, target.lives - rawHits);
+                if (target.lives <= 0) target.eliminated = true;
+            }
         }
     }
 
@@ -495,7 +559,7 @@ var KILLER_GAME = (function () {
         UI.setLoading(true);
         var throwsToSubmit = _pendingThrows.slice();
         var turnNum        = _state.turnNumber;
-        var isComplete     = _state.status === 'complete';
+        var isComplete     = _pendingWinner !== null;
 
         var submitPromise = throwsToSubmit.length > 0
             ? API.killerThrow(_state.matchId, { throws: throwsToSubmit, turn_number: turnNum })
@@ -503,10 +567,26 @@ var KILLER_GAME = (function () {
 
         submitPromise
             .then(function (s) {
-                if (s) _applyState(s);
-                if (isComplete || _state.status === 'complete') {
+                if (s) {
+                    _applyState(s);
+                    // Trust the server's winner over the local flag
+                    if (s.status === 'complete' && s.winner_id) {
+                        _pendingWinner = s.winner_id;
+                        isComplete = true;
+                    }
+                }
+                if (isComplete) {
+                    _state.status   = 'complete';
+                    _state.winnerId = _pendingWinner || _state.winnerId;
                     UI.setLoading(false);
-                    _showResult();
+                    _pendingWinner = null;
+                    var elimEvents = s ? (s.events || []) : [];
+                    _announceEliminations(elimEvents);
+                    // Estimate speech duration so result screen waits for it to finish.
+                    // Count eliminated players to approximate total announcement length.
+                    var elimCount = elimEvents.filter(function(ev) { return ev.type === 'eliminated'; }).length;
+                    var speechDelay = elimCount > 0 ? 1000 + elimCount * 2800 : 600;
+                    setTimeout(function () { _showResult(); }, speechDelay);
                     return;
                 }
                 return API.killerNext(_state.matchId);
@@ -521,6 +601,7 @@ var KILLER_GAME = (function () {
                 _applyState(s);
                 UI.setLoading(false);
 
+                _announceEliminations(s.events || []);
                 _resetUI();
                 _updateBoard();
                 _updateStatus();
@@ -560,25 +641,13 @@ var KILLER_GAME = (function () {
     function _onUndo() {
         if (_throwHistory.length === 0) return;
 
-        var snap = _throwHistory.pop();
+        _throwHistory.pop();
         _pendingThrows.pop();
 
-        // Restore all player states from snapshot
-        snap.playerSnaps.forEach(function (ps) {
-            var pl = _state.players.find(function (p) { return String(p.id) === String(ps.id); });
-            if (pl) {
-                pl.hits        = ps.hits;
-                pl.is_killer   = ps.is_killer;
-                pl.lives       = ps.lives;
-                pl.eliminated  = ps.eliminated;
-            }
-        });
+        // Clear any pending winner (state.players was never mutated, so no restore needed)
+        _pendingWinner = null;
 
-        // Restore game status if we'd declared a winner locally
-        _state.status   = 'active';
-        _state.winnerId = null;
-
-        // If board was locked, unlock it
+        // If board was locked after 3rd dart or a potential winner, unlock it
         if (_state.setComplete) {
             _state.setComplete = false;
             _lockBoard(false);
@@ -591,10 +660,8 @@ var KILLER_GAME = (function () {
 
         var ub = document.getElementById('killer-undo-btn');
         if (ub) ub.disabled = (_throwHistory.length === 0);
-
-        _updateBoard();
-        _updateStatus();
-        _applyHighlights();
+        // Revert scoreboard pips to working state after undo
+        _updateBoardFromWorking();
     }
 
     // ── End ───────────────────────────────────────────────────────────────────
@@ -724,16 +791,33 @@ var KILLER_GAME = (function () {
     function _announceCurrentPlayer() {
         var p = _currentPlayer();
         if (!p) return;
-        _speak(p.name + '.', 400);
+        _speak(p.name + "'s turn to throw.", 400);
+    }
+
+    function _announceEliminations(events) {
+        if (!SPEECH.isEnabled() || !events || events.length === 0) return;
+        var msgs = [];
+        events.forEach(function (ev) {
+            if (ev.type === 'eliminated') {
+                var pl = _playerById(ev.player_id);
+                if (pl) msgs.push(pl.name + ' is eliminated!');
+            }
+        });
+        if (msgs.length === 0) return;
+        window.speechSynthesis && window.speechSynthesis.cancel();
+        window.speechSynthesis && window.speechSynthesis.speak(
+            Object.assign(new SpeechSynthesisUtterance(msgs.join(' ')),
+                          { rate: 1.0, pitch: 1.0 })
+        );
     }
 
     function _speakDart(segment, multiplier, hitsScored, events) {
         if (!SPEECH.isEnabled()) return;
         var targetMul = _state.variant === 'doubles' ? 2 : 3;
-        var mulLabel  = multiplier === 3 ? 'Treble' : multiplier === 2 ? 'Double' : 'Single';
+        var mulLabel  = multiplier === 3 ? 'Treble' : multiplier === 2 ? 'Double' : '';
         var segLabel  = segment === 0 ? 'Miss' :
                         segment === 25 ? (multiplier === 2 ? 'Bullseye' : 'Outer bull') :
-                        mulLabel + ' ' + segment;
+                        (mulLabel ? mulLabel + ' ' + segment : String(segment));
 
         var parts = [segLabel];
 
@@ -744,9 +828,8 @@ var KILLER_GAME = (function () {
                 parts.push(name + ', you are now a killer!');
             } else if (ev.type === 'life_lost') {
                 parts.push(name + ' loses a life.');
-            } else if (ev.type === 'eliminated') {
-                parts.push(name + ' is eliminated!');
             }
+            // 'eliminated' is deferred — announced in _onNext after NEXT is pressed
         });
 
         var msg = parts.join(' ');
