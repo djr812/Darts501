@@ -354,6 +354,22 @@ const API = (() => {
         return request('POST', '/api/baseball/matches/' + matchId + '/end', {});
     }
 
+    async function createNineLivesMatch(data) {
+        return request('POST', '/api/nine_lives/matches', data);
+    }
+    async function getNineLivesMatch(matchId) {
+        return request('GET', '/api/nine_lives/matches/' + matchId);
+    }
+    async function nineLivesThrow(matchId, data) {
+        return request('POST', '/api/nine_lives/matches/' + matchId + '/throw', data);
+    }
+    async function nineLivesNext(matchId, data) {
+        return request('POST', '/api/nine_lives/matches/' + matchId + '/next', data);
+    }
+    async function endNineLivesMatch(matchId) {
+        return request('POST', '/api/nine_lives/matches/' + matchId + '/end', {});
+    }
+
     async function createKillerMatch(data) {
         return request('POST', '/api/killer/matches', data);
     }
@@ -426,6 +442,11 @@ const API = (() => {
         baseballNext,
         baseballUndo,
         endBaseballMatch,
+        createNineLivesMatch,
+        getNineLivesMatch,
+        nineLivesThrow,
+        nineLivesNext,
+        endNineLivesMatch,
         createKillerMatch,
         getKillerMatch,
         killerThrow,

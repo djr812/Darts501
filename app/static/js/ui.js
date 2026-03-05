@@ -30,7 +30,7 @@ const UI = (() => {
         });
     }
 
-    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller) {
+    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives) {
         // Clear any lingering modal overlays from the previous game screen
         ['confirm-modal', 'rules-modal'].forEach(function(id) {
             var el = document.getElementById(id);
@@ -67,7 +67,7 @@ const UI = (() => {
             { value: 'Shanghai', label: 'Shanghai', sub: '7 or 20 rounds', icon: '🀄' },
             { value: 'Killer',   label: 'Killer',   sub: 'A game of doubles', icon: '☠️' },
             { value: 'Baseball', label: 'Baseball', sub: '9 innings',      icon: '⚾' },
-            { value: 'NineLives',       label: 'Nine Lives',       sub: 'Coming Soon',    icon: '🐱', comingSoon: true },
+            { value: 'NineLives',       label: 'Nine Lives',       sub: 'Last cat standing', icon: '🐱' },
             { value: 'RaceTo1000',      label: 'Race to 1000',     sub: 'Coming Soon',    icon: '🏁', comingSoon: true },
             { value: 'BermudaTriangle', label: 'Bermuda Triangle', sub: 'Coming Soon',    icon: '🔺', comingSoon: true },
             { value: 'Practice',        label: 'Practice',         sub: 'Solo training',  icon: '🎪', centred: true },
@@ -94,6 +94,8 @@ const UI = (() => {
                 tile.addEventListener('click', () => { if (onBaseball) onBaseball(); });
             } else if (gt.value === 'Killer') {
                 tile.addEventListener('click', () => { if (onKiller) onKiller(); });
+            } else if (gt.value === 'NineLives') {
+                tile.addEventListener('click', () => { if (onNineLives) onNineLives(); });
             } else {
                 tile.addEventListener('click', () => {
                     _buildMatchSetupScreen(
@@ -298,7 +300,7 @@ const UI = (() => {
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', () => {
             API.getPlayers().then(p => {
-                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller);
+                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives);
             });
         });
         _appTarget.appendChild(backLink);
@@ -1304,6 +1306,35 @@ const UI = (() => {
                 {
                     heading: 'Strategy',
                     body: 'Close numbers quickly to stop opponents scoring on them, and build points on numbers you\'ve closed that opponents haven\'t. The Bull is often the key battleground.'
+                },
+            ]
+        },
+        'nine_lives': {
+            title: 'Nine Lives',
+            sections: [
+                {
+                    heading: 'Objective',
+                    body: 'Be the last player standing, or be the first to hit all numbers from 1 to 20 in order.'
+                },
+                {
+                    heading: 'Setup',
+                    body: 'Each player starts with 9 lives. Turn order is randomised. Each player independently tracks their own current target number, starting at 1.'
+                },
+                {
+                    heading: 'Gameplay',
+                    body: 'On your turn, throw 3 darts. Your goal is to hit your current target number — any multiplier counts (single, double, or treble). If you hit it, your target advances to the next number.'
+                },
+                {
+                    heading: 'Losing a Life',
+                    body: 'If you do not hit your target number with any of your 3 darts, you lose one life. Players are eliminated when they run out of lives, but finish the turn first.'
+                },
+                {
+                    heading: 'Winning',
+                    body: 'The game ends when all other players are eliminated, or when a player hits number 20 — completing the sequence. That player wins instantly.'
+                },
+                {
+                    heading: 'Turn Structure',
+                    body: 'Throw 3 darts, then press NEXT to submit. Undo is available within the current turn. The board locks after the 3rd dart or on completing number 20.'
                 },
             ]
         },
