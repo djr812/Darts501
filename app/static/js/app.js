@@ -431,7 +431,7 @@
 
     async function _returnToSetup() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
     }
 
     // ------------------------------------------------------------------
@@ -591,7 +591,7 @@
         try {
             await API.cancelMatch(state.matchId);
             var existing = await API.getPlayers().catch(function() { return []; });
-            UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+            UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
         } catch (err) {
             UI.showToast('CANCEL FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
         } finally {
@@ -645,7 +645,7 @@
                 // onBack — return to setup screen
                 function() {
                     API.getPlayers().then(function(p) {
-                        UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                        UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
                     });
                 },
                 // onStart — begin the practice session
@@ -653,7 +653,7 @@
                     PRACTICE.start(config, function() {
                         // onEnd — back to setup after session
                         API.getPlayers().then(function(p) {
-                            UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                            UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
                         });
                     });
                 }
@@ -671,6 +671,74 @@
         API.getPlayers().then(function(existing) {
             _showShanghaiSetup(existing);
         });
+    }
+
+    function _onBermuda() {
+        API.getPlayers().then(function (existing) { _showBermudaSetup(existing); });
+    }
+
+    function _showBermudaSetup(existingPlayers) {
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.style.cssText = '';
+        document.body.className = 'mode-setup';
+
+        var inner = document.createElement('div');
+        inner.className = 'setup-screen-inner';
+        app.appendChild(inner);
+
+        UI.appendSetupHeader(inner, 'Bermuda Triangle');
+
+        var countSection = document.createElement('div');
+        countSection.className = 'setup-section';
+        countSection.innerHTML = '<div class="setup-label">NUMBER OF PLAYERS</div>';
+        var countRow = document.createElement('div');
+        countRow.className = 'setup-option-row';
+        var selectedCount = 2;
+        [2, 3, 4].forEach(function (n) {
+            var btn = document.createElement('button');
+            btn.className = 'option-btn' + (n === 2 ? ' selected' : '');
+            btn.type = 'button';
+            btn.textContent = n;
+            btn.addEventListener('click', function () {
+                countRow.querySelectorAll('.option-btn').forEach(function (b) { b.classList.remove('selected'); });
+                btn.classList.add('selected');
+                selectedCount = n;
+                UI.renderCricketPlayerSlots(existingPlayers, selectedCount, namesSection);
+            });
+            countRow.appendChild(btn);
+        });
+        countSection.appendChild(countRow);
+        inner.appendChild(countSection);
+
+        var namesSection = document.createElement('div');
+        namesSection.className = 'setup-section';
+        inner.appendChild(namesSection);
+        UI.renderCricketPlayerSlots(existingPlayers, 2, namesSection);
+
+        var startBtn = document.createElement('button');
+        startBtn.className = 'start-btn'; startBtn.textContent = 'START MATCH'; startBtn.type = 'button';
+        startBtn.addEventListener('click', function () {
+            var players = UI.collectCricketPlayers(namesSection);
+            if (!players) return;
+            SPEECH.unlock();
+            if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
+            BERMUDA_GAME.start({ players: players }, function () {
+                API.getPlayers().then(function (p) {
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
+                });
+            });
+        });
+        inner.appendChild(startBtn);
+
+        var backLink = document.createElement('button');
+        backLink.className = 'setup-back-link'; backLink.type = 'button'; backLink.textContent = '← BACK TO HOME';
+        backLink.addEventListener('click', function () {
+            API.getPlayers().then(function (p) {
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
+            });
+        });
+        inner.appendChild(backLink);
     }
 
     function _onNineLives() {
@@ -730,7 +798,7 @@
             if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
             NINE_LIVES_GAME.start({ players: players }, function () {
                 API.getPlayers().then(function (p) {
-                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
                 });
             });
         });
@@ -742,7 +810,7 @@
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', function () {
             API.getPlayers().then(function (p) {
-                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
             });
         });
         inner.appendChild(backLink);
@@ -834,7 +902,7 @@
             if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
             KILLER_GAME.start({ players: players, variant: selectedVariant }, function() {
                 API.getPlayers().then(function(p) {
-                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
                 });
             });
         });
@@ -846,7 +914,7 @@
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', function() {
             API.getPlayers().then(function(p) {
-                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
             });
         });
         inner.appendChild(backLink);
@@ -912,7 +980,7 @@
             if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
             BASEBALL_GAME.start({ players: players }, function() {
                 API.getPlayers().then(function(p) {
-                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
                 });
             });
         });
@@ -924,7 +992,7 @@
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', function() {
             API.getPlayers().then(function(p) {
-                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
             });
         });
         inner.appendChild(backLink);
@@ -985,7 +1053,7 @@
             if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
             CRICKET_GAME.start({ players: players }, function() {
                 API.getPlayers().then(function(p) {
-                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
                 });
             });
         });
@@ -998,7 +1066,7 @@
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', function() {
             API.getPlayers().then(function(p) {
-                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
             });
         });
         inner.appendChild(backLink);
@@ -1097,7 +1165,7 @@
                 cpuDifficulty: cpuDifficulty,
             }, function() {
                 API.getPlayers().then(function(p) {
-                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                    UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
                 });
             });
         });
@@ -1109,7 +1177,7 @@
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', function() {
             API.getPlayers().then(function(p) {
-                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
             });
         });
         inner.appendChild(backLink);
@@ -1126,7 +1194,7 @@
             STATS.showStatsScreen(player, async () => {
                 // Back button → return to setup screen
                 const existing = await API.getPlayers().catch(() => []);
-                UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+                UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
             });
         });
     }
@@ -1137,7 +1205,7 @@
 
     async function init() {
         const existing = await API.getPlayers().catch(() => []);
-        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives);
+        UI.buildSetupScreen(existing, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda);
     }
 
     if (document.readyState === 'loading') {

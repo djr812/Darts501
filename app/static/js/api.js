@@ -354,6 +354,22 @@ const API = (() => {
         return request('POST', '/api/baseball/matches/' + matchId + '/end', {});
     }
 
+    async function createBermudaMatch(data) {
+        return request('POST', '/api/bermuda/matches', data);
+    }
+    async function getBermudaMatch(matchId) {
+        return request('GET', '/api/bermuda/matches/' + matchId);
+    }
+    async function bermudaThrow(matchId, data) {
+        return request('POST', '/api/bermuda/matches/' + matchId + '/throw', data);
+    }
+    async function bermudaNext(matchId) {
+        return request('POST', '/api/bermuda/matches/' + matchId + '/next', {});
+    }
+    async function endBermudaMatch(matchId) {
+        return request('POST', '/api/bermuda/matches/' + matchId + '/end', {});
+    }
+
     async function createNineLivesMatch(data) {
         return request('POST', '/api/nine_lives/matches', data);
     }
@@ -442,6 +458,11 @@ const API = (() => {
         baseballNext,
         baseballUndo,
         endBaseballMatch,
+        createBermudaMatch,
+        getBermudaMatch,
+        bermudaThrow,
+        bermudaNext,
+        endBermudaMatch,
         createNineLivesMatch,
         getNineLivesMatch,
         nineLivesThrow,

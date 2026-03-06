@@ -82,6 +82,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.routes.api.baseball  import baseball_bp
     from app.routes.api.killer      import killer_bp
     from app.routes.api.nine_lives  import nine_lives_bp
+    from app.routes.api.bermuda     import bermuda_bp
 
     api_blueprints = [
         throws_bp,
@@ -96,6 +97,7 @@ def _register_blueprints(app: Flask) -> None:
         baseball_bp,
         killer_bp,
         nine_lives_bp,
+        bermuda_bp,
     ]
 
     for bp in api_blueprints:

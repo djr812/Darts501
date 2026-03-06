@@ -30,7 +30,7 @@ const UI = (() => {
         });
     }
 
-    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives) {
+    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives, onBermuda) {
         // Clear any lingering modal overlays from the previous game screen
         ['confirm-modal', 'rules-modal'].forEach(function(id) {
             var el = document.getElementById(id);
@@ -69,7 +69,7 @@ const UI = (() => {
             { value: 'Baseball', label: 'Baseball', sub: '9 innings',      icon: '⚾' },
             { value: 'NineLives',       label: 'Nine Lives',       sub: 'Last cat standing', icon: '🐱' },
             { value: 'RaceTo1000',      label: 'Race to 1000',     sub: 'Coming Soon',    icon: '🏁', comingSoon: true },
-            { value: 'BermudaTriangle', label: 'Bermuda Triangle', sub: 'Coming Soon',    icon: '🔺', comingSoon: true },
+            { value: 'BermudaTriangle', label: 'Bermuda Triangle', sub: '13-round scorer', icon: '🔺' },
             { value: 'Practice',        label: 'Practice',         sub: 'Solo training',  icon: '🎪', centred: true },
         ];
 
@@ -96,6 +96,8 @@ const UI = (() => {
                 tile.addEventListener('click', () => { if (onKiller) onKiller(); });
             } else if (gt.value === 'NineLives') {
                 tile.addEventListener('click', () => { if (onNineLives) onNineLives(); });
+            } else if (gt.value === 'BermudaTriangle') {
+                tile.addEventListener('click', () => { if (onBermuda) onBermuda(); });
             } else {
                 tile.addEventListener('click', () => {
                     _buildMatchSetupScreen(
@@ -300,7 +302,7 @@ const UI = (() => {
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', () => {
             API.getPlayers().then(p => {
-                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives);
+                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives, onBermuda);
             });
         });
         _appTarget.appendChild(backLink);
@@ -1306,6 +1308,39 @@ const UI = (() => {
                 {
                     heading: 'Strategy',
                     body: 'Close numbers quickly to stop opponents scoring on them, and build points on numbers you\'ve closed that opponents haven\'t. The Bull is often the key battleground.'
+                },
+            ]
+        },
+        'bermuda': {
+            title: 'Bermuda Triangle',
+            sections: [
+                {
+                    heading: 'Objective',
+                    body: 'Score the most points after 13 rounds. Each round targets a specific number, ring, or bull in this order: 12, 13, 14, Any Double, 15, 16, 17, Any Triple, 18, 19, 20, Single Bull, Double Bull.'
+                },
+                {
+                    heading: 'Scoring — Number Rounds',
+                    body: 'In rounds targeting a number (12 through 20), only hits on that exact number count. A single scores face value, a double scores double, a treble scores triple. For example, treble 14 in round 3 scores 42 points.'
+                },
+                {
+                    heading: 'Scoring — Any Double Round',
+                    body: 'Any double (except the bull) scores points. A double 19 scores 38 points, a double 5 scores 10 points. Singles and trebles score nothing this round.'
+                },
+                {
+                    heading: 'Scoring — Any Triple Round',
+                    body: 'Any treble scores points. A treble 20 scores 60 points, a treble 7 scores 21 points. Singles and doubles score nothing this round.'
+                },
+                {
+                    heading: 'Scoring — Bull Rounds',
+                    body: 'Round 12 targets the Outer Bull (25 points). Only the outer bull scores. Round 13 targets the Double Bull (50 points). Only the inner bull scores.'
+                },
+                {
+                    heading: 'Halving',
+                    body: 'If a player scores zero points with all three darts in a round, their current total is halved (rounded down). The minimum score is 0.'
+                },
+                {
+                    heading: 'Winning',
+                    body: 'All players must complete all 13 rounds. The player with the highest total score wins. Tied scores share the win.'
                 },
             ]
         },
