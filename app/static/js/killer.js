@@ -816,7 +816,7 @@ var KILLER_GAME = (function () {
         var targetMul = _state.variant === 'doubles' ? 2 : 3;
         var mulLabel  = multiplier === 3 ? 'Treble' : multiplier === 2 ? 'Double' : '';
         var segLabel  = segment === 0 ? 'Miss' :
-                        segment === 25 ? (multiplier === 2 ? 'Bullseye' : 'Outer bull') :
+                        segment === 25 ? (multiplier === 2 ? 'Bulls Eye' : 'Outer bull') :
                         (mulLabel ? mulLabel + ' ' + segment : String(segment));
 
         var parts = [segLabel];

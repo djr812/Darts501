@@ -689,7 +689,7 @@ var NINE_LIVES_GAME = (function () {
         if (!SPEECH.isEnabled()) return;
         var mulLabel = multiplier === 3 ? 'Treble' : multiplier === 2 ? 'Double' : '';
         var segLabel = segment === 0   ? 'Miss' :
-                       segment === 25  ? (multiplier === 2 ? 'Bullseye' : 'Outer bull') :
+                       segment === 25  ? (multiplier === 2 ? 'Bulls Eye' : 'Outer bull') :
                        (mulLabel ? mulLabel + ' ' + segment : String(segment));
         window.speechSynthesis && window.speechSynthesis.cancel();
         window.speechSynthesis && window.speechSynthesis.speak(
