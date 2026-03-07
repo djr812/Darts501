@@ -5207,6 +5207,32 @@ body.mode-shanghai {
     background: rgba(167,139,250,0.12);
 }
 
+.setup-rules-btn {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    height: 44px;
+    margin: 0 auto 10px;
+    padding: 0 24px;
+    background: transparent;
+    border: 1px solid #4a3a6a;
+    border-radius: var(--radius-lg);
+    color: #a78bfa;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    -webkit-transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s;
+    text-transform: uppercase;
+}
+
+.setup-rules-btn:active {
+    border-color: #a78bfa;
+    background: rgba(167,139,250,0.12);
+}
+
 /* Overlay — same base as other modals but purple tint */
 .rules-overlay {
     background: rgba(10, 6, 20, 0.88);

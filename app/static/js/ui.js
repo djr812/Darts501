@@ -289,6 +289,12 @@ const UI = (() => {
                 legsPerSet:  parseInt(legsSel.dataset.value, 10),
             });
         });
+        const rulesBtn501 = document.createElement('button');
+        rulesBtn501.type = 'button';
+        rulesBtn501.className = 'setup-rules-btn';
+        rulesBtn501.textContent = '📖 VIEW RULES';
+        rulesBtn501.addEventListener('click', () => showRulesModal(gameType || '501'));
+        _appTarget.appendChild(rulesBtn501);
         _appTarget.appendChild(startBtn);
 
         // Defaults — no gameTypeRow click needed (it's already set via hidden btn)

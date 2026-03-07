@@ -673,6 +673,15 @@
         });
     }
 
+    function _makeSetupRulesBtn(gameType) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'setup-rules-btn';
+        btn.textContent = '📖 VIEW RULES';
+        btn.addEventListener('click', function () { UI.showRulesModal(gameType); });
+        return btn;
+    }
+
     function _onRace1000() {
         API.getPlayers().then(function (existing) { _showRace1000Setup(existing); });
     }
@@ -766,6 +775,7 @@
                 });
             });
         });
+        inner.appendChild(_makeSetupRulesBtn('race1000'));
         inner.appendChild(startBtn);
 
         var backLink = document.createElement('button');
@@ -835,6 +845,7 @@
                 });
             });
         });
+        inner.appendChild(_makeSetupRulesBtn('bermuda'));
         inner.appendChild(startBtn);
 
         var backLink = document.createElement('button');
@@ -908,6 +919,7 @@
                 });
             });
         });
+        inner.appendChild(_makeSetupRulesBtn('nine_lives'));
         inner.appendChild(startBtn);
 
         var backLink = document.createElement('button');
@@ -1012,6 +1024,7 @@
                 });
             });
         });
+        inner.appendChild(_makeSetupRulesBtn('killer'));
         inner.appendChild(startBtn);
 
         var backLink = document.createElement('button');
@@ -1090,6 +1103,7 @@
                 });
             });
         });
+        inner.appendChild(_makeSetupRulesBtn('baseball'));
         inner.appendChild(startBtn);
 
         var backLink = document.createElement('button');
@@ -1163,6 +1177,7 @@
                 });
             });
         });
+        inner.appendChild(_makeSetupRulesBtn('cricket'));
         inner.appendChild(startBtn);
 
         // Back link at bottom
@@ -1275,6 +1290,7 @@
                 });
             });
         });
+        inner.appendChild(_makeSetupRulesBtn('shanghai'));
         inner.appendChild(startBtn);
 
         var backLink = document.createElement('button');
