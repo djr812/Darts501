@@ -27,6 +27,8 @@ var RACE1000_GAME = (function () {
         setComplete:        false,
         turnNumber:         1,
         targetSet:          false,   // someone reached 1000 this round but round not over
+        cpuDifficulty:      'medium',
+        cpuTurnRunning:     false,
     };
 
     var _pendingThrows = [];
@@ -47,6 +49,8 @@ var RACE1000_GAME = (function () {
         _state.setComplete        = false;
         _state.turnNumber         = 1;
         _state.targetSet          = false;
+        _state.cpuDifficulty      = 'medium';
+        _state.cpuTurnRunning     = false;
         _pendingThrows = [];
         _throwHistory  = [];
 
@@ -65,8 +69,18 @@ var RACE1000_GAME = (function () {
                 _applyState(s);
                 _state.onEnd = onEnd;
                 UI.setLoading(false);
+                // Propagate isCpu flag from resolved players into state
+                players.forEach(function (p) {
+                    if (p.isCpu) {
+                        var sp = _state.players.find(function (x) { return String(x.id) === String(p.id); });
+                        if (sp) sp.isCpu = true;
+                    }
+                });
                 _buildScreen();
                 _announcePlayer(true);
+                if (_isCpuPlayer(_currentPlayer())) {
+                    setTimeout(_runCpuTurn, 1500);
+                }
             })
             .catch(function (err) {
                 UI.setLoading(false);
@@ -78,21 +92,35 @@ var RACE1000_GAME = (function () {
 
     function _resolvePlayers(selections) {
         return Promise.all(selections.map(function (sel) {
-            if (sel.mode === 'existing') return Promise.resolve({ id: sel.id, name: sel.name });
-            return API.createPlayer(sel.name).then(function (p) { return { id: p.id, name: p.name }; });
+            if (sel.isCpu) {
+                return API.createPlayer('CPU').then(function (p) {
+                    _state.cpuDifficulty = sel.difficulty || 'medium';
+                    return { id: p.id, name: 'CPU', isCpu: true };
+                });
+            }
+            if (sel.mode === 'existing') return Promise.resolve({ id: sel.id, name: sel.name, isCpu: false });
+            return API.createPlayer(sel.name).then(function (p) { return { id: p.id, name: p.name, isCpu: false }; });
         }));
     }
 
     // ── State helpers ─────────────────────────────────────────────────────────
 
     function _applyState(s) {
-        _state.matchId            = s.match_id;
-        _state.players            = s.players || [];
+        _state.matchId = s.match_id;
+        var prevPlayers = _state.players || [];
+        _state.players = (s.players || []).map(function (p) {
+            var prev = prevPlayers.find(function (pp) { return String(pp.id) === String(p.id); });
+            return Object.assign({}, p, { isCpu: prev ? !!prev.isCpu : (p.name === 'CPU') });
+        });
         _state.currentPlayerIndex = s.current_player_index;
         _state.currentPlayerId    = s.current_player_id ? String(s.current_player_id) : null;
         _state.variant            = s.variant || 'twenties';
         _state.status             = s.status || 'active';
         _state.winnerId           = s.winner_id || null;
+    }
+
+    function _isCpuPlayer(p) {
+        return p && (p.isCpu === true || p.name === 'CPU');
     }
 
     function _currentPlayer() {
@@ -442,6 +470,8 @@ var RACE1000_GAME = (function () {
 
     function _onThrow(segment, multiplier) {
         if (_state.setComplete || _state.status !== 'active') return;
+        // Block human input during CPU turn (CPU calls _onThrow directly)
+        if (_state.cpuTurnRunning && !_isCpuPlayer(_currentPlayer())) return;
         if (_pendingThrows.length >= 3) return;
 
         var pts = _scoreDart(segment, multiplier);
@@ -534,12 +564,108 @@ var RACE1000_GAME = (function () {
                     afterDelay = _speakTurnEnd(scoredEv, false);
                 }
 
-                setTimeout(function () { _announcePlayer(false); }, afterDelay);
+                setTimeout(function () {
+                    _announcePlayer(false);
+                    if (_isCpuPlayer(_currentPlayer())) {
+                        setTimeout(_runCpuTurn, 1200);
+                    }
+                }, afterDelay);
             })
             .catch(function (err) {
                 UI.setLoading(false);
                 console.error('[race1000] next error:', err);
             });
+    }
+
+    // ── CPU turn ──────────────────────────────────────────────────────────────
+
+    function _runCpuTurn() {
+        if (_state.cpuTurnRunning || _state.status !== 'active') return;
+        if (!_isCpuPlayer(_currentPlayer())) return;
+        _state.cpuTurnRunning = true;
+
+        var DART_DELAY = 900;
+        var dartsThrown = 0;
+
+        function _throwNext() {
+            if (dartsThrown >= 3) {
+                _state.cpuTurnRunning = false;
+                _lockBoard(false);
+                setTimeout(_onNext, 600);
+                return;
+            }
+            var dart = _cpuChooseDart();
+            dartsThrown++;
+            _onThrow(dart.segment, dart.multiplier);
+            setTimeout(_throwNext, DART_DELAY);
+        }
+
+        _lockBoard(true);
+        var nb = document.getElementById('r1k-next-btn'); if (nb) nb.disabled = true;
+        var ub = document.getElementById('r1k-undo-btn'); if (ub) ub.disabled = true;
+        setTimeout(_throwNext, 600);
+    }
+
+    function _cpuChooseDart() {
+        var profile  = _cpuProfile();
+        var intended = _cpuIntend();
+        return _cpuApplyVariance(intended.segment, intended.multiplier, profile);
+    }
+
+    function _cpuIntend() {
+        var diff = _state.cpuDifficulty;
+        var r = Math.random();
+        if (_state.variant === 'twenties') {
+            if (diff === 'hard') {
+                if (r < 0.85) return { segment: 20, multiplier: 3 };
+                return { segment: 20, multiplier: 2 };
+            } else if (diff === 'medium') {
+                if (r < 0.60) return { segment: 20, multiplier: 3 };
+                if (r < 0.80) return { segment: 20, multiplier: 2 };
+                return { segment: 20, multiplier: 1 };
+            } else {
+                // Easy — mix including occasional brain fade
+                if (r < 0.35) return { segment: 20, multiplier: 3 };
+                if (r < 0.60) return { segment: 20, multiplier: 2 };
+                if (r < 0.80) return { segment: 20, multiplier: 1 };
+                var BOARD_RING = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+                return { segment: BOARD_RING[Math.floor(Math.random() * BOARD_RING.length)], multiplier: 1 };
+            }
+        } else {
+            // All-numbers: always aim T20
+            return { segment: 20, multiplier: 3 };
+        }
+    }
+
+    function _cpuProfile() {
+        var profiles = {
+            easy:   { trebleHit: 0.45, trebleSingle: 0.30, doubleHit: 0.55, doubleSingle: 0.25, singleHit: 0.88 },
+            medium: { trebleHit: 0.72, trebleSingle: 0.18, doubleHit: 0.68, doubleSingle: 0.18, singleHit: 0.94 },
+            hard:   { trebleHit: 0.88, trebleSingle: 0.08, doubleHit: 0.82, doubleSingle: 0.12, singleHit: 0.98 },
+        };
+        return profiles[_state.cpuDifficulty] || profiles.medium;
+    }
+
+    function _cpuApplyVariance(segment, multiplier, profile) {
+        var BOARD_RING = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+        function adjacent(seg) {
+            var idx = BOARD_RING.indexOf(seg);
+            if (idx === -1) return seg;
+            return BOARD_RING[(idx + (Math.random() < 0.5 ? 1 : -1) + BOARD_RING.length) % BOARD_RING.length];
+        }
+        var r = Math.random();
+        if (multiplier === 3) {
+            if (r < profile.trebleHit) return { segment: segment, multiplier: 3 };
+            if (r < profile.trebleHit + profile.trebleSingle) return { segment: segment, multiplier: 1 };
+            return { segment: adjacent(segment), multiplier: 1 };
+        }
+        if (multiplier === 2) {
+            if (r < profile.doubleHit) return { segment: segment, multiplier: 2 };
+            if (r < profile.doubleHit + profile.doubleSingle) return { segment: segment, multiplier: 1 };
+            return { segment: 0, multiplier: 0 };
+        }
+        if (r < profile.singleHit) return { segment: segment, multiplier: 1 };
+        return { segment: adjacent(segment), multiplier: 1 };
     }
 
     function _clearTurn() {
@@ -575,6 +701,7 @@ var RACE1000_GAME = (function () {
     // ── Undo ──────────────────────────────────────────────────────────────────
 
     function _onUndo() {
+        if (_state.cpuTurnRunning) return;
         if (_throwHistory.length === 0) return;
 
         _throwHistory.pop();
