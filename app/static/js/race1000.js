@@ -625,25 +625,50 @@ var RACE1000_GAME = (function () {
     function _cpuIntend() {
         var diff = _state.cpuDifficulty;
         var r = Math.random();
+        var BOARD_RING = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+
         if (_state.variant === 'twenties') {
             if (diff === 'hard') {
-                if (r < 0.85) return { segment: 20, multiplier: 3 };
-                return { segment: 20, multiplier: 2 };
-            } else if (diff === 'medium') {
+                // Hard (was Medium): T20 60%, D20 20%, S20 20%
                 if (r < 0.60) return { segment: 20, multiplier: 3 };
                 if (r < 0.80) return { segment: 20, multiplier: 2 };
                 return { segment: 20, multiplier: 1 };
-            } else {
-                // Easy — mix including occasional brain fade
+            } else if (diff === 'medium') {
+                // Medium (was Easy): T20 35%, D20 25%, S20 25%, brain fade 15%
                 if (r < 0.35) return { segment: 20, multiplier: 3 };
                 if (r < 0.60) return { segment: 20, multiplier: 2 };
-                if (r < 0.80) return { segment: 20, multiplier: 1 };
-                var BOARD_RING = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+                if (r < 0.85) return { segment: 20, multiplier: 1 };
+                return { segment: BOARD_RING[Math.floor(Math.random() * BOARD_RING.length)], multiplier: 1 };
+            } else {
+                // Easy (new): T20 <5%, D20 <10%, lots of S20/S1/S5, regular brain fades
+                if (r < 0.04) return { segment: 20, multiplier: 3 };
+                if (r < 0.12) return { segment: 20, multiplier: 2 };
+                if (r < 0.35) return { segment: 20, multiplier: 1 };
+                if (r < 0.52) return { segment: 1,  multiplier: 1 };
+                if (r < 0.67) return { segment: 5,  multiplier: 1 };
                 return { segment: BOARD_RING[Math.floor(Math.random() * BOARD_RING.length)], multiplier: 1 };
             }
         } else {
-            // All-numbers: always aim T20
-            return { segment: 20, multiplier: 3 };
+            // All-numbers variant
+            if (diff === 'hard') {
+                // Hard: mostly T20, occasional T19
+                if (r < 0.85) return { segment: 20, multiplier: 3 };
+                return { segment: 19, multiplier: 3 };
+            } else if (diff === 'medium') {
+                // Medium: mix of T20, D20, S20 with some brain fades
+                if (r < 0.35) return { segment: 20, multiplier: 3 };
+                if (r < 0.60) return { segment: 20, multiplier: 2 };
+                if (r < 0.80) return { segment: 20, multiplier: 1 };
+                return { segment: BOARD_RING[Math.floor(Math.random() * BOARD_RING.length)], multiplier: 1 };
+            } else {
+                // Easy: T20 <5%, D20 <10%, mainly singles, lots of S1/S5, regular brain fades
+                if (r < 0.04) return { segment: 20, multiplier: 3 };
+                if (r < 0.12) return { segment: 20, multiplier: 2 };
+                if (r < 0.30) return { segment: 20, multiplier: 1 };
+                if (r < 0.47) return { segment: 1,  multiplier: 1 };
+                if (r < 0.62) return { segment: 5,  multiplier: 1 };
+                return { segment: BOARD_RING[Math.floor(Math.random() * BOARD_RING.length)], multiplier: 1 };
+            }
         }
     }
 
