@@ -103,7 +103,7 @@ const UI = (() => {
             } else {
                 tile.addEventListener('click', () => {
                     _buildMatchSetupScreen(
-                        gt.value, existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai
+                        gt.value, existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives, onBermuda, onRace1000
                     );
                 });
             }
@@ -122,7 +122,7 @@ const UI = (() => {
     }
 
     // ── Match setup screen: checkout / sets / legs / players / start ──
-    function _buildMatchSetupScreen(gameType, existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai) {
+    function _buildMatchSetupScreen(gameType, existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives, onBermuda, onRace1000) {
         const app = document.getElementById('app');
         app.innerHTML = '';
         app.style.cssText = '';
