@@ -30,7 +30,7 @@ const UI = (() => {
         });
     }
 
-    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives, onBermuda) {
+    function buildSetupScreen(existingPlayers, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives, onBermuda, onRace1000) {
         // Clear any lingering modal overlays from the previous game screen
         ['confirm-modal', 'rules-modal'].forEach(function(id) {
             var el = document.getElementById(id);
@@ -68,7 +68,7 @@ const UI = (() => {
             { value: 'Killer',   label: 'Killer',   sub: 'A game of doubles', icon: '☠️' },
             { value: 'Baseball', label: 'Baseball', sub: '9 innings',      icon: '⚾' },
             { value: 'NineLives',       label: 'Nine Lives',       sub: 'Last cat standing', icon: '🐱' },
-            { value: 'RaceTo1000',      label: 'Race to 1000',     sub: 'Coming Soon',    icon: '🏁', comingSoon: true },
+            { value: 'RaceTo1000',      label: 'Race to 1000',     sub: 'First to 1000',  icon: '🏁' },
             { value: 'BermudaTriangle', label: 'Bermuda Triangle', sub: '13-round scorer', icon: '🔺' },
             { value: 'Practice',        label: 'Practice',         sub: 'Solo training',  icon: '🎪', centred: true },
         ];
@@ -98,6 +98,8 @@ const UI = (() => {
                 tile.addEventListener('click', () => { if (onNineLives) onNineLives(); });
             } else if (gt.value === 'BermudaTriangle') {
                 tile.addEventListener('click', () => { if (onBermuda) onBermuda(); });
+            } else if (gt.value === 'RaceTo1000') {
+                tile.addEventListener('click', () => { if (onRace1000) onRace1000(); });
             } else {
                 tile.addEventListener('click', () => {
                     _buildMatchSetupScreen(
@@ -302,7 +304,7 @@ const UI = (() => {
         backLink.textContent = '← BACK TO HOME';
         backLink.addEventListener('click', () => {
             API.getPlayers().then(p => {
-                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives, onBermuda);
+                buildSetupScreen(p, onStartGame, onViewStats, onPractice, onCricket, onShanghai, onBaseball, onKiller, onNineLives, onBermuda, onRace1000);
             });
         });
         _appTarget.appendChild(backLink);
@@ -1308,6 +1310,31 @@ const UI = (() => {
                 {
                     heading: 'Strategy',
                     body: 'Close numbers quickly to stop opponents scoring on them, and build points on numbers you\'ve closed that opponents haven\'t. The Bull is often the key battleground.'
+                },
+            ]
+        },
+        'race1000': {
+            title: 'Race to 1000',
+            sections: [
+                {
+                    heading: 'Objective',
+                    body: 'Be the first player to accumulate 1,000 points or more. Unlike 01 games, there is no double-out — the first to reach the target wins.'
+                },
+                {
+                    heading: 'Gameplay',
+                    body: 'Players take turns throwing 3 darts. Points are added to a running total each turn. All 3 darts must be thrown before the turn ends.'
+                },
+                {
+                    heading: '20s Only Variant',
+                    body: 'Only the 20 segment scores. Single 20 = 20 pts, Double 20 = 40 pts, Treble 20 = 60 pts. Any other segment scores 0.'
+                },
+                {
+                    heading: 'All Numbers Variant',
+                    body: 'Any segment on the board scores its face value (segment × multiplier). For example, Treble 19 = 57 pts, Double 7 = 14 pts.'
+                },
+                {
+                    heading: 'Winning',
+                    body: 'A player wins by reaching 1,000+ points after completing all 3 darts of their turn. If multiple players reach 1,000 in the same round, the player with the highest score wins.'
                 },
             ]
         },

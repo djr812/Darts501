@@ -2281,6 +2281,216 @@ body.mode-practice #app {
     padding: 3px 0;
 }
 
+/* ── Race to 1000 ───────────────────────────────────────────────────── */
+.r1k-progress-wrap {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    gap: 5px;
+    padding: 6px 8px;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.r1k-progress-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    gap: 6px;
+}
+
+.r1k-progress-label {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    min-width: 56px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.r1k-progress-track {
+    -webkit-flex: 1;
+    flex: 1;
+    height: 8px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.r1k-progress-fill {
+    height: 100%;
+    background: var(--text-dim);
+    border-radius: 4px;
+    width: 0%;
+    -webkit-transition: width 0.3s ease;
+    transition: width 0.3s ease;
+}
+
+.r1k-fill-active {
+    background: var(--accent);
+}
+
+.r1k-progress-score {
+    font-family: var(--font-mono);
+    font-size: 0.60rem;
+    color: var(--text-secondary);
+    min-width: 28px;
+    text-align: right;
+}
+
+.r1k-board {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    gap: 4px;
+    padding: 2px 8px 4px;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.r1k-player-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+}
+
+.r1k-active {
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.06);
+}
+
+.r1k-player-name {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    color: var(--text-primary);
+    -webkit-flex: 1;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.r1k-active .r1k-player-name { color: var(--accent); }
+
+.r1k-player-sub {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    min-width: 36px;
+    text-align: right;
+    color: var(--text-dim);
+}
+
+.r1k-sub-scoring { color: #27ae60; }
+
+.r1k-player-need {
+    font-family: var(--font-mono);
+    font-size: 0.52rem;
+    color: var(--text-dim);
+    min-width: 60px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.r1k-player-score {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    min-width: 44px;
+    text-align: right;
+}
+
+.r1k-status {
+    font-family: var(--font-mono);
+    font-size: 0.60rem;
+    letter-spacing: 0.07em;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 2px 8px;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.r1k-tabs {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    gap: 6px;
+    padding: 4px 8px;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.r1k-result-table {
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.r1k-result-row {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+}
+
+.r1k-result-row:last-child { border-bottom: none; }
+
+.r1k-result-head {
+    background: var(--bg-raised);
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    color: var(--text-dim);
+}
+
+.r1k-result-winner { background: rgba(39,174,96,0.1); }
+
+.r1k-result-name {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    -webkit-flex: 1;
+    flex: 1;
+    color: var(--text-primary);
+}
+
+.r1k-result-score {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 50px;
+    text-align: right;
+}
+
 /* ── Bermuda Triangle ───────────────────────────────────────────────── */
 .bm-round-strip {
     display: -webkit-box;

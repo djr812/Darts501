@@ -354,6 +354,22 @@ const API = (() => {
         return request('POST', '/api/baseball/matches/' + matchId + '/end', {});
     }
 
+    async function createRace1000Match(data) {
+        return request('POST', '/api/race1000/matches', data);
+    }
+    async function getRace1000Match(matchId) {
+        return request('GET', '/api/race1000/matches/' + matchId);
+    }
+    async function race1000Throw(matchId, data) {
+        return request('POST', '/api/race1000/matches/' + matchId + '/throw', data);
+    }
+    async function race1000Next(matchId, data) {
+        return request('POST', '/api/race1000/matches/' + matchId + '/next', data);
+    }
+    async function endRace1000Match(matchId) {
+        return request('POST', '/api/race1000/matches/' + matchId + '/end', {});
+    }
+
     async function createBermudaMatch(data) {
         return request('POST', '/api/bermuda/matches', data);
     }
@@ -458,6 +474,11 @@ const API = (() => {
         baseballNext,
         baseballUndo,
         endBaseballMatch,
+        createRace1000Match,
+        getRace1000Match,
+        race1000Throw,
+        race1000Next,
+        endRace1000Match,
         createBermudaMatch,
         getBermudaMatch,
         bermudaThrow,
