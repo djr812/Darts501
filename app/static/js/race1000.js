@@ -58,8 +58,11 @@ var RACE1000_GAME = (function () {
         if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
         UI.setLoading(true);
 
+        var _resolvedPlayers = [];
+
         _resolvePlayers(config.players)
             .then(function (players) {
+                _resolvedPlayers = players;
                 return API.createRace1000Match({
                     player_ids: players.map(function (p) { return p.id; }),
                     variant:    _state.variant,
@@ -70,7 +73,7 @@ var RACE1000_GAME = (function () {
                 _state.onEnd = onEnd;
                 UI.setLoading(false);
                 // Propagate isCpu flag from resolved players into state
-                players.forEach(function (p) {
+                _resolvedPlayers.forEach(function (p) {
                     if (p.isCpu) {
                         var sp = _state.players.find(function (x) { return String(x.id) === String(p.id); });
                         if (sp) sp.isCpu = true;
@@ -93,10 +96,17 @@ var RACE1000_GAME = (function () {
     function _resolvePlayers(selections) {
         return Promise.all(selections.map(function (sel) {
             if (sel.isCpu) {
-                return API.createPlayer('CPU').then(function (p) {
-                    _state.cpuDifficulty = sel.difficulty || 'medium';
-                    return { id: p.id, name: 'CPU', isCpu: true };
-                });
+                // Use dedicated getCpuPlayer — finds existing record without risking 409
+                return API.getCpuPlayer()
+                    .catch(function () { return null; })
+                    .then(function (rec) {
+                        if (!rec) return API.createPlayer('CPU');
+                        return rec;
+                    })
+                    .then(function (rec) {
+                        _state.cpuDifficulty = sel.difficulty || 'medium';
+                        return { id: rec.id, name: 'CPU', isCpu: true };
+                    });
             }
             if (sel.mode === 'existing') return Promise.resolve({ id: sel.id, name: sel.name, isCpu: false });
             return API.createPlayer(sel.name).then(function (p) { return { id: p.id, name: p.name, isCpu: false }; });
