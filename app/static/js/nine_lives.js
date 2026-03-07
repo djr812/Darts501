@@ -47,6 +47,8 @@ var NINE_LIVES_GAME = (function () {
         _state.multiplier         = 1;
         _state.turnNumber         = 1;
         _state.setComplete        = false;
+        _state.cpuDifficulty  = 'medium';
+        _state.cpuTurnRunning = false;
         _pendingThrows  = [];
         _throwHistory   = [];
         _hitThisTurn    = false;
@@ -56,18 +58,29 @@ var NINE_LIVES_GAME = (function () {
         if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
         UI.setLoading(true);
 
+        var _resolvedPlayers = [];
         _resolvePlayers(config.players)
             .then(function (players) {
+                _resolvedPlayers = players;
                 return API.createNineLivesMatch({
                     player_ids: players.map(function (p) { return p.id; }),
                 });
             })
             .then(function (s) {
                 _applyState(s);
+                _resolvedPlayers.forEach(function (p) {
+                    if (p.isCpu) {
+                        var sp = _state.players.find(function (x) { return String(x.id) === String(p.id); });
+                        if (sp) sp.isCpu = true;
+                    }
+                });
                 _state.onEnd = onEnd;
                 UI.setLoading(false);
                 _buildScreen();
-                _announceCurrentPlayer(true);
+                var startDelay = _announceCurrentPlayer(true);
+                if (_isCpuPlayer(_currentPlayer())) {
+                    setTimeout(_runCpuTurn, startDelay + 400);
+                }
             })
             .catch(function (err) {
                 UI.setLoading(false);
@@ -78,13 +91,31 @@ var NINE_LIVES_GAME = (function () {
     // ── Player resolution ─────────────────────────────────────────────────────
 
     function _resolvePlayers(selections) {
-        var promises = selections.map(function (sel) {
-            if (sel.mode === 'existing') {
-                return Promise.resolve({ id: sel.id, name: sel.name });
+        // Process sequentially to avoid race conditions
+        var result = [];
+        function resolveNext(i) {
+            if (i >= selections.length) return Promise.resolve(result);
+            var sel = selections[i];
+            var p;
+            if (sel.isCpu) {
+                p = API.getCpuPlayer()
+                    .catch(function () { return null; })
+                    .then(function (rec) { return rec || API.createPlayer('CPU'); })
+                    .then(function (rec) {
+                        _state.cpuDifficulty = sel.difficulty || 'medium';
+                        result.push({ id: rec.id, name: 'CPU', isCpu: true });
+                    });
+            } else if (sel.mode === 'existing') {
+                result.push({ id: sel.id, name: sel.name, isCpu: false });
+                p = Promise.resolve();
+            } else {
+                p = API.createPlayer(sel.name).then(function (rec) {
+                    result.push({ id: rec.id, name: rec.name, isCpu: false });
+                });
             }
-            return API.createPlayer(sel.name).then(function (p) { return { id: p.id, name: p.name }; });
-        });
-        return Promise.all(promises);
+            return p.then(function () { return resolveNext(i + 1); });
+        }
+        return resolveNext(0);
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -92,11 +123,19 @@ var NINE_LIVES_GAME = (function () {
     function _applyState(s) {
         _state.matchId            = s.match_id;
         _state.gameId             = s.game_id;
-        _state.players            = s.players || [];
+        var prev = _state.players || [];
+        _state.players = (s.players || []).map(function (p) {
+            var old = prev.find(function (pp) { return String(pp.id) === String(p.id); });
+            return Object.assign({}, p, { isCpu: old ? !!old.isCpu : (p.name === 'CPU') });
+        });
         _state.currentPlayerIndex = s.current_player_index;
         _state.currentPlayerId    = s.current_player_id ? String(s.current_player_id) : null;
         _state.status             = s.status || 'active';
         _state.winnerId           = s.winner_id || null;
+    }
+
+    function _isCpuPlayer(p) {
+        return p && (p.isCpu === true || p.name === 'CPU');
     }
 
     function _currentPlayer() {
@@ -401,6 +440,7 @@ var NINE_LIVES_GAME = (function () {
     function _onThrow(segment, multiplier) {
         if (_state.setComplete || _state.status !== 'active') return;
         if (_pendingThrows.length >= 3) return;
+        if (_state.cpuTurnRunning && !_isCpuPlayer(_currentPlayer())) return;
 
         var p      = _currentPlayer();
         var ws     = _workingState();
@@ -503,10 +543,16 @@ var NINE_LIVES_GAME = (function () {
                 // Announce life lost / eliminations then next player
                 if (!hitThisTurn) {
                     _announceLifeLost(lifeLost, eliminated, function () {
-                        _announceCurrentPlayer(false);
+                        var d = _announceCurrentPlayer(false);
+                        if (_isCpuPlayer(_currentPlayer())) {
+                            setTimeout(_runCpuTurn, d + 400);
+                        }
                     });
                 } else {
-                    _announceCurrentPlayer(false);
+                    var d = _announceCurrentPlayer(false);
+                    if (_isCpuPlayer(_currentPlayer())) {
+                        setTimeout(_runCpuTurn, d + 400);
+                    }
                 }
             })
             .catch(function (err) {
@@ -515,7 +561,119 @@ var NINE_LIVES_GAME = (function () {
             });
     }
 
+    // ── CPU turn ──────────────────────────────────────────────────────────────
+
+    function _runCpuTurn() {
+        if (_state.cpuTurnRunning || _state.status !== 'active') return;
+        if (!_isCpuPlayer(_currentPlayer())) return;
+        _state.cpuTurnRunning = true;
+        _lockBoard(true);
+        var nb = document.getElementById('nl-next-btn'); if (nb) nb.disabled = true;
+        var ub = document.getElementById('nl-undo-btn'); if (ub) ub.disabled = true;
+
+        var DART_DELAY = 900;
+        var dartsThrown = 0;
+
+        function throwNext() {
+            // Stop early if we've already hit (no benefit to throwing more in Nine Lives
+            // once target is hit — but rules say all 3 must be thrown, so continue)
+            if (dartsThrown >= 3 || _state.setComplete) {
+                _state.cpuTurnRunning = false;
+                _lockBoard(false);
+                setTimeout(_onNext, 600);
+                return;
+            }
+            var ws   = _workingState();
+            var dart = _cpuNLChooseDart(ws.target, ws.hit);
+            dartsThrown++;
+            _onThrow(dart.segment, dart.multiplier);
+            setTimeout(throwNext, DART_DELAY);
+        }
+
+        setTimeout(throwNext, 600);
+    }
+
+    function _cpuNLChooseDart(target, alreadyHit) {
+        var profile = _cpuNLProfile();
+        var BOARD_RING = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+
+        function adjacentTo(seg) {
+            var idx = BOARD_RING.indexOf(seg);
+            if (idx === -1) return seg;
+            return BOARD_RING[(idx + (Math.random() < 0.5 ? 1 : -1) + BOARD_RING.length) % BOARD_RING.length];
+        }
+
+        // If already hit this turn, remaining darts are neutral — just throw singles
+        // CPU still aims at target (neutral hit) or misses; doesn't matter strategically
+        if (alreadyHit) {
+            return { segment: target, multiplier: 1 };
+        }
+
+        // CPU intends to hit the target with some multiplier
+        var r = Math.random();
+
+        // Decide intended multiplier based on difficulty
+        var intendedMult;
+        if (profile.preferTreble && r < 0.30) {
+            intendedMult = 3;
+        } else if (r < profile.doubleRate) {
+            intendedMult = 2;
+        } else {
+            intendedMult = 1;
+        }
+
+        // Apply accuracy variance
+        var acc = Math.random();
+        if (acc < profile.hitRate) {
+            // Hit — lands on target with intended multiplier
+            return { segment: target, multiplier: intendedMult };
+        } else if (acc < profile.hitRate + profile.adjacentRate) {
+            // Near miss — adjacent segment, single
+            return { segment: adjacentTo(target), multiplier: 1 };
+        } else if (acc < profile.hitRate + profile.adjacentRate + profile.brainFadeRate) {
+            // Brain fade — random segment
+            return { segment: BOARD_RING[Math.floor(Math.random() * BOARD_RING.length)], multiplier: 1 };
+        } else {
+            // Complete miss
+            return { segment: 0, multiplier: 0 };
+        }
+    }
+
+    function _cpuNLProfile() {
+        var profiles = {
+            // Easy: ~4% hit rate per dart → ~11% chance of hitting in a full turn of 3
+            // Overwhelmingly misses — adjacent landings, brain fades, complete misses
+            easy: {
+                preferTreble:  false,
+                doubleRate:    0.02,
+                hitRate:       0.04,
+                adjacentRate:  0.25,
+                brainFadeRate: 0.40,
+                // remainder (~0.31) = complete miss
+            },
+            // Medium: ~35% hit rate per dart → ~73% chance of hitting in a full turn
+            medium: {
+                preferTreble:  false,
+                doubleRate:    0.15,
+                hitRate:       0.35,
+                adjacentRate:  0.25,
+                brainFadeRate: 0.20,
+            },
+            // Hard: ~85% hit rate per dart — dangerous, occasionally aims trebles
+            hard: {
+                preferTreble:  true,
+                doubleRate:    0.30,
+                hitRate:       0.85,
+                adjacentRate:  0.10,
+                brainFadeRate: 0.03,
+            },
+        };
+        return profiles[_state.cpuDifficulty] || profiles.medium;
+    }
+
     function _clearTurn() {
+        _state.cpuDifficulty  = 'medium';
+        _state.cpuTurnRunning = false;
         _pendingThrows  = [];
         _throwHistory   = [];
         _hitThisTurn    = false;
@@ -547,6 +705,7 @@ var NINE_LIVES_GAME = (function () {
     // ── Undo ──────────────────────────────────────────────────────────────────
 
     function _onUndo() {
+        if (_state.cpuTurnRunning) return;
         if (_throwHistory.length === 0) return;
 
         _throwHistory.pop();
@@ -678,11 +837,14 @@ var NINE_LIVES_GAME = (function () {
 
     function _announceCurrentPlayer(isFirst) {
         var p = _currentPlayer();
-        if (!p) return;
+        if (!p) return 0;
         var ws = _workingState();
         var target = ws.target <= 20 ? ws.target : 20;
         var delay  = isFirst ? 600 : 400;
-        _speak(p.name + ', you are targeting ' + target + '.', delay);
+        var msg    = p.name + ', you are targeting ' + target + '.';
+        _speak(msg, delay);
+        // Return total time before speech finishes so callers can wait
+        return delay + msg.length * 85;
     }
 
     function _speakDart(segment, multiplier, isHit) {
