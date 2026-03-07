@@ -805,22 +805,33 @@
 
         UI.appendSetupHeader(inner, 'Bermuda Triangle');
 
+        // Player count — 1 = vs CPU, 2–4 = multiplayer
         var countSection = document.createElement('div');
         countSection.className = 'setup-section';
         countSection.innerHTML = '<div class="setup-label">NUMBER OF PLAYERS</div>';
         var countRow = document.createElement('div');
         countRow.className = 'setup-option-row';
         var selectedCount = 2;
-        [2, 3, 4].forEach(function (n) {
+        [1, 2, 3, 4].forEach(function (n) {
             var btn = document.createElement('button');
             btn.className = 'option-btn' + (n === 2 ? ' selected' : '');
             btn.type = 'button';
-            btn.textContent = n;
+            if (n === 1) {
+                btn.innerHTML = '1<span class="option-hint">vs CPU</span>';
+            } else {
+                btn.textContent = n;
+            }
             btn.addEventListener('click', function () {
                 countRow.querySelectorAll('.option-btn').forEach(function (b) { b.classList.remove('selected'); });
                 btn.classList.add('selected');
                 selectedCount = n;
-                UI.renderCricketPlayerSlots(existingPlayers, selectedCount, namesSection);
+                if (n === 1) {
+                    UI.showDifficultyModal(function (difficulty) {
+                        UI.renderBermudaPlayerSlots(existingPlayers, 1, namesSection, difficulty);
+                    });
+                } else {
+                    UI.renderBermudaPlayerSlots(existingPlayers, n, namesSection, null);
+                }
             });
             countRow.appendChild(btn);
         });
@@ -830,12 +841,12 @@
         var namesSection = document.createElement('div');
         namesSection.className = 'setup-section';
         inner.appendChild(namesSection);
-        UI.renderCricketPlayerSlots(existingPlayers, 2, namesSection);
+        UI.renderBermudaPlayerSlots(existingPlayers, 2, namesSection, null);
 
         var startBtn = document.createElement('button');
         startBtn.className = 'start-btn'; startBtn.textContent = 'START MATCH'; startBtn.type = 'button';
         startBtn.addEventListener('click', function () {
-            var players = UI.collectCricketPlayers(namesSection);
+            var players = UI.collectBermudaPlayers(namesSection);
             if (!players) return;
             SPEECH.unlock();
             if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();

@@ -492,7 +492,7 @@ var RACE1000_GAME = (function () {
         if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled() && pts > 0) SOUNDS.dart();
 
         _addPill(segment, multiplier, pts);
-        _speakDart(segment, multiplier, pts);
+        var dartDuration = _speakDart(segment, multiplier, pts);
         _updateTurnSub();
 
         var ub = document.getElementById('r1k-undo-btn');
@@ -503,6 +503,7 @@ var RACE1000_GAME = (function () {
             _lockBoard(true);
             var nb = document.getElementById('r1k-next-btn');
             if (nb) nb.disabled = false;
+            _speakTurnSummary(dartDuration);
         }
     }
 
