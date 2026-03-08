@@ -503,7 +503,6 @@ var RACE1000_GAME = (function () {
             _lockBoard(true);
             var nb = document.getElementById('r1k-next-btn');
             if (nb) nb.disabled = false;
-            _speakTurnSummary(dartDuration);
         }
     }
 
