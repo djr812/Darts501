@@ -124,6 +124,31 @@ body.mode-stats #app {
     overflow: hidden;
 }
 
+/* ── Small screens (phones in landscape): stats page becomes fully scrollable ──
+   Targets landscape viewports narrower than 1024px (phones) but not iPad (1024px+) */
+@media (max-width: 1023px) and (orientation: landscape) {
+    body.mode-stats {
+        overflow: auto;
+        height: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    body.mode-stats #app {
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+    }
+    /* Stats player picker */
+    .stats-player-list {
+        overflow: visible;
+        height: auto;
+    }
+    /* Prevent SVG charts from overflowing narrow screens */
+    .daily-trend-svg,
+    .heatmap-svg-wrap svg {
+        max-width: 100%;
+    }
+}
+
 /* --- Header --- */
 #header {
     grid-area: header;
@@ -4623,6 +4648,57 @@ body.mode-cricket #app {
     padding: 12px;
     -webkit-box-sizing: border-box;
     box-sizing: border-box;
+}
+
+/* ── Mobile: single scrollable column ── */
+@media (max-width: 1023px) and (orientation: landscape) {
+    .stats-content {
+        overflow: visible;
+        height: auto;
+        flex: none;
+    }
+
+    .stats-two-col {
+        -webkit-box-orient: vertical;
+        -webkit-flex-direction: column;
+        flex-direction: column;
+        overflow: visible;
+        height: auto;
+        flex: none;
+    }
+
+    .stats-col {
+        overflow: visible;
+        height: auto;
+        width: 100% !important;
+        -webkit-box-sizing: border-box;
+        box-sizing: border-box;
+    }
+
+    .stats-col-left {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .stats-col-right {
+        width: 100% !important;
+        -webkit-box-sizing: border-box;
+        box-sizing: border-box;
+    }
+
+    .condensed-stats-card {
+        max-height: none;
+    }
+
+    .condensed-stats-scroll {
+        overflow: visible;
+        height: auto;
+    }
+
+    .heatmap-inner {
+        -webkit-flex-wrap: wrap;
+        flex-wrap: wrap;
+    }
 }
 
 /* ── Condensed stats card ── */
