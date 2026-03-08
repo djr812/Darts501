@@ -1457,39 +1457,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 }
 
 /* Filter bar */
-.stats-filter-bar {
-    display: flex;
-    flex-direction: column;
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-raised);
-    flex-shrink: 0;
-}
-
-.filter-group {
-    display: flex;
-}
-
-.filter-btn {
-    flex: 1;
-    height: 34px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-surface);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
-    letter-spacing: 0.12em;
-    cursor: pointer;
-    transition: all 0.1s ease;
-}
-
-.filter-btn.active {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: var(--accent-glow);
-}
-
 /* Scrollable content */
 .stats-content {
     flex: 1;
@@ -1599,12 +1566,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 }
 .stats-header > * + * {
     margin-left: 16px;
-}
-.stats-filter-bar > * + * {
-    margin-top: 6px;
-}
-.filter-group > * + * {
-    margin-left: 6px;
 }
 .stats-content > * + * {
     margin-top: 12px;
@@ -1975,15 +1936,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
 
 
 /* Trend chart card */
-.trend-card {
-    padding: 12px;
-    overflow: hidden;
-}
-
-.trend-chart-svg {
-    border-radius: 4px;
-}
-
 /* =========================================================
    PRACTICE MODE
    ========================================================= */
@@ -4707,11 +4659,6 @@ body.mode-cricket #app {
 
 /* history card inside left column — remove extra margin */
 .stats-col-left .history-card {
-    margin: 0;
-}
-
-/* trend card inside left column */
-.stats-col-left .trend-card {
     margin: 0;
 }
 

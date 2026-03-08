@@ -116,116 +116,34 @@ const STATS = (() => {
         app.appendChild(header);
 
         // ---- Scope filters ----
-        const filterBar = document.createElement('div');
-        filterBar.className = 'stats-filter-bar';
-
-        // Game type filter
-        const gameTypeGroup = document.createElement('div');
-        gameTypeGroup.className = 'filter-group';
-        const gameTypes = [
-            { label: 'ALL GAMES', gameType: 'all' },
-            { label: '501',       gameType: '501' },
-            { label: '201',       gameType: '201' },
-        ];
-        gameTypes.forEach((opt, i) => {
-            const btn = document.createElement('button');
-            btn.className = 'filter-btn' + (i === 0 ? ' active' : '');
-            btn.dataset.gameType = opt.gameType;
-            btn.type = 'button';
-            btn.textContent = opt.label;
-            btn.addEventListener('click', () => {
-                gameTypeGroup.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                _reload(player.id, filterBar, contentArea);
-            });
-            gameTypeGroup.appendChild(btn);
-        });
-
-        // Checkout rule filter
-        const checkoutGroup = document.createElement('div');
-        checkoutGroup.className = 'filter-group';
-        const checkouts = [
-            { label: 'ALL RULES',   doubleOut: 'all' },
-            { label: 'DOUBLE OUT',  doubleOut: '1'   },
-            { label: 'SINGLE OUT',  doubleOut: '0'   },
-        ];
-        checkouts.forEach((opt, i) => {
-            const btn = document.createElement('button');
-            btn.className = 'filter-btn' + (i === 0 ? ' active' : '');
-            btn.dataset.doubleOut = opt.doubleOut;
-            btn.type = 'button';
-            btn.textContent = opt.label;
-            btn.addEventListener('click', () => {
-                checkoutGroup.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                _reload(player.id, filterBar, contentArea);
-            });
-            checkoutGroup.appendChild(btn);
-        });
-
-        // Match count filter (for trend chart)
-        const limitGroup = document.createElement('div');
-        limitGroup.className = 'filter-group';
-        [10, 20, 50].forEach((n, i) => {
-            const btn = document.createElement('button');
-            btn.className = 'filter-btn' + (i === 1 ? ' active' : '');
-            btn.dataset.limit = n;
-            btn.type = 'button';
-            btn.textContent = `LAST ${n}`;
-            btn.addEventListener('click', () => {
-                limitGroup.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                _reload(player.id, filterBar, contentArea);
-            });
-            limitGroup.appendChild(btn);
-        });
-
-        filterBar.appendChild(gameTypeGroup);
-        filterBar.appendChild(checkoutGroup);
-        filterBar.appendChild(limitGroup);
-        app.appendChild(filterBar);
-
         // ---- Content area ----
         const contentArea = document.createElement('div');
         contentArea.className = 'stats-content';
         app.appendChild(contentArea);
 
         // Initial load
-        _reload(player.id, filterBar, contentArea);
+        _reload(player.id, contentArea);
     }
 
     // ------------------------------------------------------------------
     // Data load + render
     // ------------------------------------------------------------------
 
-    function _getScope(filterBar) {
-        const activeGameType  = filterBar.querySelector('.filter-group:nth-child(1) .filter-btn.active');
-        const activeDoubleOut = filterBar.querySelector('.filter-group:nth-child(2) .filter-btn.active');
-        const activeLimit     = filterBar.querySelector('.filter-group:nth-child(3) .filter-btn.active');
-        return {
-            gameType:  (activeGameType  && activeGameType.dataset.gameType)   || 'all',
-            doubleOut: (activeDoubleOut && activeDoubleOut.dataset.doubleOut)  || 'all',
-            limit:     (activeLimit     && activeLimit.dataset.limit)          || '20',
-        };
-    }
-
-    async function _reload(playerId, filterBar, contentArea) {
+    async function _reload(playerId, contentArea) {
         contentArea.innerHTML = '<div class="stats-loading">LOADING...</div>';
-        const scope = _getScope(filterBar);
 
         try {
-            const [data, trend, heatmap] = await Promise.all([
-                API.getPlayerStats(playerId, scope),
-                API.getPlayerTrend(playerId, scope),
-                API.getPlayerHeatmap(playerId, scope),
+            const [data, heatmap] = await Promise.all([
+                API.getPlayerStats(playerId, {}),
+                API.getPlayerHeatmap(playerId, {}),
             ]);
-            _render(data, trend, heatmap, contentArea);
+            _render(data, heatmap, contentArea);
         } catch (err) {
             contentArea.innerHTML = `<div class="stats-error">FAILED TO LOAD STATS<br><small>${err.message}</small></div>`;
         }
     }
 
-    function _render(data, trend, heatmap, container) {
+    function _render(data, heatmap, container) {
         container.innerHTML = '';
 
         const { records, scoring, checkout } = data;
@@ -235,14 +153,11 @@ const STATS = (() => {
         cols.className = 'stats-two-col';
         container.appendChild(cols);
 
-        // ── LEFT column: trend chart + session history ──
+        // ── LEFT column: session history ──
         const leftCol = document.createElement('div');
         leftCol.className = 'stats-col stats-col-left';
         cols.appendChild(leftCol);
 
-        if (trend && trend.matches && trend.matches.length > 1) {
-            leftCol.appendChild(_buildTrendChart(trend.matches));
-        }
         _renderHistory(data.player.id, leftCol);
 
         // ── RIGHT column: condensed stats card ──
@@ -327,153 +242,6 @@ const STATS = (() => {
     }
 
     // ------------------------------------------------------------------
-    // Trend chart
-    // ------------------------------------------------------------------
-
-    function _buildTrendChart(matches) {
-        const W = 560, H = 160;
-        const PAD = { top: 18, right: 16, bottom: 28, left: 42 };
-        const innerW = W - PAD.left - PAD.right;
-        const innerH = H - PAD.top  - PAD.bottom;
-
-        const avgs = matches.map(m => m.avg);
-        const minV = Math.max(0,   Math.floor(Math.min(...avgs) / 10) * 10 - 10);
-        const maxV = Math.min(180, Math.ceil (Math.max(...avgs) / 10) * 10 + 10);
-        const range = maxV - minV || 10;
-
-        function xPos(i) {
-            return PAD.left + (i / Math.max(matches.length - 1, 1)) * innerW;
-        }
-        function yPos(v) {
-            return PAD.top + innerH - ((v - minV) / range) * innerH;
-        }
-
-        function el(tag, attrs, ns) {
-            const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
-            Object.keys(attrs).forEach(k => e.setAttribute(k, attrs[k]));
-            return e;
-        }
-
-        const svg = el('svg', {
-            viewBox: `0 0 ${W} ${H}`,
-            width: '100%',
-            style: 'display:block;',
-            class: 'trend-chart-svg',
-        });
-
-        // Background
-        svg.appendChild(el('rect', { x: 0, y: 0, width: W, height: H,
-            fill: '#1a1a1a', rx: 6 }));
-
-        // Grid lines + Y labels
-        const yTicks = 4;
-        for (let i = 0; i <= yTicks; i++) {
-            const v = minV + (range / yTicks) * i;
-            const y = yPos(v);
-
-            const line = el('line', {
-                x1: PAD.left, x2: W - PAD.right,
-                y1: y, y2: y,
-                stroke: '#2a2a2a', 'stroke-width': 1,
-            });
-            svg.appendChild(line);
-
-            const label = el('text', {
-                x: PAD.left - 6, y: y,
-                'text-anchor': 'end', 'dominant-baseline': 'central',
-                fill: '#555', 'font-size': 9, 'font-family': 'monospace',
-            });
-            label.textContent = v.toFixed(0);
-            svg.appendChild(label);
-        }
-
-        // Overall average reference line
-        const overallAvg = avgs.reduce((a, b) => a + b, 0) / avgs.length;
-        const avgY = yPos(overallAvg);
-        const avgLine = el('line', {
-            x1: PAD.left, x2: W - PAD.right,
-            y1: avgY, y2: avgY,
-            stroke: '#a87200', 'stroke-width': 1,
-            'stroke-dasharray': '4 3',
-        });
-        svg.appendChild(avgLine);
-        const avgLabel = el('text', {
-            x: W - PAD.right + 2, y: avgY,
-            'dominant-baseline': 'central',
-            fill: '#a87200', 'font-size': 8, 'font-family': 'monospace',
-        });
-        avgLabel.textContent = overallAvg.toFixed(1);
-        svg.appendChild(avgLabel);
-
-        // Filled area under line
-        const areaPoints = matches.map((m, i) => `${xPos(i)},${yPos(m.avg)}`).join(' ');
-        const firstX = xPos(0), lastX = xPos(matches.length - 1);
-        const baseY  = PAD.top + innerH;
-        const area = el('polygon', {
-            points: `${firstX},${baseY} ${areaPoints} ${lastX},${baseY}`,
-            fill: 'rgba(240,165,0,0.08)',
-        });
-        svg.appendChild(area);
-
-        // Line
-        const linePath = matches.map((m, i) =>
-            `${i === 0 ? 'M' : 'L'}${xPos(i)},${yPos(m.avg)}`
-        ).join(' ');
-        svg.appendChild(el('path', {
-            d: linePath,
-            fill: 'none',
-            stroke: '#f0a500',
-            'stroke-width': 2,
-            'stroke-linejoin': 'round',
-            'stroke-linecap':  'round',
-        }));
-
-        // Data points + tooltips
-        matches.forEach((m, i) => {
-            const cx = xPos(i), cy = yPos(m.avg);
-            const isFirst = i === 0, isLast = i === matches.length - 1;
-            const highlight = i === avgs.indexOf(Math.max(...avgs));
-
-            const dot = el('circle', {
-                cx, cy, r: highlight ? 5 : 3,
-                fill: highlight ? '#f0a500' : '#c87800',
-                stroke: '#0d0d0d', 'stroke-width': 1,
-                cursor: 'pointer',
-            });
-
-            const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-            title.textContent = `${m.date}  vs ${m.opponent}
-Avg: ${m.avg}  (${m.darts} darts)`;
-            dot.appendChild(title);
-            svg.appendChild(dot);
-
-            // X axis label — show first, last, and every 5th
-            if (isFirst || isLast || i % 5 === 0) {
-                const xLabel = el('text', {
-                    x: cx, y: H - PAD.bottom + 10,
-                    'text-anchor': 'middle',
-                    fill: '#444', 'font-size': 8, 'font-family': 'monospace',
-                });
-                xLabel.textContent = (i + 1);
-                svg.appendChild(xLabel);
-            }
-        });
-
-        // Chart title
-        const titleEl = el('text', {
-            x: PAD.left, y: 10,
-            fill: '#666', 'font-size': 9, 'font-family': 'monospace',
-            'letter-spacing': 1,
-        });
-        titleEl.textContent = '3-DART AVERAGE TREND';
-        svg.appendChild(titleEl);
-
-        const card = document.createElement('div');
-        card.className = 'stat-card trend-card';
-        card.appendChild(svg);
-        return card;
-    }
-
     // ------------------------------------------------------------------
     // Stats heatmap (full multi-colour gradient)
     // ------------------------------------------------------------------
