@@ -442,6 +442,211 @@ def get_player_trend(player_id):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 30-day daily average trend (all game types + practice)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@stats_bp.route("/players/<int:player_id>/stats/daily_trend", methods=["GET"])
+def get_player_daily_trend(player_id):
+    """
+    Return daily 3-dart averages for the past 30 calendar days.
+
+    Aggregates darts from ALL game types (01 games via turns/legs,
+    newer games via their own throw tables, practice via practice_sessions).
+
+    Returns:
+        { "days": [ { "date": "YYYY-MM-DD", "avg": 54.3, "darts": 72, "sessions": 2 }, ... ] }
+        Only days with at least one dart thrown are included.
+        Ordered oldest -> newest.
+    """
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id FROM players WHERE id = %s AND is_active = TRUE", (player_id,))
+    if not cursor.fetchone():
+        return jsonify({"error": "Player not found"}), 404
+
+    # Collect (date, points, darts) tuples from every source, then aggregate in Python
+    from collections import defaultdict
+    from datetime import date, timedelta
+
+    day_points = defaultdict(int)
+    day_darts  = defaultdict(int)
+    day_sessions = defaultdict(int)
+
+    # ── 501/201 via turns + legs ──────────────────────────────────────────────
+    # Use turns.created_at so each turn is dated when it was actually played.
+    cursor.execute("""
+        SELECT
+            DATE(t.created_at)                  AS day,
+            SUM(t.score_before - t.score_after) AS pts,
+            SUM(t.darts_thrown)                 AS darts,
+            COUNT(DISTINCT m.id)                AS sessions
+        FROM turns t
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
+        WHERE t.player_id    = %s
+          AND t.score_after  IS NOT NULL
+          AND t.is_bust       = 0
+          AND m.status        = 'complete'
+          AND m.session_type != 'practice'
+          AND t.created_at   >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(t.created_at)
+    """, (player_id,))
+    for r in cursor.fetchall():
+        d = str(r["day"])
+        day_points[d]   += int(r["pts"]      or 0)
+        day_darts[d]    += int(r["darts"]    or 0)
+        day_sessions[d] += int(r["sessions"] or 0)
+
+    # ── Race to 1000 ──────────────────────────────────────────────────────────
+    cursor.execute("""
+        SELECT DATE(rt.created_at) AS day, COUNT(*) AS darts, COALESCE(SUM(rt.points),0) AS pts,
+               COUNT(DISTINCT rt.match_id) AS sessions
+        FROM race1000_throws rt
+        WHERE rt.player_id = %s
+          AND rt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(rt.created_at)
+    """, (player_id,))
+    for r in cursor.fetchall():
+        d = str(r["day"])
+        day_points[d]   += int(r["pts"]   or 0)
+        day_darts[d]    += int(r["darts"] or 0)
+        day_sessions[d] += 1
+
+    # ── Nine Lives ────────────────────────────────────────────────────────────
+    cursor.execute("""
+        SELECT DATE(nt.created_at) AS day, COUNT(*) AS darts
+        FROM nine_lives_throws nt
+        WHERE nt.player_id = %s
+          AND nt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(nt.created_at)
+    """, (player_id,))
+    for r in cursor.fetchall():
+        d = str(r["day"])
+        # Nine Lives darts don't have meaningful points for a 3-dart avg,
+        # but we count darts so the denominator stays honest — points stay 0
+        day_darts[d]    += int(r["darts"] or 0)
+        day_sessions[d] += 1
+
+    # ── Killer ────────────────────────────────────────────────────────────────
+    cursor.execute("""
+        SELECT DATE(kt.created_at) AS day, COUNT(*) AS darts
+        FROM killer_throws kt
+        WHERE kt.player_id = %s
+          AND kt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(kt.created_at)
+    """, (player_id,))
+    for r in cursor.fetchall():
+        d = str(r["day"])
+        day_darts[d]    += int(r["darts"] or 0)
+        day_sessions[d] += 1
+
+    # ── Bermuda Triangle ──────────────────────────────────────────────────────
+    cursor.execute("""
+        SELECT DATE(bt.created_at) AS day, COUNT(*) AS darts, COALESCE(SUM(bt.points),0) AS pts
+        FROM bermuda_throws bt
+        WHERE bt.player_id = %s
+          AND bt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(bt.created_at)
+    """, (player_id,))
+    for r in cursor.fetchall():
+        d = str(r["day"])
+        day_points[d]   += int(r["pts"]   or 0)
+        day_darts[d]    += int(r["darts"] or 0)
+        day_sessions[d] += 1
+
+    # ── Baseball ──────────────────────────────────────────────────────────────
+    cursor.execute("""
+        SELECT DATE(bt.created_at) AS day, COUNT(*) AS darts, COALESCE(SUM(bt.runs),0) AS pts
+        FROM baseball_throws bt
+        WHERE bt.player_id = %s
+          AND bt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(bt.created_at)
+    """, (player_id,))
+    for r in cursor.fetchall():
+        d = str(r["day"])
+        day_points[d]   += int(r["pts"]   or 0)
+        day_darts[d]    += int(r["darts"] or 0)
+        day_sessions[d] += 1
+
+    # ── Shanghai ──────────────────────────────────────────────────────────────
+    cursor.execute("""
+        SELECT DATE(st.created_at) AS day,
+               COUNT(*) AS darts, COALESCE(SUM(st.points),0) AS pts
+        FROM shanghai_throws st
+        WHERE st.player_id = %s
+          AND st.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(st.created_at)
+    """, (player_id,))
+    for r in cursor.fetchall():
+        d = str(r["day"])
+        day_points[d]   += int(r["pts"]   or 0)
+        day_darts[d]    += int(r["darts"] or 0)
+        day_sessions[d] += 1
+
+    # ── Cricket ───────────────────────────────────────────────────────────────
+    cursor.execute("""
+        SELECT DATE(ct.created_at) AS day,
+               COUNT(*) AS darts, COALESCE(SUM(ct.points_scored),0) AS pts
+        FROM cricket_throws ct
+        WHERE ct.player_id = %s
+          AND ct.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(ct.created_at)
+    """, (player_id,))
+    for r in cursor.fetchall():
+        d = str(r["day"])
+        day_points[d]   += int(r["pts"]   or 0)
+        day_darts[d]    += int(r["darts"] or 0)
+        day_sessions[d] += 1
+
+    # ── Practice (stored in turns/legs/matches with session_type='practice') ──
+    # Use turns.created_at as the date — m.ended_at is unreliable for practice
+    # (historical sessions were backfilled to NOW() and lack real timestamps).
+    # Points from throws.points since turn score_before - score_after = 0 in practice.
+    cursor.execute("""
+        SELECT
+            DATE(t.created_at)         AS day,
+            COUNT(th.id)               AS darts,
+            COALESCE(SUM(th.points),0) AS pts,
+            COUNT(DISTINCT m.id)       AS sessions
+        FROM throws th
+        JOIN turns   t  ON t.id  = th.turn_id
+        JOIN legs    l  ON l.id  = t.leg_id
+        JOIN matches m  ON m.id  = l.match_id
+        WHERE t.player_id    = %s
+          AND m.session_type = 'practice'
+          AND t.created_at  >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(t.created_at)
+    """, (player_id,))
+    for r in cursor.fetchall():
+        d = str(r["day"])
+        day_points[d]   += int(r["pts"]      or 0)
+        day_darts[d]    += int(r["darts"]    or 0)
+        day_sessions[d] += int(r["sessions"] or 0)
+
+    # ── Build ordered output — only days with darts ───────────────────────────
+    today    = date.today()
+    cutoff   = today - timedelta(days=30)
+    all_days = sorted(day_darts.keys())
+
+    result = []
+    for d in all_days:
+        darts = day_darts[d]
+        if darts == 0:
+            continue
+        pts = day_points[d]
+        avg = round((pts / darts) * 3, 1) if darts else 0.0
+        result.append({
+            "date":     d,
+            "avg":      avg,
+            "darts":    darts,
+            "sessions": day_sessions[d],
+        })
+
+    return jsonify({"days": result}), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Heatmap
 # ─────────────────────────────────────────────────────────────────────────────
 

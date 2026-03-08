@@ -287,6 +287,10 @@ const API = (() => {
         return request('GET', `/api/matches/${matchId}/scorecard`);
     }
 
+    async function getPlayerDailyTrend(playerId) {
+        return request('GET', `/api/players/${playerId}/stats/daily_trend`);
+    }
+
     async function getGenericScorecard(matchId) {
         return request('GET', `/api/matches/${matchId}/scorecard/generic`);
     }
@@ -474,6 +478,7 @@ const API = (() => {
         submitShanghaiRound,
         endShanghaiMatch,
         getMatchScorecard,
+        getPlayerDailyTrend,
         getGenericScorecard,
         getShanghaiScorecard,
         getCricketScorecard,

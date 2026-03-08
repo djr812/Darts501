@@ -4222,6 +4222,25 @@ body.mode-practice #app {
     letter-spacing: 0.08em;
 }
 
+/* =========================================================
+   30-DAY DAILY AVERAGE TREND CHART
+   ========================================================= */
+
+.daily-trend-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.daily-trend-wrap {
+    padding: 4px 8px 8px;
+}
+
+.daily-trend-svg {
+    border-radius: 4px;
+    display: block;
+    width: 100%;
+}
+
 /* Generic scorecard summary table */
 .sc-summary-table {
     padding: 8px 16px 4px;

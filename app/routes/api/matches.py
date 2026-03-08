@@ -451,11 +451,11 @@ def end_practice_session(match_id):
         return jsonify({"error": "Practice session not found"}), 404
 
     cursor.execute(
-        "UPDATE matches SET status = 'complete' WHERE id = %s",
+        "UPDATE matches SET status = 'complete', ended_at = NOW() WHERE id = %s",
         (match_id,)
     )
     cursor.execute(
-        "UPDATE legs SET status = 'complete' WHERE match_id = %s",
+        "UPDATE legs SET status = 'complete', ended_at = NOW() WHERE match_id = %s",
         (match_id,)
     )
     cursor.execute(

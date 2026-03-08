@@ -133,17 +133,18 @@ const STATS = (() => {
         contentArea.innerHTML = '<div class="stats-loading">LOADING...</div>';
 
         try {
-            const [data, heatmap] = await Promise.all([
+            const [data, heatmap, trend] = await Promise.all([
                 API.getPlayerStats(playerId, {}),
                 API.getPlayerHeatmap(playerId, {}),
+                API.getPlayerDailyTrend(playerId),
             ]);
-            _render(data, heatmap, contentArea);
+            _render(data, heatmap, trend, contentArea);
         } catch (err) {
             contentArea.innerHTML = `<div class="stats-error">FAILED TO LOAD STATS<br><small>${err.message}</small></div>`;
         }
     }
 
-    function _render(data, heatmap, container) {
+    function _render(data, heatmap, trend, container) {
         container.innerHTML = '';
 
         const { records, scoring, checkout } = data;
@@ -177,6 +178,11 @@ const STATS = (() => {
             hmCard.appendChild(hmTitle);
             hmCard.appendChild(_buildStatsHeatmap(heatmap.counts));
             rightCol.appendChild(hmCard);
+        }
+
+        // ── 30-day average trend ──
+        if (trend && trend.days && trend.days.length > 0) {
+            rightCol.appendChild(_buildDailyTrendChart(trend.days));
         }
     }
 
@@ -497,6 +503,184 @@ const STATS = (() => {
     }
 
     // ------------------------------------------------------------------
+    // 30-day daily average trend chart
+    // ------------------------------------------------------------------
+
+    function _buildDailyTrendChart(days) {
+        const card = document.createElement('div');
+        card.className = 'stat-card daily-trend-card';
+
+        const title = document.createElement('div');
+        title.className = 'stat-card-title';
+        title.textContent = '30-DAY AVERAGE TREND';
+        card.appendChild(title);
+
+        const W = 560, H = 140;
+        const PAD = { top: 16, right: 20, bottom: 30, left: 44 };
+        const innerW = W - PAD.left - PAD.right;
+        const innerH = H - PAD.top  - PAD.bottom;
+
+        const avgs = days.map(d => d.avg);
+        const rawMin = Math.min(...avgs);
+        const rawMax = Math.max(...avgs);
+        // Auto-scale: pad 10% of range above and below, snap to nearest 5
+        const rangePad = Math.max((rawMax - rawMin) * 0.15, 5);
+        const minV = Math.max(0,   Math.floor((rawMin - rangePad) / 5) * 5);
+        const maxV =               Math.ceil ((rawMax + rangePad) / 5) * 5;
+        const range = maxV - minV || 10;
+
+        // Build full 30-day calendar with carry-forward for gap days.
+        // Line starts from the first day that has actual data.
+        const today    = new Date();
+        const calendar = [];
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            const key   = d.toISOString().slice(0, 10);
+            const match = days.find(x => x.date === key);
+            calendar.push({ date: key, data: match || null });
+        }
+
+        // Resolve display avg for each day: actual data or carry-forward from last real day.
+        // Days before the first real data point get null (no line yet).
+        let lastAvg = null;
+        const resolved = calendar.map(entry => {
+            if (entry.data) {
+                lastAvg = entry.data.avg;
+                return { date: entry.date, avg: entry.data.avg, real: true };
+            } else if (lastAvg !== null) {
+                return { date: entry.date, avg: lastAvg, real: false };
+            } else {
+                return { date: entry.date, avg: null, real: false };
+            }
+        });
+
+        function xPos(i) {
+            return PAD.left + (i / 29) * innerW;
+        }
+        function yPos(v) {
+            return PAD.top + innerH - ((v - minV) / range) * innerH;
+        }
+
+        function svgEl(tag, attrs) {
+            const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+            Object.keys(attrs).forEach(k => e.setAttribute(k, attrs[k]));
+            return e;
+        }
+
+        const svg = svgEl('svg', {
+            viewBox: `0 0 ${W} ${H}`,
+            width: '100%',
+            style: 'display:block;',
+            class: 'daily-trend-svg',
+        });
+
+        // Background
+        svg.appendChild(svgEl('rect', { x: 0, y: 0, width: W, height: H, fill: '#1a1a1a', rx: 6 }));
+
+        // Y grid lines + labels
+        const yTicks = 4;
+        for (let i = 0; i <= yTicks; i++) {
+            const v = minV + (range / yTicks) * i;
+            const y = yPos(v);
+            svg.appendChild(svgEl('line', {
+                x1: PAD.left, x2: W - PAD.right, y1: y, y2: y,
+                stroke: '#2a2a2a', 'stroke-width': 1,
+            }));
+            const lbl = svgEl('text', {
+                x: PAD.left - 6, y: y,
+                'text-anchor': 'end', 'dominant-baseline': 'central',
+                fill: '#555', 'font-size': 9, 'font-family': 'monospace',
+            });
+            lbl.textContent = v.toFixed(0);
+            svg.appendChild(lbl);
+        }
+
+        // X axis date labels — show every 5th index + first and last
+        resolved.forEach((entry, i) => {
+            if (i === 0 || i === 29 || i % 5 === 0) {
+                const parts = entry.date.split('-');
+                const lbl = svgEl('text', {
+                    x: xPos(i), y: H - PAD.bottom + 11,
+                    'text-anchor': 'middle',
+                    fill: '#444', 'font-size': 8, 'font-family': 'monospace',
+                });
+                lbl.textContent = parts[2] + '/' + parts[1];   // DD/MM
+                svg.appendChild(lbl);
+            }
+        });
+
+        // Overall average reference line (real data days only)
+        const overallAvg = avgs.reduce((a, b) => a + b, 0) / avgs.length;
+        const avgY = yPos(overallAvg);
+        svg.appendChild(svgEl('line', {
+            x1: PAD.left, x2: W - PAD.right, y1: avgY, y2: avgY,
+            stroke: '#a87200', 'stroke-width': 1, 'stroke-dasharray': '4 3',
+        }));
+        const avgLbl = svgEl('text', {
+            x: W - PAD.right + 3, y: avgY,
+            'dominant-baseline': 'central',
+            fill: '#a87200', 'font-size': 8, 'font-family': 'monospace',
+        });
+        avgLbl.textContent = overallAvg.toFixed(1);
+        svg.appendChild(avgLbl);
+
+        // Single continuous line path — only from first real data point onward.
+        // Carry-forward days produce horizontal segments; real days may step up/down.
+        const linePoints = resolved.filter(e => e.avg !== null);
+        if (linePoints.length >= 2) {
+            // Filled area under the line
+            const firstIdx = resolved.findIndex(e => e.avg !== null);
+            const lastIdx  = resolved.length - 1 - [...resolved].reverse().findIndex(e => e.avg !== null);
+            const areaCoords = linePoints.map((e, j) => {
+                const idx = resolved.indexOf(e);
+                return `${xPos(idx)},${yPos(e.avg)}`;
+            }).join(' ');
+            const firstX = xPos(firstIdx), lastX = xPos(lastIdx);
+            const baseY  = PAD.top + innerH;
+            svg.appendChild(svgEl('polygon', {
+                points: `${firstX},${baseY} ${areaCoords} ${lastX},${baseY}`,
+                fill: 'rgba(240,165,0,0.07)',
+            }));
+
+            // The line itself
+            const pathD = linePoints.map((e, j) => {
+                const idx = resolved.indexOf(e);
+                return `${j === 0 ? 'M' : 'L'}${xPos(idx)},${yPos(e.avg)}`;
+            }).join(' ');
+            svg.appendChild(svgEl('path', {
+                d: pathD, fill: 'none', stroke: '#f0a500',
+                'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+            }));
+        }
+
+        // Dots only on real data days
+        resolved.forEach((entry, i) => {
+            if (!entry.real) return;
+            const cx = xPos(i), cy = yPos(entry.avg);
+            const isMax = entry.avg === Math.max(...avgs);
+            const isMin = entry.avg === Math.min(...avgs);
+            const dot = svgEl('circle', {
+                cx, cy,
+                r: isMax || isMin ? 5 : 3,
+                fill: isMax ? '#f0a500' : isMin ? '#e05555' : '#c87800',
+                stroke: '#0d0d0d', 'stroke-width': 1,
+            });
+            const tip = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+            const cal = calendar[i];
+            tip.textContent = `${entry.date.split('-').reverse().join('/')}  ·  avg: ${entry.avg}  ·  ${cal.data.darts} darts  ·  ${cal.data.sessions} session${cal.data.sessions !== 1 ? 's' : ''}`;
+            dot.appendChild(tip);
+            svg.appendChild(dot);
+        });
+
+        const wrap = document.createElement('div');
+        wrap.className = 'daily-trend-wrap';
+        wrap.appendChild(svg);
+        card.appendChild(wrap);
+        return card;
+    }
+
+        // ------------------------------------------------------------------
     // Session history section
     // ------------------------------------------------------------------
 
