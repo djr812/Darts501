@@ -700,9 +700,18 @@ var PRACTICE = (function() {
             var nb = document.getElementById('practice-next-btn');
             if (nb) nb.disabled = false;
             if (SPEECH.isEnabled()) {
+                // Capture turnScore NOW — it will be reset to 0 if the next dart
+                // is thrown before the setTimeout fires (e.g. rapid entry)
+                var capturedTurnScore = _state.turnScore;
+                // Estimate dart label speech duration so we don't cut it off
+                var mulLabel = multiplier === 3 ? 'Treble ' : multiplier === 2 ? 'Double ' : '';
+                var dartLabel = segment === 0 ? 'Miss' :
+                                segment === 25 ? (multiplier === 2 ? 'Bulls Eye' : 'Outer bull') :
+                                (mulLabel + segment);
+                var dartDuration = 200 + dartLabel.length * 80;
                 setTimeout(function() {
-                    SPEECH.announceTurnEnd(_state.turnScore, 0);
-                }, 900);
+                    SPEECH.announceTurnEnd(capturedTurnScore, 0);
+                }, dartDuration + 200);
             }
         }
 
