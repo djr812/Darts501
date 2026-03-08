@@ -561,6 +561,7 @@ def get_player_history(player_id):
                     WHEN 'killer'     THEN (SELECT g.ended_at FROM killer_games     g WHERE g.match_id = m.id LIMIT 1)
                     WHEN 'bermuda'    THEN (SELECT g.ended_at FROM bermuda_games    g WHERE g.match_id = m.id LIMIT 1)
                     WHEN 'baseball'   THEN (SELECT g.ended_at FROM baseball_games   g WHERE g.match_id = m.id LIMIT 1)
+                    WHEN 'shanghai'   THEN (SELECT g.ended_at FROM shanghai_games   g WHERE g.match_id = m.id LIMIT 1)
                     ELSE NULL
                 END
             ) AS ended_at,
@@ -571,6 +572,7 @@ def get_player_history(player_id):
                     WHEN 'killer'     THEN (SELECT g.winner_id FROM killer_games     g WHERE g.match_id = m.id LIMIT 1)
                     WHEN 'bermuda'    THEN (SELECT g.winner_id FROM bermuda_games    g WHERE g.match_id = m.id LIMIT 1)
                     WHEN 'baseball'   THEN (SELECT g.winner_ids FROM baseball_games  g WHERE g.match_id = m.id LIMIT 1)
+                    WHEN 'shanghai'   THEN (SELECT g.winner_id  FROM shanghai_games   g WHERE g.match_id = m.id LIMIT 1)
                     ELSE NULL
                 END
             ) AS winner_id
@@ -596,22 +598,116 @@ def get_player_history(player_id):
         opp_rows  = cursor.fetchall()
         opponents = ', '.join(r["name"] for r in opp_rows) if opp_rows else "—"
 
-        # Per-match avg for this player
-        cursor.execute("""
-            SELECT
-                SUM(t.score_before - t.score_after) AS pts,
-                SUM(t.darts_thrown)                 AS darts
-            FROM turns t
-            JOIN legs l ON l.id = t.leg_id
-            WHERE t.player_id  = %s
-              AND l.match_id   = %s
-              AND t.score_after IS NOT NULL
-              AND t.is_bust    = 0
-        """, (player_id, row["match_id"]))
-        avg_row = cursor.fetchone()
-        pts   = int(avg_row["pts"]   or 0)
-        darts = int(avg_row["darts"] or 0)
-        avg   = round((pts / darts) * 3, 1) if darts else 0.0
+        # Per-match darts thrown + display score — varies by game type
+        game_type = row["game_type"]
+        darts = 0
+        avg   = "—"     # default: show — for avg on non-01 games
+        score = None    # game-specific score shown instead of avg
+
+        if game_type in ("501", "201"):
+            cursor.execute("""
+                SELECT
+                    SUM(t.score_before - t.score_after) AS pts,
+                    SUM(t.darts_thrown)                 AS darts
+                FROM turns t
+                JOIN legs l ON l.id = t.leg_id
+                WHERE t.player_id  = %s
+                  AND l.match_id   = %s
+                  AND t.score_after IS NOT NULL
+                  AND t.is_bust    = 0
+            """, (player_id, row["match_id"]))
+            r2    = cursor.fetchone()
+            pts   = int(r2["pts"]   or 0)
+            darts = int(r2["darts"] or 0)
+            avg   = round((pts / darts) * 3, 1) if darts else 0.0
+
+        elif game_type == "race1000":
+            cursor.execute("""
+                SELECT COUNT(*) AS darts, COALESCE(SUM(points),0) AS score
+                FROM race1000_throws WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            r2    = cursor.fetchone()
+            darts = int(r2["darts"] or 0)
+            score = int(r2["score"] or 0)
+
+        elif game_type == "nine_lives":
+            cursor.execute("""
+                SELECT COUNT(*) AS darts FROM nine_lives_throws
+                WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            r2    = cursor.fetchone()
+            darts = int(r2["darts"] or 0)
+            cursor.execute("""
+                SELECT lives FROM nine_lives_players
+                WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            lrow  = cursor.fetchone()
+            score = int(lrow["lives"]) if lrow else 0
+
+        elif game_type == "killer":
+            cursor.execute("""
+                SELECT COUNT(*) AS darts FROM killer_throws
+                WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            r2    = cursor.fetchone()
+            darts = int(r2["darts"] or 0)
+            cursor.execute("""
+                SELECT lives FROM killer_players
+                WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            lrow  = cursor.fetchone()
+            score = int(lrow["lives"]) if lrow else 0
+
+        elif game_type == "bermuda":
+            cursor.execute("""
+                SELECT COUNT(*) AS darts FROM bermuda_throws
+                WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            r2    = cursor.fetchone()
+            darts = int(r2["darts"] or 0)
+            cursor.execute("""
+                SELECT score FROM bermuda_players
+                WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            srow  = cursor.fetchone()
+            score = int(srow["score"]) if srow else 0
+
+        elif game_type == "baseball":
+            cursor.execute("""
+                SELECT COUNT(*) AS darts FROM baseball_throws
+                WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            r2    = cursor.fetchone()
+            darts = int(r2["darts"] or 0)
+            cursor.execute("""
+                SELECT COALESCE(SUM(runs),0) AS runs FROM baseball_innings
+                WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            rrow  = cursor.fetchone()
+            score = int(rrow["runs"]) if rrow else 0
+
+        elif game_type == "shanghai":
+            cursor.execute("""
+                SELECT COUNT(*) AS darts, COALESCE(SUM(score),0) AS score
+                FROM shanghai_rounds WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            r2    = cursor.fetchone()
+            darts = int(r2["darts"] * 3 or 0)   # each round = 3 darts
+            score = int(r2["score"] or 0)
+
+        elif game_type == "cricket":
+            cursor.execute("""
+                SELECT COUNT(*) AS darts FROM cricket_throws
+                WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            r2    = cursor.fetchone()
+            darts = int(r2["darts"] or 0)
+            cursor.execute("""
+                SELECT points FROM cricket_scores
+                WHERE match_id=%s AND player_id=%s
+            """, (row["match_id"], player_id))
+            srow  = cursor.fetchone()
+            score = int(srow["points"]) if srow else 0
 
         is_practice = row["session_type"] == "practice"
         if is_practice:
@@ -635,6 +731,7 @@ def get_player_history(player_id):
             "opponent":    opponents,
             "result":      result,
             "avg":         avg,
+            "score":       score,   # game-specific score (non-01 games); None for 01
             "darts":       darts,
         })
 
@@ -776,4 +873,375 @@ def get_match_scorecard(match_id):
         },
         "players": [{"id": p["id"], "name": p["name"]} for p in players],
         "legs":    legs_out,
+    }), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Generic scorecard — tailored per non-01 game type
+# ─────────────────────────────────────────────────────────────────────────────
+
+@stats_bp.route("/matches/<int:match_id>/scorecard/generic", methods=["GET"])
+def get_generic_scorecard(match_id):
+    """
+    Return a game-type-aware scorecard for non-01 games.
+    Each game returns a different structure suited to its layout.
+    """
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute(
+        "SELECT id, game_type, session_type FROM matches WHERE id = %s",
+        (match_id,)
+    )
+    match = cursor.fetchone()
+    if not match:
+        return jsonify({"error": "Match not found"}), 404
+
+    cursor.execute("""
+        SELECT p.id, p.name, mp.turn_order
+        FROM match_players mp
+        JOIN players p ON p.id = mp.player_id
+        WHERE mp.match_id = %s ORDER BY mp.turn_order
+    """, (match_id,))
+    players = cursor.fetchall()
+
+    game_type = match["game_type"]
+
+    # ── Race to 1000 ──────────────────────────────────────────────────────────
+    if game_type == "race1000":
+        cursor.execute("SELECT * FROM race1000_games WHERE match_id=%s", (match_id,))
+        game = cursor.fetchone()
+        cursor.execute("""
+            SELECT player_id, score FROM race1000_players
+            WHERE match_id=%s ORDER BY turn_order
+        """, (match_id,))
+        final_scores = {r["player_id"]: r["score"] for r in cursor.fetchall()}
+
+        cursor.execute("""
+            SELECT player_id, turn_number, dart_number, segment, multiplier, points
+            FROM race1000_throws WHERE match_id=%s
+            ORDER BY turn_number, player_id, dart_number
+        """, (match_id,))
+        throw_rows = cursor.fetchall()
+
+        # Group into turns: { turn_number: { player_id: [darts] } }
+        from collections import defaultdict
+        turns = defaultdict(lambda: defaultdict(list))
+        for t in throw_rows:
+            turns[t["turn_number"]][t["player_id"]].append({
+                "dart":   t["dart_number"],
+                "seg":    t["segment"],
+                "mul":    t["multiplier"],
+                "pts":    t["points"],
+            })
+
+        return jsonify({
+            "game_type":    "race1000",
+            "variant":      game["variant"] if game else "twenties",
+            "winner_id":    game["winner_id"] if game else None,
+            "players":      [{"id": p["id"], "name": p["name"]} for p in players],
+            "final_scores": final_scores,
+            "turns":        {str(tn): {str(pid): darts
+                             for pid, darts in pmap.items()}
+                             for tn, pmap in turns.items()},
+        }), 200
+
+    # ── Nine Lives ────────────────────────────────────────────────────────────
+    elif game_type == "nine_lives":
+        cursor.execute("SELECT * FROM nine_lives_games WHERE match_id=%s", (match_id,))
+        game = cursor.fetchone()
+        cursor.execute("""
+            SELECT player_id, target, lives, eliminated, completed
+            FROM nine_lives_players WHERE match_id=%s ORDER BY turn_order
+        """, (match_id,))
+        final_states = {r["player_id"]: dict(r) for r in cursor.fetchall()}
+
+        cursor.execute("""
+            SELECT player_id, turn_number, dart_number, segment, multiplier, is_hit
+            FROM nine_lives_throws WHERE match_id=%s
+            ORDER BY turn_number, player_id, dart_number
+        """, (match_id,))
+        throw_rows = cursor.fetchall()
+
+        from collections import defaultdict
+        turns = defaultdict(lambda: defaultdict(list))
+        for t in throw_rows:
+            turns[t["turn_number"]][t["player_id"]].append({
+                "dart":   t["dart_number"],
+                "seg":    t["segment"],
+                "mul":    t["multiplier"],
+                "is_hit": bool(t["is_hit"]),
+            })
+
+        return jsonify({
+            "game_type":     "nine_lives",
+            "winner_id":     game["winner_id"] if game else None,
+            "players":       [{"id": p["id"], "name": p["name"]} for p in players],
+            "final_states":  {str(k): v for k, v in final_states.items()},
+            "turns":         {str(tn): {str(pid): darts
+                              for pid, darts in pmap.items()}
+                              for tn, pmap in turns.items()},
+        }), 200
+
+    # ── Killer ────────────────────────────────────────────────────────────────
+    elif game_type == "killer":
+        cursor.execute("SELECT * FROM killer_games WHERE match_id=%s", (match_id,))
+        game = cursor.fetchone()
+        cursor.execute("""
+            SELECT player_id, assigned_number, hits, is_killer, lives, eliminated
+            FROM killer_players WHERE match_id=%s ORDER BY turn_order
+        """, (match_id,))
+        final_states = {r["player_id"]: dict(r) for r in cursor.fetchall()}
+
+        cursor.execute("""
+            SELECT player_id, turn_number, dart_number, segment, multiplier, hits_scored
+            FROM killer_throws WHERE match_id=%s
+            ORDER BY turn_number, player_id, dart_number
+        """, (match_id,))
+        throw_rows = cursor.fetchall()
+
+        from collections import defaultdict
+        turns = defaultdict(lambda: defaultdict(list))
+        for t in throw_rows:
+            turns[t["turn_number"]][t["player_id"]].append({
+                "dart":       t["dart_number"],
+                "seg":        t["segment"],
+                "mul":        t["multiplier"],
+                "hits_scored": t["hits_scored"],
+            })
+
+        return jsonify({
+            "game_type":    "killer",
+            "variant":      game["variant"] if game else "doubles",
+            "winner_id":    game["winner_id"] if game else None,
+            "players":      [{"id": p["id"], "name": p["name"]} for p in players],
+            "final_states": {str(k): v for k, v in final_states.items()},
+            "turns":        {str(tn): {str(pid): darts
+                             for pid, darts in pmap.items()}
+                             for tn, pmap in turns.items()},
+        }), 200
+
+    # ── Bermuda Triangle ──────────────────────────────────────────────────────
+    elif game_type == "bermuda":
+        cursor.execute("SELECT * FROM bermuda_games WHERE match_id=%s", (match_id,))
+        game = cursor.fetchone()
+        cursor.execute("""
+            SELECT player_id, score FROM bermuda_players
+            WHERE match_id=%s ORDER BY turn_order
+        """, (match_id,))
+        final_scores = {r["player_id"]: r["score"] for r in cursor.fetchall()}
+
+        # Per-round summary (was_halved, score_after)
+        cursor.execute("""
+            SELECT player_id, round_number, points_scored, was_halved, score_after
+            FROM bermuda_turns WHERE match_id=%s
+            ORDER BY round_number, player_id
+        """, (match_id,))
+        round_rows = cursor.fetchall()
+        from collections import defaultdict
+        round_summary = defaultdict(dict)
+        for r in round_rows:
+            round_summary[r["round_number"]][r["player_id"]] = {
+                "pts":       r["points_scored"],
+                "halved":    bool(r["was_halved"]),
+                "score_after": r["score_after"],
+            }
+
+        # Individual throws
+        cursor.execute("""
+            SELECT player_id, round_number, dart_number, segment, multiplier, points
+            FROM bermuda_throws WHERE match_id=%s
+            ORDER BY round_number, player_id, dart_number
+        """, (match_id,))
+        throw_rows = cursor.fetchall()
+        throws_by_round = defaultdict(lambda: defaultdict(list))
+        for t in throw_rows:
+            throws_by_round[t["round_number"]][t["player_id"]].append({
+                "dart": t["dart_number"],
+                "seg":  t["segment"],
+                "mul":  t["multiplier"],
+                "pts":  t["points"],
+            })
+
+        return jsonify({
+            "game_type":     "bermuda",
+            "winner_id":     game["winner_id"] if game else None,
+            "players":       [{"id": p["id"], "name": p["name"]} for p in players],
+            "final_scores":  final_scores,
+            "round_summary": {str(rn): {str(pid): v for pid, v in pmap.items()}
+                              for rn, pmap in round_summary.items()},
+            "throws_by_round": {str(rn): {str(pid): darts
+                                for pid, darts in pmap.items()}
+                                for rn, pmap in throws_by_round.items()},
+        }), 200
+
+    # ── Baseball ──────────────────────────────────────────────────────────────
+    elif game_type == "baseball":
+        cursor.execute("SELECT * FROM baseball_games WHERE match_id=%s", (match_id,))
+        game = cursor.fetchone()
+        cursor.execute("""
+            SELECT player_id, inning_number, target_number, runs, outs, darts_thrown, complete
+            FROM baseball_innings WHERE match_id=%s
+            ORDER BY player_id, inning_number
+        """, (match_id,))
+        inning_rows = cursor.fetchall()
+        from collections import defaultdict
+        innings = defaultdict(dict)
+        for r in inning_rows:
+            innings[r["player_id"]][r["inning_number"]] = {
+                "target": r["target_number"],
+                "runs":   r["runs"],
+                "outs":   r["outs"],
+                "darts":  r["darts_thrown"],
+            }
+        # Total runs per player
+        totals = {pid: sum(inn["runs"] for inn in pid_innings.values())
+                  for pid, pid_innings in innings.items()}
+
+        return jsonify({
+            "game_type":   "baseball",
+            "start_number": game["start_number"] if game else 1,
+            "winner_ids":  game["winner_ids"] if game else None,
+            "players":     [{"id": p["id"], "name": p["name"]} for p in players],
+            "innings":     {str(pid): {str(inn): v for inn, v in pid_innings.items()}
+                            for pid, pid_innings in innings.items()},
+            "totals":      {str(k): v for k, v in totals.items()},
+        }), 200
+
+    else:
+        return jsonify({"error": f"No generic scorecard for game_type '{game_type}'"}), 404
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shanghai & Cricket generic scorecards (appended to generic endpoint above)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@stats_bp.route("/matches/<int:match_id>/scorecard/shanghai", methods=["GET"])
+def get_shanghai_scorecard(match_id):
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id, game_type FROM matches WHERE id = %s", (match_id,))
+    match = cursor.fetchone()
+    if not match:
+        return jsonify({"error": "Match not found"}), 404
+
+    cursor.execute("""
+        SELECT p.id, p.name, mp.turn_order
+        FROM match_players mp JOIN players p ON p.id = mp.player_id
+        WHERE mp.match_id = %s ORDER BY mp.turn_order
+    """, (match_id,))
+    players = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM shanghai_games WHERE match_id = %s", (match_id,))
+    game = cursor.fetchone()
+
+    # Rounds summary: { round_number: { player_id: {score, shanghai, darts_thrown} } }
+    cursor.execute("""
+        SELECT player_id, round_number, target_number, score, shanghai, darts_thrown
+        FROM shanghai_rounds WHERE match_id = %s
+        ORDER BY round_number, player_id
+    """, (match_id,))
+    from collections import defaultdict
+    rounds = defaultdict(dict)
+    for r in cursor.fetchall():
+        rounds[r["round_number"]][r["player_id"]] = {
+            "target":  r["target_number"],
+            "score":   r["score"],
+            "shanghai": bool(r["shanghai"]),
+            "darts":   r["darts_thrown"],
+        }
+
+    # Per-round throw detail: { round_number: { player_id: [darts] } }
+    cursor.execute("""
+        SELECT st.player_id, sr.round_number, st.dart_number, st.segment, st.multiplier, st.points
+        FROM shanghai_throws st
+        JOIN shanghai_rounds sr ON sr.id = st.round_id
+        WHERE st.match_id = %s
+        ORDER BY sr.round_number, st.player_id, st.dart_number
+    """, (match_id,))
+    throws = defaultdict(lambda: defaultdict(list))
+    for t in cursor.fetchall():
+        throws[t["round_number"]][t["player_id"]].append({
+            "dart": t["dart_number"],
+            "seg":  t["segment"],
+            "mul":  t["multiplier"],
+            "pts":  t["points"],
+        })
+
+    # Final totals
+    cursor.execute("""
+        SELECT player_id, SUM(score) AS total FROM shanghai_rounds
+        WHERE match_id = %s GROUP BY player_id
+    """, (match_id,))
+    totals = {r["player_id"]: int(r["total"] or 0) for r in cursor.fetchall()}
+
+    return jsonify({
+        "game_type":  "shanghai",
+        "num_rounds": game["num_rounds"] if game else 20,
+        "winner_id":  game["winner_id"]  if game else None,
+        "players":    [{"id": p["id"], "name": p["name"]} for p in players],
+        "rounds":     {str(rn): {str(pid): v for pid, v in pmap.items()}
+                       for rn, pmap in rounds.items()},
+        "throws":     {str(rn): {str(pid): darts for pid, darts in pmap.items()}
+                       for rn, pmap in throws.items()},
+        "totals":     {str(k): v for k, v in totals.items()},
+    }), 200
+
+
+@stats_bp.route("/matches/<int:match_id>/scorecard/cricket", methods=["GET"])
+def get_cricket_scorecard(match_id):
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id, game_type, winner_id FROM matches WHERE id = %s", (match_id,))
+    match = cursor.fetchone()
+    if not match:
+        return jsonify({"error": "Match not found"}), 404
+
+    cursor.execute("""
+        SELECT p.id, p.name, mp.turn_order
+        FROM match_players mp JOIN players p ON p.id = mp.player_id
+        WHERE mp.match_id = %s ORDER BY mp.turn_order
+    """, (match_id,))
+    players = cursor.fetchall()
+
+    # Final marks per player per number
+    cursor.execute("""
+        SELECT player_id, number, marks FROM cricket_marks WHERE match_id = %s
+    """, (match_id,))
+    from collections import defaultdict
+    final_marks = defaultdict(dict)
+    for r in cursor.fetchall():
+        final_marks[r["player_id"]][r["number"]] = r["marks"]
+
+    # Final scores
+    cursor.execute("SELECT player_id, points FROM cricket_scores WHERE match_id = %s", (match_id,))
+    final_scores = {r["player_id"]: r["points"] for r in cursor.fetchall()}
+
+    # Turn-by-turn throws: { turn_number: { player_id: [darts] } }
+    cursor.execute("""
+        SELECT player_id, turn_number, dart_number, segment, multiplier, marks_added, points_scored
+        FROM cricket_throws WHERE match_id = %s
+        ORDER BY turn_number, player_id, dart_number
+    """, (match_id,))
+    turns = defaultdict(lambda: defaultdict(list))
+    for t in cursor.fetchall():
+        turns[t["turn_number"]][t["player_id"]].append({
+            "dart":       t["dart_number"],
+            "seg":        t["segment"],
+            "mul":        t["multiplier"],
+            "marks":      t["marks_added"],
+            "pts":        t["points_scored"],
+        })
+
+    return jsonify({
+        "game_type":    "cricket",
+        "winner_id":    match["winner_id"],
+        "players":      [{"id": p["id"], "name": p["name"]} for p in players],
+        "final_marks":  {str(pid): {str(num): m for num, m in nmap.items()}
+                         for pid, nmap in final_marks.items()},
+        "final_scores": {str(k): v for k, v in final_scores.items()},
+        "turns":        {str(tn): {str(pid): darts for pid, darts in pmap.items()}
+                         for tn, pmap in turns.items()},
     }), 200

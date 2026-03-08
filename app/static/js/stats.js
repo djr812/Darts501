@@ -786,18 +786,41 @@ Avg: ${m.avg}  (${m.darts} darts)`;
 
                     const gameLabel = (session.game_type || '').toUpperCase();
 
+                    // For non-01 games show a game-specific score label instead of avg
+                    const SCORE_LABELS = {
+                        race1000:  'pts', bermuda: 'pts', baseball: 'runs',
+                        nine_lives: 'lives', killer: 'lives',
+                        shanghai: 'pts', cricket: 'pts',
+                    };
+                    const gt = (session.game_type || '').toLowerCase();
+                    let avgDisplay, dartsDisplay;
+                    if (session.score !== null && session.score !== undefined && SCORE_LABELS[gt]) {
+                        avgDisplay   = `${session.score} ${SCORE_LABELS[gt]}`;
+                        dartsDisplay = `${session.darts}d`;
+                    } else {
+                        avgDisplay   = session.avg;
+                        dartsDisplay = `${session.darts}d`;
+                    }
+
                     row.innerHTML =
                         `<span class="history-date">${_esc(session.date)}</span>` +
                         `<span class="history-type ${resultCls}">${_esc(session.result)}</span>` +
                         `<span class="history-game">${_esc(gameLabel)}</span>` +
                         `<span class="history-opp">${_esc(oppText)}</span>` +
-                        `<span class="history-avg">${session.avg}</span>` +
-                        `<span class="history-darts">${session.darts}d</span>` +
+                        `<span class="history-avg">${_esc(String(avgDisplay))}</span>` +
+                        `<span class="history-darts">${_esc(dartsDisplay)}</span>` +
                         `<span class="history-chevron">›</span>`;
 
+                    const NON01_GAMES = ['race1000','nine_lives','killer','bermuda','baseball','shanghai','cricket'];
                     row.addEventListener('click', () => {
                         if (session.is_practice) {
                             _showPracticeSummaryModal(session);
+                        } else if (gt === 'shanghai') {
+                            _showShanghaiScorecardModal(session.match_id, playerId);
+                        } else if (gt === 'cricket') {
+                            _showCricketScorecardModal(session.match_id, playerId);
+                        } else if (NON01_GAMES.includes(gt)) {
+                            _showGenericScorecardModal(session.match_id, playerId);
                         } else {
                             _showScorecardModal(session.match_id, playerId);
                         }
@@ -824,7 +847,7 @@ Avg: ${m.avg}  (${m.darts} darts)`;
     function _showPracticeSummaryModal(session) {
         const overlay = _modalOverlay('practice-summary-modal');
         const box = document.createElement('div');
-        box.className = 'modal-box scorecard-box';
+        box.className = 'modal-box scorecard-box practice-summary-modal-box';
 
         box.innerHTML =
             `<div class="modal-title">PRACTICE SESSION</div>` +
@@ -832,12 +855,35 @@ Avg: ${m.avg}  (${m.darts} darts)`;
             `<div class="scorecard-practice-stats">` +
                 `<div class="sc-pstat"><span class="sc-pval">${session.darts}</span><span class="sc-plbl">DARTS</span></div>` +
                 `<div class="sc-pstat"><span class="sc-pval">${session.avg}</span><span class="sc-plbl">3-DART AVG</span></div>` +
-            `</div>`;
+            `</div>` +
+            `<div class="practice-heatmap-loading">Loading heatmap…</div>`;
 
         const closeBtn = _closeButton(() => overlay.remove());
         box.appendChild(closeBtn);
         overlay.appendChild(box);
         document.body.appendChild(overlay);
+
+        // Fetch and render heatmap scoped to this match
+        API.getPlayerHeatmap(session.player_id, { matchId: session.match_id })
+            .then(function(data) {
+                const loadingEl = box.querySelector('.practice-heatmap-loading');
+                if (loadingEl) loadingEl.remove();
+                if (data && data.counts && Object.keys(data.counts).length > 0) {
+                    const hmWrap = _buildStatsHeatmap(data.counts);
+                    hmWrap.classList.add('practice-heatmap-wrap');
+                    // Insert before close button
+                    box.insertBefore(hmWrap, closeBtn);
+                } else {
+                    const empty = document.createElement('div');
+                    empty.className = 'practice-heatmap-loading';
+                    empty.textContent = 'No throw data recorded.';
+                    box.insertBefore(empty, closeBtn);
+                }
+            })
+            .catch(function() {
+                const loadingEl = box.querySelector('.practice-heatmap-loading');
+                if (loadingEl) loadingEl.textContent = 'Could not load heatmap.';
+            });
     }
 
     async function _showScorecardModal(matchId, focusPlayerId) {
@@ -945,7 +991,592 @@ Avg: ${m.avg}  (${m.darts} darts)`;
     // Modal helpers
     // ------------------------------------------------------------------
 
-    function _modalOverlay(id) {
+    // ── Generic (non-01) scorecard modal ─────────────────────────────────────
+
+    async function _showGenericScorecardModal(matchId, focusPlayerId) {
+        const overlay = _modalOverlay('scorecard-modal');
+        const box = document.createElement('div');
+        box.className = 'modal-box scorecard-box';
+        box.innerHTML = '<div class="modal-title">SCORECARD</div><div class="sc-loading">LOADING…</div>';
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        try {
+            const data = await API.getGenericScorecard(matchId);
+            box.innerHTML = '';
+            _renderGenericScorecard(data, focusPlayerId, box, () => overlay.remove());
+        } catch(e) {
+            box.innerHTML = '<div class="modal-title">SCORECARD</div><div class="sc-loading">FAILED TO LOAD</div>';
+            box.appendChild(_closeButton(() => overlay.remove()));
+        }
+    }
+
+    function _renderGenericScorecard(data, focusPlayerId, box, onClose) {
+        const gt = data.game_type;
+        if      (gt === 'race1000')  _renderRace1000Scorecard(data, focusPlayerId, box, onClose);
+        else if (gt === 'nine_lives') _renderNineLivesScorecard(data, focusPlayerId, box, onClose);
+        else if (gt === 'killer')    _renderKillerScorecard(data, focusPlayerId, box, onClose);
+        else if (gt === 'bermuda')   _renderBermudaScorecard(data, focusPlayerId, box, onClose);
+        else if (gt === 'baseball')  _renderBaseballScorecard(data, focusPlayerId, box, onClose);
+        else {
+            box.innerHTML = '<div class="modal-title">SCORECARD</div><div class="sc-loading">UNSUPPORTED GAME TYPE</div>';
+            box.appendChild(_closeButton(onClose));
+        }
+    }
+
+    // ── Dart notation helper ──────────────────────────────────────────────────
+    function _dartNotation(seg, mul) {
+        if (seg === 0) return 'MISS';
+        if (seg === 25) return mul === 2 ? 'BULL' : 'OUTER';
+        const prefix = mul === 3 ? 'T' : mul === 2 ? 'D' : '';
+        return prefix + seg;
+    }
+
+    function _scHeader(box, title, subtitle) {
+        const t = document.createElement('div');
+        t.className = 'modal-title';
+        t.textContent = title;
+        box.appendChild(t);
+        if (subtitle) {
+            const s = document.createElement('div');
+            s.className = 'sc-meta';
+            s.textContent = subtitle;
+            box.appendChild(s);
+        }
+    }
+
+    // ── Race to 1000 ─────────────────────────────────────────────────────────
+    function _renderRace1000Scorecard(data, focusPlayerId, box, onClose) {
+        const winner = data.players.find(p => p.id === data.winner_id);
+        _scHeader(box, 'RACE TO 1000', winner ? winner.name.toUpperCase() + ' WINS' : '');
+
+        // Final scores table
+        const scoresEl = document.createElement('div');
+        scoresEl.className = 'sc-summary-table';
+        data.players.forEach(p => {
+            const score = data.final_scores[String(p.id)] || 0;
+            const isFocus = p.id === focusPlayerId;
+            scoresEl.innerHTML +=
+                `<div class="sc-summary-row${isFocus ? ' sc-focus' : ''}">` +
+                `<span class="sc-summary-name">${_esc(p.name)}</span>` +
+                `<span class="sc-summary-score">${score} pts</span></div>`;
+        });
+        box.appendChild(scoresEl);
+
+        // Turn-by-turn breakdown
+        const turnNums = Object.keys(data.turns).map(Number).sort((a,b) => a-b);
+        if (turnNums.length) {
+            const hdr = document.createElement('div');
+            hdr.className = 'sc-leg-header';
+            hdr.textContent = 'TURN BY TURN';
+            box.appendChild(hdr);
+
+            const colHdr = document.createElement('div');
+            colHdr.className = 'sc-col-header';
+            let hdrHTML = '<span class="sc-turn-num">#</span>';
+            data.players.forEach(p => {
+                hdrHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">${_esc(p.name.toUpperCase())}</span>`;
+            });
+            colHdr.innerHTML = hdrHTML;
+            box.appendChild(colHdr);
+
+            turnNums.forEach(tn => {
+                const rowEl = document.createElement('div');
+                rowEl.className = 'sc-turn-row';
+                let rowHTML = `<span class="sc-turn-num">${tn}</span>`;
+                data.players.forEach(p => {
+                    const darts = (data.turns[String(tn)] || {})[String(p.id)];
+                    if (!darts || !darts.length) {
+                        rowHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">—</span>`;
+                        return;
+                    }
+                    const turnPts = darts.reduce((s, d) => s + d.pts, 0);
+                    const dartStr = darts.map(d =>
+                        `<span class="sc-dart">${_esc(_dartNotation(d.seg, d.mul))}</span>`
+                    ).join('');
+                    rowHTML +=
+                        `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">` +
+                        `<span class="sc-darts">${dartStr}</span>` +
+                        `<span class="sc-turn-score">${turnPts}</span>` +
+                        `</span>`;
+                });
+                rowEl.innerHTML = rowHTML;
+                box.appendChild(rowEl);
+            });
+        }
+        box.appendChild(_closeButton(onClose));
+    }
+
+    // ── Nine Lives ───────────────────────────────────────────────────────────
+    function _renderNineLivesScorecard(data, focusPlayerId, box, onClose) {
+        const winner = data.players.find(p => p.id === data.winner_id);
+        _scHeader(box, 'NINE LIVES', winner ? winner.name.toUpperCase() + ' WINS' : '');
+
+        // Final state per player
+        const summaryEl = document.createElement('div');
+        summaryEl.className = 'sc-summary-table';
+        data.players.forEach(p => {
+            const st = data.final_states[String(p.id)] || {};
+            const isFocus = p.id === focusPlayerId;
+            const status = st.eliminated ? 'ELIMINATED' : st.completed ? 'COMPLETED' : `Target: ${st.target}`;
+            summaryEl.innerHTML +=
+                `<div class="sc-summary-row${isFocus ? ' sc-focus' : ''}">` +
+                `<span class="sc-summary-name">${_esc(p.name)}</span>` +
+                `<span class="sc-summary-score">${st.lives !== undefined ? st.lives + ' lives' : '—'}</span>` +
+                `<span class="sc-summary-extra">${status}</span></div>`;
+        });
+        box.appendChild(summaryEl);
+
+        // Turn-by-turn
+        const turnNums = Object.keys(data.turns).map(Number).sort((a,b) => a-b);
+        if (turnNums.length) {
+            const hdr = document.createElement('div');
+            hdr.className = 'sc-leg-header';
+            hdr.textContent = 'TURN BY TURN';
+            box.appendChild(hdr);
+
+            const colHdr = document.createElement('div');
+            colHdr.className = 'sc-col-header';
+            let hdrHTML = '<span class="sc-turn-num">#</span>';
+            data.players.forEach(p => {
+                hdrHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">${_esc(p.name.toUpperCase())}</span>`;
+            });
+            colHdr.innerHTML = hdrHTML;
+            box.appendChild(colHdr);
+
+            turnNums.forEach(tn => {
+                const rowEl = document.createElement('div');
+                rowEl.className = 'sc-turn-row';
+                let rowHTML = `<span class="sc-turn-num">${tn}</span>`;
+                data.players.forEach(p => {
+                    const darts = (data.turns[String(tn)] || {})[String(p.id)];
+                    if (!darts || !darts.length) {
+                        rowHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">—</span>`;
+                        return;
+                    }
+                    const hits = darts.filter(d => d.is_hit).length;
+                    const dartStr = darts.map(d =>
+                        `<span class="sc-dart${d.is_hit ? ' dart-checkout' : ''}">${_esc(_dartNotation(d.seg, d.mul))}</span>`
+                    ).join('');
+                    rowHTML +=
+                        `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">` +
+                        `<span class="sc-darts">${dartStr}</span>` +
+                        `<span class="sc-turn-score">${hits} hit</span>` +
+                        `</span>`;
+                });
+                rowEl.innerHTML = rowHTML;
+                box.appendChild(rowEl);
+            });
+        }
+        box.appendChild(_closeButton(onClose));
+    }
+
+    // ── Killer ───────────────────────────────────────────────────────────────
+    function _renderKillerScorecard(data, focusPlayerId, box, onClose) {
+        const winner = data.players.find(p => p.id === data.winner_id);
+        _scHeader(box, 'KILLER', winner ? winner.name.toUpperCase() + ' WINS' : '');
+
+        const summaryEl = document.createElement('div');
+        summaryEl.className = 'sc-summary-table';
+        data.players.forEach(p => {
+            const st = data.final_states[String(p.id)] || {};
+            const isFocus = p.id === focusPlayerId;
+            const status = st.eliminated ? 'ELIMINATED' : (st.is_killer ? 'KILLER' : `${st.hits}/3 hits`);
+            summaryEl.innerHTML +=
+                `<div class="sc-summary-row${isFocus ? ' sc-focus' : ''}">` +
+                `<span class="sc-summary-name">${_esc(p.name)}</span>` +
+                `<span class="sc-summary-score">No. ${st.assigned_number || '?'}</span>` +
+                `<span class="sc-summary-extra">${st.lives !== undefined ? st.lives + ' lives' : '—'} · ${status}</span></div>`;
+        });
+        box.appendChild(summaryEl);
+
+        const turnNums = Object.keys(data.turns).map(Number).sort((a,b) => a-b);
+        if (turnNums.length) {
+            const hdr = document.createElement('div');
+            hdr.className = 'sc-leg-header';
+            hdr.textContent = 'TURN BY TURN';
+            box.appendChild(hdr);
+
+            const colHdr = document.createElement('div');
+            colHdr.className = 'sc-col-header';
+            let hdrHTML = '<span class="sc-turn-num">#</span>';
+            data.players.forEach(p => {
+                hdrHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">${_esc(p.name.toUpperCase())}</span>`;
+            });
+            colHdr.innerHTML = hdrHTML;
+            box.appendChild(colHdr);
+
+            turnNums.forEach(tn => {
+                const rowEl = document.createElement('div');
+                rowEl.className = 'sc-turn-row';
+                let rowHTML = `<span class="sc-turn-num">${tn}</span>`;
+                data.players.forEach(p => {
+                    const darts = (data.turns[String(tn)] || {})[String(p.id)];
+                    if (!darts || !darts.length) {
+                        rowHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">—</span>`;
+                        return;
+                    }
+                    const dartStr = darts.map(d =>
+                        `<span class="sc-dart${d.hits_scored > 0 ? ' dart-checkout' : ''}">${_esc(_dartNotation(d.seg, d.mul))}</span>`
+                    ).join('');
+                    rowHTML +=
+                        `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">` +
+                        `<span class="sc-darts">${dartStr}</span>` +
+                        `</span>`;
+                });
+                rowEl.innerHTML = rowHTML;
+                box.appendChild(rowEl);
+            });
+        }
+        box.appendChild(_closeButton(onClose));
+    }
+
+    // ── Bermuda Triangle ─────────────────────────────────────────────────────
+    const _BERMUDA_ROUND_LABELS = [
+        null,'12','13','14','Any Double','15','16','17','Any Triple','18','19','20','Single Bull','Double Bull'
+    ];
+
+    function _renderBermudaScorecard(data, focusPlayerId, box, onClose) {
+        const winner = data.players.find(p => p.id === data.winner_id);
+        _scHeader(box, 'BERMUDA TRIANGLE', winner ? winner.name.toUpperCase() + ' WINS' : '');
+
+        const summaryEl = document.createElement('div');
+        summaryEl.className = 'sc-summary-table';
+        data.players.forEach(p => {
+            const score = data.final_scores[String(p.id)] || 0;
+            const isFocus = p.id === focusPlayerId;
+            summaryEl.innerHTML +=
+                `<div class="sc-summary-row${isFocus ? ' sc-focus' : ''}">` +
+                `<span class="sc-summary-name">${_esc(p.name)}</span>` +
+                `<span class="sc-summary-score">${score} pts</span></div>`;
+        });
+        box.appendChild(summaryEl);
+
+        // Round-by-round layout
+        const roundNums = Object.keys(data.round_summary).map(Number).sort((a,b) => a-b);
+        if (roundNums.length) {
+            const hdr = document.createElement('div');
+            hdr.className = 'sc-leg-header';
+            hdr.textContent = 'ROUND BY ROUND';
+            box.appendChild(hdr);
+
+            const colHdr = document.createElement('div');
+            colHdr.className = 'sc-col-header';
+            let hdrHTML = '<span class="sc-turn-num">RND</span>';
+            data.players.forEach(p => {
+                hdrHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">${_esc(p.name.toUpperCase())}</span>`;
+            });
+            colHdr.innerHTML = hdrHTML;
+            box.appendChild(colHdr);
+
+            roundNums.forEach(rn => {
+                const rowEl = document.createElement('div');
+                rowEl.className = 'sc-turn-row';
+                const rlabel = _BERMUDA_ROUND_LABELS[rn] || String(rn);
+                let rowHTML = `<span class="sc-turn-num" title="Round ${rn}">${_esc(rlabel)}</span>`;
+                data.players.forEach(p => {
+                    const summary = (data.round_summary[String(rn)] || {})[String(p.id)];
+                    const darts   = ((data.throws_by_round || {})[String(rn)] || {})[String(p.id)];
+                    if (!summary) {
+                        rowHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">—</span>`;
+                        return;
+                    }
+                    const dartStr = darts ? darts.map(d =>
+                        `<span class="sc-dart${d.pts > 0 ? ' dart-checkout' : ''}">${_esc(_dartNotation(d.seg, d.mul))}</span>`
+                    ).join('') : '';
+                    const halvedCls = summary.halved ? ' sc-bust' : '';
+                    rowHTML +=
+                        `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">` +
+                        `<span class="sc-darts">${dartStr}</span>` +
+                        `<span class="sc-turn-score${halvedCls}">${summary.halved ? 'HALVED' : summary.pts}</span>` +
+                        `<span class="sc-remaining">${summary.score_after}</span>` +
+                        `</span>`;
+                });
+                rowEl.innerHTML = rowHTML;
+                box.appendChild(rowEl);
+            });
+        }
+        box.appendChild(_closeButton(onClose));
+    }
+
+    // ── Baseball ─────────────────────────────────────────────────────────────
+    function _renderBaseballScorecard(data, focusPlayerId, box, onClose) {
+        const winnerIds = (data.winner_ids || '').split(',').map(s => parseInt(s, 10));
+        const winnerNames = data.players
+            .filter(p => winnerIds.includes(p.id))
+            .map(p => p.name.toUpperCase())
+            .join(' & ');
+        _scHeader(box, 'BASEBALL', winnerNames ? winnerNames + ' WIN' : '');
+
+        const inningNums = [];
+        data.players.forEach(p => {
+            Object.keys(data.innings[String(p.id)] || {}).forEach(i => {
+                if (!inningNums.includes(Number(i))) inningNums.push(Number(i));
+            });
+        });
+        inningNums.sort((a,b) => a-b);
+
+        // Column header: player names
+        const colHdr = document.createElement('div');
+        colHdr.className = 'sc-col-header';
+        let hdrHTML = '<span class="sc-turn-num">INN</span>';
+        data.players.forEach(p => {
+            hdrHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">${_esc(p.name.toUpperCase())}</span>`;
+        });
+        colHdr.innerHTML = hdrHTML;
+        box.appendChild(colHdr);
+
+        inningNums.forEach(inn => {
+            const start = data.start_number || 1;
+            const target = start + inn - 1;
+            const rowEl = document.createElement('div');
+            rowEl.className = 'sc-turn-row';
+            let rowHTML = `<span class="sc-turn-num" title="Target: ${target}">${inn}<span style="font-size:9px;opacity:0.6"> (${target})</span></span>`;
+            data.players.forEach(p => {
+                const idata = (data.innings[String(p.id)] || {})[String(inn)];
+                if (!idata) {
+                    rowHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">—</span>`;
+                    return;
+                }
+                rowHTML +=
+                    `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">` +
+                    `<span class="sc-turn-score">${idata.runs}r</span>` +
+                    `<span class="sc-remaining">${idata.outs} out${idata.outs !== 1 ? 's' : ''}</span>` +
+                    `</span>`;
+            });
+            rowEl.innerHTML = rowHTML;
+            box.appendChild(rowEl);
+        });
+
+        // Totals row
+        const totalsRow = document.createElement('div');
+        totalsRow.className = 'sc-turn-row sc-totals-row';
+        let totHTML = '<span class="sc-turn-num">TOT</span>';
+        data.players.forEach(p => {
+            const total = data.totals[String(p.id)] || 0;
+            const isWinner = winnerIds.includes(p.id);
+            totHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}"><span class="sc-turn-score${isWinner ? ' dart-checkout' : ''}">${total} runs</span></span>`;
+        });
+        totalsRow.innerHTML = totHTML;
+        box.appendChild(totalsRow);
+
+        box.appendChild(_closeButton(onClose));
+    }
+
+        // ── Shanghai scorecard ───────────────────────────────────────────────────
+
+    async function _showShanghaiScorecardModal(matchId, focusPlayerId) {
+        const overlay = _modalOverlay('scorecard-modal');
+        const box = document.createElement('div');
+        box.className = 'modal-box scorecard-box';
+        box.innerHTML = '<div class="modal-title">SCORECARD</div><div class="sc-loading">LOADING…</div>';
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        try {
+            const data = await API.getShanghaiScorecard(matchId);
+            box.innerHTML = '';
+            _renderShanghaiScorecard(data, focusPlayerId, box, () => overlay.remove());
+        } catch(e) {
+            box.innerHTML = '<div class="modal-title">SCORECARD</div><div class="sc-loading">FAILED TO LOAD</div>';
+            box.appendChild(_closeButton(() => overlay.remove()));
+        }
+    }
+
+    function _renderShanghaiScorecard(data, focusPlayerId, box, onClose) {
+        const winner = data.players.find(p => p.id === data.winner_id);
+        _scHeader(box, 'SHANGHAI', winner ? winner.name.toUpperCase() + ' WINS' : '');
+
+        // Final scores summary
+        const summaryEl = document.createElement('div');
+        summaryEl.className = 'sc-summary-table';
+        data.players.forEach(p => {
+            const total = data.totals[String(p.id)] || 0;
+            const isFocus = p.id === focusPlayerId;
+            summaryEl.innerHTML +=
+                `<div class="sc-summary-row${isFocus ? ' sc-focus' : ''}">` +
+                `<span class="sc-summary-name">${_esc(p.name)}</span>` +
+                `<span class="sc-summary-score">${total} pts</span></div>`;
+        });
+        box.appendChild(summaryEl);
+
+        // Round-by-round breakdown
+        const roundNums = Object.keys(data.rounds).map(Number).sort((a,b) => a-b);
+        if (roundNums.length) {
+            const hdr = document.createElement('div');
+            hdr.className = 'sc-leg-header';
+            hdr.textContent = 'ROUND BY ROUND';
+            box.appendChild(hdr);
+
+            const colHdr = document.createElement('div');
+            colHdr.className = 'sc-col-header';
+            let hdrHTML = '<span class="sc-turn-num">TGT</span>';
+            data.players.forEach(p => {
+                hdrHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">${_esc(p.name.toUpperCase())}</span>`;
+            });
+            colHdr.innerHTML = hdrHTML;
+            box.appendChild(colHdr);
+
+            roundNums.forEach(rn => {
+                const rowEl = document.createElement('div');
+                rowEl.className = 'sc-turn-row';
+                // Get target from first player's data for this round
+                const anyPlayer = Object.values(data.rounds[String(rn)] || {})[0];
+                const target = anyPlayer ? anyPlayer.target : rn;
+                let rowHTML = `<span class="sc-turn-num">${target}</span>`;
+                data.players.forEach(p => {
+                    const rd    = (data.rounds[String(rn)] || {})[String(p.id)];
+                    const darts = (data.throws[String(rn)]  || {})[String(p.id)];
+                    if (!rd) {
+                        rowHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">—</span>`;
+                        return;
+                    }
+                    const dartStr = darts ? darts.map(d => {
+                        const hit = d.pts > 0;
+                        return `<span class="sc-dart${d.pts > 0 ? ' dart-checkout' : ''}">${_esc(_dartNotation(d.seg, d.mul))}</span>`;
+                    }).join('') : '';
+                    const shanghaiBadge = rd.shanghai ? ' <span class="sc-shanghai-badge">SHANGHAI!</span>' : '';
+                    rowHTML +=
+                        `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">` +
+                        `<span class="sc-darts">${dartStr}</span>` +
+                        `<span class="sc-turn-score">${rd.score}${shanghaiBadge}</span>` +
+                        `</span>`;
+                });
+                rowEl.innerHTML = rowHTML;
+                box.appendChild(rowEl);
+            });
+
+            // Totals row
+            const totalsRow = document.createElement('div');
+            totalsRow.className = 'sc-turn-row sc-totals-row';
+            let totHTML = '<span class="sc-turn-num">TOT</span>';
+            data.players.forEach(p => {
+                const total = data.totals[String(p.id)] || 0;
+                const isWinner = p.id === data.winner_id;
+                totHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}"><span class="sc-turn-score${isWinner ? ' dart-checkout' : ''}">${total}</span></span>`;
+            });
+            totalsRow.innerHTML = totHTML;
+            box.appendChild(totalsRow);
+        }
+        box.appendChild(_closeButton(onClose));
+    }
+
+    // ── Cricket scorecard ────────────────────────────────────────────────────
+
+    async function _showCricketScorecardModal(matchId, focusPlayerId) {
+        const overlay = _modalOverlay('scorecard-modal');
+        const box = document.createElement('div');
+        box.className = 'modal-box scorecard-box';
+        box.innerHTML = '<div class="modal-title">SCORECARD</div><div class="sc-loading">LOADING…</div>';
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        try {
+            const data = await API.getCricketScorecard(matchId);
+            box.innerHTML = '';
+            _renderCricketScorecard(data, focusPlayerId, box, () => overlay.remove());
+        } catch(e) {
+            box.innerHTML = '<div class="modal-title">SCORECARD</div><div class="sc-loading">FAILED TO LOAD</div>';
+            box.appendChild(_closeButton(() => overlay.remove()));
+        }
+    }
+
+    const _CRICKET_NUMBERS = [20, 19, 18, 17, 16, 15, 25];
+
+    function _renderCricketScorecard(data, focusPlayerId, box, onClose) {
+        const winner = data.players.find(p => p.id === data.winner_id);
+        _scHeader(box, 'CRICKET', winner ? winner.name.toUpperCase() + ' WINS' : '');
+
+        // Marks/scores summary table — one row per scoring number
+        const hdr = document.createElement('div');
+        hdr.className = 'sc-leg-header';
+        hdr.textContent = 'FINAL MARKS & SCORES';
+        box.appendChild(hdr);
+
+        // Column header
+        const colHdr = document.createElement('div');
+        colHdr.className = 'sc-col-header';
+        let hdrHTML = '<span class="sc-turn-num">NUM</span>';
+        data.players.forEach(p => {
+            hdrHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">${_esc(p.name.toUpperCase())}</span>`;
+        });
+        colHdr.innerHTML = hdrHTML;
+        box.appendChild(colHdr);
+
+        _CRICKET_NUMBERS.forEach(num => {
+            const rowEl = document.createElement('div');
+            rowEl.className = 'sc-turn-row';
+            const label = num === 25 ? 'BULL' : String(num);
+            let rowHTML = `<span class="sc-turn-num">${label}</span>`;
+            data.players.forEach(p => {
+                const marks = ((data.final_marks[String(p.id)] || {})[String(num)]) || 0;
+                const closed = marks >= 3;
+                const marksStr = marks === 0 ? '·' : marks === 1 ? '/' : marks === 2 ? 'X' : '✓';
+                rowHTML +=
+                    `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">` +
+                    `<span class="sc-turn-score${closed ? ' dart-checkout' : ''}">${marksStr}</span>` +
+                    `</span>`;
+            });
+            rowEl.innerHTML = rowHTML;
+            box.appendChild(rowEl);
+        });
+
+        // Points row
+        const ptsRow = document.createElement('div');
+        ptsRow.className = 'sc-turn-row sc-totals-row';
+        let ptsHTML = '<span class="sc-turn-num">PTS</span>';
+        data.players.forEach(p => {
+            const pts = data.final_scores[String(p.id)] || 0;
+            const isWinner = p.id === data.winner_id;
+            ptsHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}"><span class="sc-turn-score${isWinner ? ' dart-checkout' : ''}">${pts}</span></span>`;
+        });
+        ptsRow.innerHTML = ptsHTML;
+        box.appendChild(ptsRow);
+
+        // Turn-by-turn throws
+        const turnNums = Object.keys(data.turns).map(Number).sort((a,b) => a-b);
+        if (turnNums.length) {
+            const turnHdr = document.createElement('div');
+            turnHdr.className = 'sc-leg-header';
+            turnHdr.textContent = 'TURN BY TURN';
+            box.appendChild(turnHdr);
+
+            const turnColHdr = document.createElement('div');
+            turnColHdr.className = 'sc-col-header';
+            let turnHdrHTML = '<span class="sc-turn-num">#</span>';
+            data.players.forEach(p => {
+                turnHdrHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">${_esc(p.name.toUpperCase())}</span>`;
+            });
+            turnColHdr.innerHTML = turnHdrHTML;
+            box.appendChild(turnColHdr);
+
+            turnNums.forEach(tn => {
+                const rowEl = document.createElement('div');
+                rowEl.className = 'sc-turn-row';
+                let rowHTML = `<span class="sc-turn-num">${tn}</span>`;
+                data.players.forEach(p => {
+                    const darts = (data.turns[String(tn)] || {})[String(p.id)];
+                    if (!darts || !darts.length) {
+                        rowHTML += `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">—</span>`;
+                        return;
+                    }
+                    const turnPts = darts.reduce((s,d) => s + d.pts, 0);
+                    const dartStr = darts.map(d => {
+                        const hit = d.marks > 0 || d.pts > 0;
+                        return `<span class="sc-dart${hit ? ' dart-checkout' : ''}">${_esc(_dartNotation(d.seg, d.mul))}</span>`;
+                    }).join('');
+                    rowHTML +=
+                        `<span class="sc-player-col${p.id === focusPlayerId ? ' sc-focus' : ''}">` +
+                        `<span class="sc-darts">${dartStr}</span>` +
+                        `<span class="sc-turn-score">${turnPts > 0 ? '+' + turnPts : ''}</span>` +
+                        `</span>`;
+                });
+                rowEl.innerHTML = rowHTML;
+                box.appendChild(rowEl);
+            });
+        }
+        box.appendChild(_closeButton(onClose));
+    }
+
+        function _modalOverlay(id) {
         const existing = document.getElementById(id);
         if (existing) existing.remove();
         const overlay = document.createElement('div');

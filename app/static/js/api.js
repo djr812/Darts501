@@ -287,6 +287,18 @@ const API = (() => {
         return request('GET', `/api/matches/${matchId}/scorecard`);
     }
 
+    async function getGenericScorecard(matchId) {
+        return request('GET', `/api/matches/${matchId}/scorecard/generic`);
+    }
+
+    async function getShanghaiScorecard(matchId) {
+        return request('GET', `/api/matches/${matchId}/scorecard/shanghai`);
+    }
+
+    async function getCricketScorecard(matchId) {
+        return request('GET', `/api/matches/${matchId}/scorecard/cricket`);
+    }
+
     async function getPlayerTrend(playerId, scope = {}) {
         const params = new URLSearchParams();
         if (scope.limit)     params.set('limit',      scope.limit);
@@ -462,6 +474,9 @@ const API = (() => {
         submitShanghaiRound,
         endShanghaiMatch,
         getMatchScorecard,
+        getGenericScorecard,
+        getShanghaiScorecard,
+        getCricketScorecard,
         cancelMatch,
         restartMatch,
         restartCricketMatch,
