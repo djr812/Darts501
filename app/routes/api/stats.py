@@ -468,7 +468,13 @@ def get_player_heatmap(player_id):
 
     game_type  = request.args.get("game_type",  "all")
     double_out = request.args.get("double_out", "all")
+    match_id   = request.args.get("match_id",   None)
     scope_sql, scope_params = _scope_clauses(game_type, double_out)
+
+    # Optional single-match scope (used by practice summary modal)
+    match_clause  = " AND m.id = %s" if match_id else ""
+    match_params  = [int(match_id)] if match_id else []
+    status_clause = "" if match_id else " AND m.status = 'complete'"
 
     heatmap_sql = (
         """
@@ -482,14 +488,15 @@ def get_player_heatmap(player_id):
         JOIN matches m  ON m.id  = l.match_id
         WHERE t.player_id  = %s
           AND th.segment   != 0
-          AND m.status      = 'complete'
         """
+        + status_clause
+        + match_clause
         + scope_sql +
         """
         GROUP BY th.segment, th.multiplier
         """
     )
-    cursor.execute(heatmap_sql, [player_id] + scope_params)
+    cursor.execute(heatmap_sql, [player_id] + match_params + scope_params)
     rows = cursor.fetchall()
 
     counts = {}
@@ -539,19 +546,39 @@ def get_player_history(player_id):
     offset = max(0, int(request.args.get("offset", 0)))
     limit  = min(50, max(1, int(request.args.get("limit", 20))))
 
-    # Simple query — no GROUP_CONCAT, fetch opponents separately per match
+    # Pull ended_at and winner_id from the game-specific tables where needed,
+    # since newer games (race1000, nine_lives, killer, bermuda, baseball) only
+    # write those fields to their own tables and not back to matches.
     cursor.execute("""
         SELECT
             m.id            AS match_id,
             m.game_type,
             m.session_type,
-            m.ended_at,
-            m.winner_id
+            COALESCE(m.ended_at,
+                CASE m.game_type
+                    WHEN 'race1000'   THEN (SELECT g.ended_at FROM race1000_games   g WHERE g.match_id = m.id LIMIT 1)
+                    WHEN 'nine_lives' THEN (SELECT g.ended_at FROM nine_lives_games g WHERE g.match_id = m.id LIMIT 1)
+                    WHEN 'killer'     THEN (SELECT g.ended_at FROM killer_games     g WHERE g.match_id = m.id LIMIT 1)
+                    WHEN 'bermuda'    THEN (SELECT g.ended_at FROM bermuda_games    g WHERE g.match_id = m.id LIMIT 1)
+                    WHEN 'baseball'   THEN (SELECT g.ended_at FROM baseball_games   g WHERE g.match_id = m.id LIMIT 1)
+                    ELSE NULL
+                END
+            ) AS ended_at,
+            COALESCE(m.winner_id,
+                CASE m.game_type
+                    WHEN 'race1000'   THEN (SELECT g.winner_id FROM race1000_games   g WHERE g.match_id = m.id LIMIT 1)
+                    WHEN 'nine_lives' THEN (SELECT g.winner_id FROM nine_lives_games g WHERE g.match_id = m.id LIMIT 1)
+                    WHEN 'killer'     THEN (SELECT g.winner_id FROM killer_games     g WHERE g.match_id = m.id LIMIT 1)
+                    WHEN 'bermuda'    THEN (SELECT g.winner_id FROM bermuda_games    g WHERE g.match_id = m.id LIMIT 1)
+                    WHEN 'baseball'   THEN (SELECT g.winner_ids FROM baseball_games  g WHERE g.match_id = m.id LIMIT 1)
+                    ELSE NULL
+                END
+            ) AS winner_id
         FROM matches m
         JOIN match_players mp ON mp.match_id = m.id AND mp.player_id = %s
         WHERE m.status = 'complete'
           AND m.session_type != 'practice'
-        ORDER BY m.ended_at DESC
+        ORDER BY ended_at DESC
         LIMIT %s OFFSET %s
     """, (player_id, limit, offset))
 
@@ -589,15 +616,19 @@ def get_player_history(player_id):
         is_practice = row["session_type"] == "practice"
         if is_practice:
             result = "PRACTICE"
-        elif row["winner_id"] == player_id:
-            result = "WIN"
-        elif row["winner_id"] is None:
-            result = "—"
         else:
-            result = "LOSS"
+            w = row["winner_id"]
+            if w is None:
+                result = "—"
+            elif str(player_id) in str(w).split(","):
+                # Handles both single winner_id (int) and baseball's "1,2" winner_ids string
+                result = "WIN"
+            else:
+                result = "LOSS"
 
         sessions.append({
             "match_id":    row["match_id"],
+            "player_id":   player_id,
             "date":        str(row["ended_at"])[:10] if row["ended_at"] else "—",
             "game_type":   row["game_type"],
             "is_practice": is_practice,
