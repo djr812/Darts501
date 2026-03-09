@@ -27,6 +27,7 @@ var KILLER_GAME = (function () {
         setComplete:        false,    // board locked after 3rd dart
         cpuDifficulty:      'medium',
         cpuTurnRunning:     false,
+        cpuPlayerId:        null,
     };
 
     var _pendingThrows  = [];   // buffered for current set
@@ -56,6 +57,7 @@ var KILLER_GAME = (function () {
         _pendingWinner  = null;
         _state.cpuDifficulty  = 'medium';
         _state.cpuTurnRunning = false;
+        _state.cpuPlayerId    = null;
 
         SPEECH.unlock();
         if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
@@ -100,6 +102,7 @@ var KILLER_GAME = (function () {
             if (sel.isCpu || sel.mode === 'cpu') {
                 return API.getCpuPlayer().then(function (rec) {
                     if (sel.difficulty) _state.cpuDifficulty = sel.difficulty;
+                    _state.cpuPlayerId = String(rec.id);
                     return { id: rec.id, name: 'CPU', isCpu: true };
                 });
             }
@@ -935,7 +938,9 @@ var KILLER_GAME = (function () {
     // ── CPU turn ──────────────────────────────────────────────────────────────
 
     function _isCpuPlayer(p) {
-        return p && (p.isCpu === true || p.name === 'CPU');
+        if (!p) return false;
+        if (_state.cpuPlayerId && String(p.id) === _state.cpuPlayerId) return true;
+        return p.isCpu === true || p.name === 'CPU';
     }
 
     function _runCpuTurn() {

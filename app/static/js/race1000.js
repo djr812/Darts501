@@ -29,6 +29,7 @@ var RACE1000_GAME = (function () {
         targetSet:          false,   // someone reached 1000 this round but round not over
         cpuDifficulty:      'medium',
         cpuTurnRunning:     false,
+        cpuPlayerId:        null,
     };
 
     var _pendingThrows = [];
@@ -51,6 +52,7 @@ var RACE1000_GAME = (function () {
         _state.targetSet          = false;
         _state.cpuDifficulty      = 'medium';
         _state.cpuTurnRunning     = false;
+        _state.cpuPlayerId        = null;
         _pendingThrows = [];
         _throwHistory  = [];
 
@@ -107,6 +109,7 @@ var RACE1000_GAME = (function () {
                     })
                     .then(function (rec) {
                         _state.cpuDifficulty = sel.difficulty || 'medium';
+                        _state.cpuPlayerId = String(rec.id);
                         return { id: rec.id, name: 'CPU', isCpu: true };
                     });
             }
@@ -132,7 +135,9 @@ var RACE1000_GAME = (function () {
     }
 
     function _isCpuPlayer(p) {
-        return p && (p.isCpu === true || p.name === 'CPU');
+        if (!p) return false;
+        if (_state.cpuPlayerId && String(p.id) === _state.cpuPlayerId) return true;
+        return p.isCpu === true || p.name === 'CPU';
     }
 
     function _currentPlayer() {

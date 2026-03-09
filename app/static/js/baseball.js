@@ -30,10 +30,15 @@ var BASEBALL_GAME = (function () {
         // Local UI state
         setComplete:        false,  // board locked after 3rd dart in a set
         inningComplete:     false,  // 3 outs reached — inning is over
+        // CPU
+        cpuDifficulty:      'medium',
+        cpuTurnRunning:     false,
+        cpuPlayerId:        null,
     };
 
     var _throwHistory  = []; // local undo stack (cleared on NEXT)
     var _pendingThrows = []; // buffered throws for current set, submitted on NEXT
+    var _welcomedPlayers = {}; // { playerId: true } — tracks first-turn welcome
 
     // ─────────────────────────────────────────────────────────────────
     // Public: start
@@ -44,16 +49,31 @@ var BASEBALL_GAME = (function () {
         if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
         UI.setLoading(true);
 
+        _state.cpuDifficulty  = 'medium';
+        _state.cpuTurnRunning = false;
+        _state.cpuPlayerId    = null;
+        _welcomedPlayers      = {};
+
+        var _resolvedPlayers = [];
         _resolvePlayers(config.players)
             .then(function (players) {
+                _resolvedPlayers = players;
                 return API.createBaseballMatch({ player_ids: players.map(function (p) { return p.id; }) });
             })
             .then(function (state) {
                 _applyState(state);
+                _resolvedPlayers.forEach(function (rp) {
+                    var sp = _state.players.find(function (p) { return String(p.id) === String(rp.id); });
+                    if (rp.isCpu && sp) sp.isCpu = true;
+                });
                 _state.onEnd = onEnd;
                 UI.setLoading(false);
                 _buildScreen();
-                _announceCurrentPlayer(true);
+                if (_isCpuPlayer(_currentPlayer())) {
+                    _runCpuTurn();
+                } else {
+                    _announceCurrentPlayer(true);
+                }
             })
             .catch(function (err) {
                 UI.setLoading(false);
@@ -68,12 +88,18 @@ var BASEBALL_GAME = (function () {
 
     function _resolvePlayers(selections) {
         var promises = selections.map(function (sel) {
-            if (sel.mode === 'existing') {
-                return Promise.resolve({ id: sel.id, name: sel.name });
-            } else {
-                return API.createPlayer(sel.name)
-                    .then(function (p) { return { id: p.id, name: p.name }; });
+            if (sel.isCpu || sel.mode === 'cpu') {
+                return API.getCpuPlayer().then(function (rec) {
+                    if (sel.difficulty) _state.cpuDifficulty = sel.difficulty;
+                    _state.cpuPlayerId = String(rec.id);
+                    return { id: rec.id, name: 'CPU', isCpu: true };
+                });
             }
+            if (sel.mode === 'existing') {
+                return Promise.resolve({ id: sel.id, name: sel.name, isCpu: false });
+            }
+            return API.createPlayer(sel.name)
+                .then(function (p) { return { id: p.id, name: p.name, isCpu: false }; });
         });
         return Promise.all(promises);
     }
@@ -85,7 +111,11 @@ var BASEBALL_GAME = (function () {
     function _applyState(s) {
         _state.matchId            = s.match_id;
         _state.gameId             = s.game_id;
-        _state.players            = s.players || [];
+        var prev = _state.players;
+        _state.players            = (s.players || []).map(function (p) {
+            var old = prev.find(function (o) { return String(o.id) === String(p.id); });
+            return Object.assign({}, p, { isCpu: old ? !!old.isCpu : (p.name === 'CPU') });
+        });
         _state.startNumber        = s.start_number;
         _state.currentInning      = s.current_inning;
         _state.currentPlayerIndex = s.current_player_index;
@@ -595,7 +625,11 @@ var BASEBALL_GAME = (function () {
                 _updateScoreboard();
                 _updateStatus();
                 _applyTargetHighlight();
-                _announceCurrentPlayer(false);
+                if (_isCpuPlayer(_currentPlayer())) {
+                    _runCpuTurn();
+                } else {
+                    _announceCurrentPlayer(false);
+                }
             })
             .catch(function (err) {
                 UI.setLoading(false);
@@ -798,21 +832,40 @@ var BASEBALL_GAME = (function () {
 
     function _announceCurrentPlayer(isFirst) {
         var player = _currentPlayer();
-        if (!player) return;
+        if (!player) return 0;
+        var pid    = String(player.id);
+        // If not explicitly told isFirst, derive it from whether we've welcomed them before
+        if (isFirst === undefined) {
+            isFirst = !_welcomedPlayers[pid];
+        }
+        _welcomedPlayers[pid] = true;
         var target = _targetNumber();
         var msg = isFirst
             ? player.name + ', welcome to Baseball Darts. In inning ' + _state.currentInning +
               ' you are targeting number ' + target + '.'
             : player.name + '. Inning ' + _state.currentInning + '. Target number ' + target + '.';
         _speak(msg, 400);
+        return 400 + 200 + msg.length * 120;
     }
 
     function _speakDart(isHit, runs) {
-        if (!SPEECH.isEnabled()) return;
+        if (!SPEECH.isEnabled()) return 0;
         var msg = isHit
             ? (runs === 1 ? 'Single. 1 run.' : runs === 2 ? 'Double. 2 runs.' : 'Treble. 3 runs.')
             : 'Out.';
         _speak(msg, 200);
+        return 300 + msg.length * 120;
+    }
+
+    function _dartSpeechDuration(segment, multiplier) {
+        // Estimates full speech duration for a dart on the current target — used by CPU timing
+        var target = _targetNumber();
+        var isHit  = (segment === target);
+        var runs   = isHit ? multiplier : 0;
+        var msg    = isHit
+            ? (runs === 1 ? 'Single. 1 run.' : runs === 2 ? 'Double. 2 runs.' : 'Treble. 3 runs.')
+            : 'Out.';
+        return 300 + msg.length * 120;
     }
 
     function _speakInningEnd(inn) {
@@ -837,6 +890,109 @@ var BASEBALL_GAME = (function () {
             });
         }
         _speak(msg, 1000);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // CPU turn
+    // ─────────────────────────────────────────────────────────────────
+
+    function _isCpuPlayer(p) {
+        if (!p) return false;
+        if (_state.cpuPlayerId && String(p.id) === _state.cpuPlayerId) return true;
+        return p.isCpu === true || p.name === 'CPU';
+    }
+
+    function _runCpuTurn() {
+        if (_state.cpuTurnRunning || _state.status !== 'active') return;
+        if (!_isCpuPlayer(_currentPlayer())) return;
+        _state.cpuTurnRunning = true;
+
+        var dartsThrown = 0;
+
+        function _throwNext() {
+            if (dartsThrown >= 3 || _state.setComplete) {
+                _state.cpuTurnRunning = false;
+                setTimeout(_onNext, 700);
+                return;
+            }
+            var dart      = _cpuChooseDart();
+            dartsThrown++;
+            var speechDur = _dartSpeechDuration(dart.segment, dart.multiplier);
+            _onThrow(dart.segment, dart.multiplier);
+            var nextDelay = Math.max(1000, speechDur + 500);
+            setTimeout(_throwNext, nextDelay);
+        }
+
+        _lockBoard(true);
+        var nb = document.getElementById('bbmp-next-btn'); if (nb) nb.disabled = true;
+        var ub = document.getElementById('bbmp-undo-btn'); if (ub) ub.disabled = true;
+
+        var announceWait = _announceCurrentPlayer();
+        setTimeout(_throwNext, Math.max(1000, announceWait + 400));
+    }
+
+    function _cpuChooseDart() {
+        var profile  = _cpuProfile();
+        var intended = _cpuIntend();
+        return _cpuApplyVariance(intended.segment, intended.multiplier, profile);
+    }
+
+    function _cpuIntend() {
+        var diff   = _state.cpuDifficulty;
+        var target = _targetNumber();
+        var r      = Math.random();
+        var BOARD_RING = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+
+        // All difficulties aim for the target number; accuracy determines whether they hit it
+        if (diff === 'hard') {
+            // Hard: mostly trebles, some doubles, rare singles
+            if (r < 0.55) return { segment: target, multiplier: 3 };
+            if (r < 0.80) return { segment: target, multiplier: 2 };
+            return { segment: target, multiplier: 1 };
+        } else if (diff === 'medium') {
+            // Medium: mix of multipliers, some misses to adjacent
+            if (r < 0.30) return { segment: target, multiplier: 3 };
+            if (r < 0.58) return { segment: target, multiplier: 2 };
+            if (r < 0.82) return { segment: target, multiplier: 1 };
+            return { segment: BOARD_RING[Math.floor(Math.random() * BOARD_RING.length)], multiplier: 1 };
+        } else {
+            // Easy: mainly singles, frequent misses to other segments
+            if (r < 0.08) return { segment: target, multiplier: 3 };
+            if (r < 0.20) return { segment: target, multiplier: 2 };
+            if (r < 0.45) return { segment: target, multiplier: 1 };
+            return { segment: BOARD_RING[Math.floor(Math.random() * BOARD_RING.length)], multiplier: 1 };
+        }
+    }
+
+    function _cpuProfile() {
+        var profiles = {
+            easy:   { trebleHit: 0.40, trebleSingle: 0.35, doubleHit: 0.50, doubleSingle: 0.30, singleHit: 0.82 },
+            medium: { trebleHit: 0.68, trebleSingle: 0.20, doubleHit: 0.65, doubleSingle: 0.20, singleHit: 0.92 },
+            hard:   { trebleHit: 0.86, trebleSingle: 0.09, doubleHit: 0.80, doubleSingle: 0.13, singleHit: 0.97 },
+        };
+        return profiles[_state.cpuDifficulty] || profiles.medium;
+    }
+
+    function _cpuApplyVariance(segment, multiplier, profile) {
+        var BOARD_RING = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+        function adjacent(seg) {
+            var idx = BOARD_RING.indexOf(seg);
+            if (idx === -1) return seg;
+            return BOARD_RING[(idx + (Math.random() < 0.5 ? 1 : -1) + BOARD_RING.length) % BOARD_RING.length];
+        }
+        var r = Math.random();
+        if (multiplier === 3) {
+            if (r < profile.trebleHit) return { segment: segment, multiplier: 3 };
+            if (r < profile.trebleHit + profile.trebleSingle) return { segment: segment, multiplier: 1 };
+            return { segment: adjacent(segment), multiplier: 1 };
+        }
+        if (multiplier === 2) {
+            if (r < profile.doubleHit) return { segment: segment, multiplier: 2 };
+            if (r < profile.doubleHit + profile.doubleSingle) return { segment: segment, multiplier: 1 };
+            return { segment: adjacent(segment), multiplier: 1 };
+        }
+        if (r < profile.singleHit) return { segment: segment, multiplier: 1 };
+        return { segment: adjacent(segment), multiplier: 1 };
     }
 
     // ─────────────────────────────────────────────────────────────────
