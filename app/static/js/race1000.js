@@ -80,9 +80,11 @@ var RACE1000_GAME = (function () {
                     }
                 });
                 _buildScreen();
-                _announcePlayer(true);
                 if (_isCpuPlayer(_currentPlayer())) {
-                    setTimeout(_runCpuTurn, 1500);
+                    // _runCpuTurn calls _announcePlayer internally and waits for it
+                    _runCpuTurn();
+                } else {
+                    _announcePlayer(true);
                 }
             })
             .catch(function (err) {
@@ -599,9 +601,11 @@ var RACE1000_GAME = (function () {
                 }
 
                 setTimeout(function () {
-                    _announcePlayer(false);
                     if (_isCpuPlayer(_currentPlayer())) {
-                        setTimeout(_runCpuTurn, 1200);
+                        // _runCpuTurn calls _announcePlayer internally and waits for it
+                        _runCpuTurn();
+                    } else {
+                        _announcePlayer(false);
                     }
                 }, afterDelay);
             })
@@ -618,7 +622,6 @@ var RACE1000_GAME = (function () {
         if (!_isCpuPlayer(_currentPlayer())) return;
         _state.cpuTurnRunning = true;
 
-        var DART_DELAY = 900;
         var dartsThrown = 0;
 
         function _throwNext() {
@@ -630,14 +633,20 @@ var RACE1000_GAME = (function () {
             }
             var dart = _cpuChooseDart();
             dartsThrown++;
+            // Speak the dart and wait for it to finish before throwing the next one
+            var speechDur = _speakDart(dart.segment, dart.multiplier, 0);
             _onThrow(dart.segment, dart.multiplier);
-            setTimeout(_throwNext, DART_DELAY);
+            var nextDelay = Math.max(800, speechDur + 300);
+            setTimeout(_throwNext, nextDelay);
         }
 
         _lockBoard(true);
         var nb = document.getElementById('r1k-next-btn'); if (nb) nb.disabled = true;
         var ub = document.getElementById('r1k-undo-btn'); if (ub) ub.disabled = true;
-        setTimeout(_throwNext, 600);
+
+        // Wait for "CPU's turn to throw" announcement to finish before first dart
+        var announceWait = _announcePlayer(false);
+        setTimeout(_throwNext, Math.max(800, announceWait + 300));
     }
 
     function _cpuChooseDart() {
@@ -877,20 +886,25 @@ var RACE1000_GAME = (function () {
     // ── Speech ────────────────────────────────────────────────────────────────
 
     function _announcePlayer(isFirst) {
-        if (!SPEECH.isEnabled()) return;
+        // Returns estimated ms until speech is finished (delay + speaking time)
+        if (!SPEECH.isEnabled()) return 0;
         var p = _currentPlayer();
-        if (!p) return;
-        var msg = p.name + "'s turn to throw.";
+        if (!p) return 0;
+        var msg   = p.name + "'s turn to throw.";
+        var delay = isFirst ? 700 : 500;
+        var dur   = delay + 200 + msg.length * 85;
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
             window.speechSynthesis && window.speechSynthesis.speak(
                 Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
             );
-        }, isFirst ? 700 : 500);
+        }, delay);
+        return dur;
     }
 
     function _speakDart(segment, multiplier, points) {
-        if (!SPEECH.isEnabled()) return;
+        // Returns estimated speech duration in ms
+        if (!SPEECH.isEnabled()) return 0;
         var label;
         if (segment === 0) {
             label = 'Miss';
@@ -904,6 +918,7 @@ var RACE1000_GAME = (function () {
         window.speechSynthesis && window.speechSynthesis.speak(
             Object.assign(new SpeechSynthesisUtterance(label), { rate: 1.0, pitch: 1.0 })
         );
+        return 200 + label.length * 85;
     }
 
     function _speakTurnSummary() {
