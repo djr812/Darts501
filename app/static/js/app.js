@@ -999,24 +999,34 @@
         variantSection.appendChild(variantRow);
         inner.appendChild(variantSection);
 
-        // Player count
+        // Player count — 1 = vs CPU, 2-6 = multiplayer
         var countSection = document.createElement('div');
         countSection.className = 'setup-section';
         countSection.innerHTML = '<div class="setup-label">NUMBER OF PLAYERS</div>';
         var countRow = document.createElement('div');
         countRow.className = 'setup-option-row';
         var selectedCount = 2;
-        [2, 3, 4, 5, 6].forEach(function(n) {
+        [1, 2, 3, 4, 5, 6].forEach(function(n) {
             var btn = document.createElement('button');
             btn.className = 'option-btn' + (n === 2 ? ' selected' : '');
             btn.dataset.value = n;
             btn.type = 'button';
-            btn.textContent = n;
+            if (n === 1) {
+                btn.innerHTML = '1<span class="option-hint">vs CPU</span>';
+            } else {
+                btn.textContent = n;
+            }
             btn.addEventListener('click', function() {
                 countRow.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
                 btn.classList.add('selected');
                 selectedCount = n;
-                UI.renderCricketPlayerSlots(existingPlayers, selectedCount, namesSection);
+                if (n === 1) {
+                    UI.showDifficultyModal(function(difficulty) {
+                        UI.renderRace1000PlayerSlots(existingPlayers, 1, namesSection, difficulty);
+                    });
+                } else {
+                    UI.renderCricketPlayerSlots(existingPlayers, n, namesSection);
+                }
             });
             countRow.appendChild(btn);
         });
@@ -1035,7 +1045,9 @@
         startBtn.textContent = 'START MATCH';
         startBtn.type = 'button';
         startBtn.addEventListener('click', function() {
-            var players = UI.collectCricketPlayers(namesSection);
+            var players = selectedCount === 1
+                ? UI.collectRace1000Players(namesSection)
+                : UI.collectCricketPlayers(namesSection);
             if (!players) return;
             SPEECH.unlock();
             if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
