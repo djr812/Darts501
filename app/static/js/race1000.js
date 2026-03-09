@@ -633,7 +633,7 @@ var RACE1000_GAME = (function () {
             // Speak the dart and wait for it to finish before throwing the next one
             var speechDur = _speakDart(dart.segment, dart.multiplier, 0);
             _onThrow(dart.segment, dart.multiplier);
-            var nextDelay = Math.max(800, speechDur + 300);
+            var nextDelay = Math.max(1000, speechDur + 450);
             setTimeout(_throwNext, nextDelay);
         }
 
@@ -643,7 +643,7 @@ var RACE1000_GAME = (function () {
 
         // Wait for "CPU's turn to throw" announcement to finish before first dart
         var announceWait = _announcePlayer(false);
-        setTimeout(_throwNext, Math.max(800, announceWait + 300));
+        setTimeout(_throwNext, Math.max(1000, announceWait + 400));
     }
 
     function _cpuChooseDart() {
@@ -887,7 +887,7 @@ var RACE1000_GAME = (function () {
         if (!p) return 0;
         var msg   = p.name + "'s turn to throw.";
         var delay = isFirst ? 700 : 500;
-        var dur   = delay + 200 + msg.length * 85;
+        var dur   = delay + 200 + msg.length * 120;
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
             SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
@@ -909,7 +909,7 @@ var RACE1000_GAME = (function () {
         }
         window.speechSynthesis && window.speechSynthesis.cancel();
         SPEECH.speak(label, { rate: 1.0, pitch: 1.0 });
-        return 200 + label.length * 85;
+        return 300 + label.length * 120;
     }
 
     function _speakTurnSummary() {
