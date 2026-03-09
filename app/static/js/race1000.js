@@ -293,6 +293,32 @@ var RACE1000_GAME = (function () {
 
     // ── Progress bars ─────────────────────────────────────────────────────────
 
+    function _leaderId() {
+        // Returns the id of the sole leader, or null if two or more players are tied for the lead
+        var maxScore = -1;
+        var leader   = null;
+        var tied     = false;
+        _state.players.forEach(function (p) {
+            if (p.score > maxScore) {
+                maxScore = p.score;
+                leader   = p.id;
+                tied     = false;
+            } else if (p.score === maxScore) {
+                tied = true;
+            }
+        });
+        return (maxScore === 0 || tied) ? null : leader;
+    }
+
+    function _fillClass(playerId) {
+        var lid    = _leaderId();
+        var isActive  = String(playerId) === String(_state.currentPlayerId);
+        var isLeader  = lid !== null && String(playerId) === String(lid);
+        return 'r1k-progress-fill' +
+               (isLeader  ? ' r1k-fill-leader'   : ' r1k-fill-trailing') +
+               (isActive  ? ' r1k-fill-active'   : '');
+    }
+
     function _renderProgressBars(container) {
         container.innerHTML = '';
         _state.players.forEach(function (p) {
@@ -307,8 +333,7 @@ var RACE1000_GAME = (function () {
             track.className = 'r1k-progress-track';
             var fill = document.createElement('div');
             fill.id        = 'r1k-fill-' + p.id;
-            fill.className = 'r1k-progress-fill' +
-                (String(p.id) === String(_state.currentPlayerId) ? ' r1k-fill-active' : '');
+            fill.className = _fillClass(p.id);
             var pct = Math.min(100, Math.round((p.score / WIN_TARGET) * 100));
             fill.style.width = pct + '%';
             track.appendChild(fill);
@@ -331,8 +356,7 @@ var RACE1000_GAME = (function () {
             if (fill) {
                 var pct = Math.min(100, Math.round((p.score / WIN_TARGET) * 100));
                 fill.style.width = pct + '%';
-                fill.className = 'r1k-progress-fill' +
-                    (String(p.id) === String(_state.currentPlayerId) ? ' r1k-fill-active' : '');
+                fill.className = _fillClass(p.id);
             }
             var scoreEl = document.getElementById('r1k-pscore-' + p.id);
             if (scoreEl) scoreEl.textContent = p.score;

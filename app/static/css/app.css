@@ -2362,15 +2362,31 @@ body.mode-practice #app {
 
 .r1k-progress-fill {
     height: 100%;
-    background: var(--text-dim);
     border-radius: 4px;
     width: 0%;
-    -webkit-transition: width 0.3s ease;
-    transition: width 0.3s ease;
+    -webkit-transition: width 0.3s ease, background 0.4s ease;
+    transition: width 0.3s ease, background 0.4s ease;
 }
 
-.r1k-fill-active {
-    background: var(--accent);
+/* Leader — green */
+.r1k-fill-leader {
+    background: #4ade80;
+}
+
+/* Trailing — red */
+.r1k-fill-trailing {
+    background: #f87171;
+}
+
+/* Active player gets a brighter, glowing version of their colour */
+.r1k-fill-leader.r1k-fill-active {
+    background: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+
+.r1k-fill-trailing.r1k-fill-active {
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
 }
 
 .r1k-progress-score {
