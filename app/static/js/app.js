@@ -163,7 +163,7 @@
 
         state.players.forEach(p => {
             p.score = state.startingScore;
-            UI.setScore(p.id, p.score);
+            UI.setStartingScore(p.id, state.startingScore);
             UI.clearDartPills(p.id);
             UI.setCheckoutHint(p.id, null);
             UI.updatePlayerSetLegs(p.id, state.setsScore[p.id] || 0, state.legsScore[p.id] || 0);

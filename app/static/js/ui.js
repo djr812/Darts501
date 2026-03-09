@@ -791,16 +791,70 @@ const UI = (() => {
         return el;
     }
 
+    // Ring geometry constants — shared by builder and updater
+    var _RING_R  = 54;   // radius of the progress arc
+    var _RING_CX = 64;   // SVG centre x
+    var _RING_CY = 64;   // SVG centre y
+    var _RING_CIRC = +(2 * Math.PI * _RING_R).toFixed(4);  // full circumference
+
     function _buildPlayerCard(player) {
         const card = document.createElement('div');
         card.className = 'player-card';
         card.id = `player-card-${player.id}`;
-        card.innerHTML = `
-            <div class="player-name">${_esc(player.name)}</div>
-            <div class="player-score" id="score-${player.id}">${player.score}</div>
-            <div class="player-darts" id="darts-${player.id}"></div>
-            <div class="checkout-hint" id="hint-${player.id}"></div>
-        `;
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'player-name';
+        nameEl.textContent = player.name;
+        card.appendChild(nameEl);
+
+        // SVG progress ring wrapping the score
+        const ns   = 'http://www.w3.org/2000/svg';
+        const svg  = document.createElementNS(ns, 'svg');
+        svg.setAttribute('viewBox', '0 0 128 128');
+        svg.setAttribute('class', 'score-ring-svg');
+        svg.id = `ring-${player.id}`;
+        svg.dataset.starting = player.score;   // 501 or 201
+
+        // Track (background circle)
+        const track = document.createElementNS(ns, 'circle');
+        track.setAttribute('cx', _RING_CX);
+        track.setAttribute('cy', _RING_CY);
+        track.setAttribute('r',  _RING_R);
+        track.setAttribute('class', 'score-ring-track');
+        svg.appendChild(track);
+
+        // Progress arc — starts full (dashoffset = 0)
+        const arc = document.createElementNS(ns, 'circle');
+        arc.setAttribute('cx', _RING_CX);
+        arc.setAttribute('cy', _RING_CY);
+        arc.setAttribute('r',  _RING_R);
+        arc.setAttribute('class', 'score-ring-arc');
+        arc.setAttribute('stroke-dasharray',  _RING_CIRC);
+        arc.setAttribute('stroke-dashoffset', '0');
+        arc.id = `ring-arc-${player.id}`;
+        svg.appendChild(arc);
+
+        // Score text inside the ring
+        const text = document.createElementNS(ns, 'text');
+        text.setAttribute('x', _RING_CX);
+        text.setAttribute('y', _RING_CY);
+        text.setAttribute('class', 'score-ring-text');
+        text.id = `score-${player.id}`;
+        text.textContent = player.score;
+        svg.appendChild(text);
+
+        card.appendChild(svg);
+
+        const dartsEl = document.createElement('div');
+        dartsEl.className = 'player-darts';
+        dartsEl.id = `darts-${player.id}`;
+        card.appendChild(dartsEl);
+
+        const hintEl = document.createElement('div');
+        hintEl.className = 'checkout-hint';
+        hintEl.id = `hint-${player.id}`;
+        card.appendChild(hintEl);
+
         return card;
     }
 
@@ -919,6 +973,23 @@ const UI = (() => {
     function setScore(playerId, score) {
         const el = document.getElementById(`score-${playerId}`);
         if (el) el.textContent = score;
+
+        // Update progress ring if present
+        const svg = document.getElementById(`ring-${playerId}`);
+        const arc = document.getElementById(`ring-arc-${playerId}`);
+        if (!svg || !arc) return;
+        const starting = parseFloat(svg.dataset.starting) || 501;
+        // fraction remaining: 1.0 = full ring, 0.0 = empty
+        const fraction  = Math.max(0, Math.min(1, score / starting));
+        const offset    = +(_RING_CIRC * (1 - fraction)).toFixed(4);
+        arc.setAttribute('stroke-dashoffset', offset);
+    }
+
+    function setStartingScore(playerId, starting) {
+        // Call at the start of each new leg so the ring knows what 100% means
+        const svg = document.getElementById(`ring-${playerId}`);
+        if (svg) svg.dataset.starting = starting;
+        setScore(playerId, starting);   // reset ring to full
     }
     function addDartPill(playerId, points, multiplier, segment) {
         const row = document.getElementById(`darts-${playerId}`);
@@ -1858,6 +1929,7 @@ const UI = (() => {
         showConfirmModal,
         setActivePlayer,
         setScore,
+        setStartingScore,
         addDartPill,
         clearDartPills,
         setCheckoutHint,

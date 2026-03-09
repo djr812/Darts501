@@ -391,6 +391,63 @@ body.mode-stats #app {
     color: #ffffff;
 }
 
+/* ── Score progress ring ── */
+.score-ring-svg {
+    display: block;
+    width: 120px;
+    height: 120px;
+    margin: 4px auto 2px;
+    /* Start arc from top (12 o'clock) */
+    -webkit-transform: rotate(-90deg);
+    transform: rotate(-90deg);
+}
+
+.score-ring-track {
+    fill: none;
+    stroke: rgba(167, 139, 250, 0.12);
+    stroke-width: 8;
+}
+
+.score-ring-arc {
+    fill: none;
+    stroke: #a78bfa;
+    stroke-width: 8;
+    stroke-linecap: round;
+    -webkit-transition: stroke-dashoffset 0.4s ease;
+    transition: stroke-dashoffset 0.4s ease;
+}
+
+/* Dim the arc on inactive cards */
+.player-card:not(.active) .score-ring-arc {
+    stroke: rgba(167, 139, 250, 0.35);
+    -webkit-transition: stroke-dashoffset 0.4s ease, stroke 0.15s ease;
+    transition: stroke-dashoffset 0.4s ease, stroke 0.15s ease;
+}
+
+.score-ring-text {
+    /* Counter-rotate so text reads normally */
+    -webkit-transform: rotate(90deg) translate(0, 0);
+    transform: rotate(90deg);
+    -webkit-transform-origin: 64px 64px;
+    transform-origin: 64px 64px;
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 400;
+    fill: var(--text-primary);
+    text-anchor: middle;
+    dominant-baseline: central;
+    letter-spacing: -0.02em;
+}
+
+.player-card.active .score-ring-text {
+    fill: #ffffff;
+}
+
+.player-card.active .score-ring-arc {
+    stroke: #a78bfa;
+    filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.6));
+}
+
 .player-darts {
     display: flex;
     margin-top: 8px;
