@@ -2344,7 +2344,9 @@ body.mode-practice #app {
     font-size: 0.55rem;
     letter-spacing: 0.05em;
     color: var(--text-secondary);
-    min-width: 56px;
+    width: 72px;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
