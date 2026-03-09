@@ -589,10 +589,7 @@ var RACE1000_GAME = (function () {
                                     '! Others still to throw.';
                         setTimeout(function () {
                             window.speechSynthesis && window.speechSynthesis.cancel();
-                            window.speechSynthesis && window.speechSynthesis.speak(
-                                Object.assign(new SpeechSynthesisUtterance(tsMsg),
-                                    { rate: 1.0, pitch: 1.0 })
-                            );
+                            SPEECH.speak(tsMsg, { rate: 1.0, pitch: 1.0 });
                         }, afterDelay);
                         afterDelay += 600 + tsMsg.length * 75;
                     }
@@ -861,9 +858,7 @@ var RACE1000_GAME = (function () {
             setTimeout(function () {
                 var msg = winName + ' wins the race to one thousand! Well played.';
                 window.speechSynthesis && window.speechSynthesis.cancel();
-                window.speechSynthesis && window.speechSynthesis.speak(
-                    Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-                );
+                SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
             }, 800);
         }
     }
@@ -895,9 +890,7 @@ var RACE1000_GAME = (function () {
         var dur   = delay + 200 + msg.length * 85;
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, delay);
         return dur;
     }
@@ -915,9 +908,7 @@ var RACE1000_GAME = (function () {
             label = mulLabel + segment;
         }
         window.speechSynthesis && window.speechSynthesis.cancel();
-        window.speechSynthesis && window.speechSynthesis.speak(
-            Object.assign(new SpeechSynthesisUtterance(label), { rate: 1.0, pitch: 1.0 })
-        );
+        SPEECH.speak(label, { rate: 1.0, pitch: 1.0 });
         return 200 + label.length * 85;
     }
 
@@ -927,9 +918,7 @@ var RACE1000_GAME = (function () {
         var msg   = total > 0 ? total + ' this turn.' : 'No score this turn.';
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, 600);
     }
 
@@ -943,9 +932,7 @@ var RACE1000_GAME = (function () {
             (p ? p.name + "'s total is " + scoredEv.new_score + '.' : '');
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, 300);
         return 300 + 2600 + msg.length * 95;
     }

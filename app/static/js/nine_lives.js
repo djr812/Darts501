@@ -829,9 +829,7 @@ var NINE_LIVES_GAME = (function () {
         if (!SPEECH.isEnabled()) return;
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(text), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(text, { rate: 1.0, pitch: 1.0 });
         }, delay || 200);
     }
 
@@ -854,9 +852,7 @@ var NINE_LIVES_GAME = (function () {
                        segment === 25  ? (multiplier === 2 ? 'Bulls Eye' : 'Outer bull') :
                        (mulLabel ? mulLabel + ' ' + segment : String(segment));
         window.speechSynthesis && window.speechSynthesis.cancel();
-        window.speechSynthesis && window.speechSynthesis.speak(
-            Object.assign(new SpeechSynthesisUtterance(segLabel), { rate: 1.0, pitch: 1.0 })
-        );
+        SPEECH.speak(segLabel, { rate: 1.0, pitch: 1.0 });
     }
 
     function _announceLifeLost(lifeLostEvents, eliminatedEvents, callback) {
@@ -875,9 +871,7 @@ var NINE_LIVES_GAME = (function () {
         }
         var msg = msgs.join(' ');
         window.speechSynthesis && window.speechSynthesis.cancel();
-        window.speechSynthesis && window.speechSynthesis.speak(
-            Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-        );
+        SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         // Wait for life-lost speech to finish (~85ms/char) before chaining next announcement
         var lifeLostDuration = 600 + msg.length * 85;
         _announceEliminations(eliminatedEvents, callback, lifeLostDuration);
@@ -899,9 +893,7 @@ var NINE_LIVES_GAME = (function () {
         setTimeout(function () {
             if (SPEECH.isEnabled()) {
                 window.speechSynthesis && window.speechSynthesis.cancel();
-                window.speechSynthesis && window.speechSynthesis.speak(
-                    Object.assign(new SpeechSynthesisUtterance(msgs.join(' ')), { rate: 1.0, pitch: 1.0 })
-                );
+                SPEECH.speak(msgs.join(' '), { rate: 1.0, pitch: 1.0 });
             }
             if (callback) setTimeout(callback, 800 + msgs.join(' ').length * 60);
         }, delay);

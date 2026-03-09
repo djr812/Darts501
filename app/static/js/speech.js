@@ -38,18 +38,96 @@ var SPEECH = (function() {
     }
 
     // ------------------------------------------------------------------
+    // Voice selection — British male, consistent across the app
+    // ------------------------------------------------------------------
+
+    // Preferred voice names in priority order (iOS / macOS / Android / Windows)
+    var PREFERRED_VOICES = [
+        'Daniel',           // iOS/macOS — British male (best match)
+        'Arthur',           // macOS Ventura+ British male
+        'Google UK English Male',   // Chrome / Android
+        'Microsoft George', // Windows British male
+        'en-GB',            // fallback: any en-GB voice
+    ];
+
+    var _voice = null;       // cached after first successful lookup
+    var _voiceLoadAttempts = 0;
+
+    function _pickVoice() {
+        if (_voice) return _voice;
+        if (!isSupported()) return null;
+        var voices = window.speechSynthesis.getVoices();
+        if (!voices || voices.length === 0) return null;
+
+        // Try preferred names first (case-insensitive partial match)
+        for (var pi = 0; pi < PREFERRED_VOICES.length; pi++) {
+            var pref = PREFERRED_VOICES[pi].toLowerCase();
+            for (var vi = 0; vi < voices.length; vi++) {
+                var v = voices[vi];
+                if (v.name.toLowerCase().indexOf(pref) !== -1) {
+                    _voice = v;
+                    return _voice;
+                }
+            }
+        }
+
+        // Last resort: any en-GB voice
+        for (var vi2 = 0; vi2 < voices.length; vi2++) {
+            if (voices[vi2].lang && voices[vi2].lang.indexOf('en-GB') !== -1) {
+                _voice = voices[vi2];
+                return _voice;
+            }
+        }
+
+        return null;
+    }
+
+    // iOS loads voices asynchronously — listen for the event and cache the result
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = function () {
+            _voice = null;   // reset so next _pickVoice() re-evaluates
+            _pickVoice();
+        };
+    }
+
+    // ------------------------------------------------------------------
     // Core speak helper
     // ------------------------------------------------------------------
 
     function _speak(text, priority, options) {
         if (!_enabled || !isSupported()) return;
-        // Cancel current utterance for high-priority announcements (new dart)
-        // so queued speech doesn't pile up during fast scoring
         if (priority) window.speechSynthesis.cancel();
         var u = new SpeechSynthesisUtterance(text);
-        u.lang  = 'en-GB';
-        u.rate  = (options && options.rate)  || 1.05;
-        u.pitch = (options && options.pitch) || 1.0;
+        var v = _pickVoice();
+        if (v) {
+            u.voice = v;
+            u.lang  = v.lang;
+        } else {
+            u.lang  = 'en-GB';
+        }
+        u.rate   = (options && options.rate)   || 1.05;
+        u.pitch  = (options && options.pitch)  || 1.0;
+        u.volume = (options && options.volume) || 1.0;
+        window.speechSynthesis.speak(u);
+    }
+
+    // ------------------------------------------------------------------
+    // Public raw speak — used by game modules that call speech directly.
+    // Applies the same voice selection as _speak.
+    // ------------------------------------------------------------------
+
+    function speak(text, options) {
+        if (!_enabled || !isSupported()) return;
+        var u = new SpeechSynthesisUtterance(text);
+        var v = _pickVoice();
+        if (v) {
+            u.voice = v;
+            u.lang  = v.lang;
+        } else {
+            u.lang  = 'en-GB';
+        }
+        u.rate   = (options && options.rate)   || 1.0;
+        u.pitch  = (options && options.pitch)  || 1.0;
         u.volume = (options && options.volume) || 1.0;
         window.speechSynthesis.speak(u);
     }
@@ -297,6 +375,7 @@ var SPEECH = (function() {
 
     return {
         isSupported:       isSupported,
+        speak:             speak,
         isEnabled:         isEnabled,
         setEnabled:        setEnabled,
         unlock:            unlock,

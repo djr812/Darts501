@@ -868,9 +868,7 @@ var BERMUDA_GAME = (function () {
         if (!SPEECH.isEnabled()) return;
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(text), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(text, { rate: 1.0, pitch: 1.0 });
         }, delay || 0);
     }
 
@@ -891,9 +889,7 @@ var BERMUDA_GAME = (function () {
                        segment === 25 ? (multiplier === 2 ? 'Bulls Eye' : 'Outer bull') :
                        (mulLabel ? mulLabel + ' ' + segment : String(segment));
         window.speechSynthesis && window.speechSynthesis.cancel();
-        window.speechSynthesis && window.speechSynthesis.speak(
-            Object.assign(new SpeechSynthesisUtterance(segLabel), { rate: 1.0, pitch: 1.0 })
-        );
+        SPEECH.speak(segLabel, { rate: 1.0, pitch: 1.0 });
         // Return estimated speech duration so callers can wait before speaking again
         return 200 + segLabel.length * 80;
     }
@@ -906,9 +902,7 @@ var BERMUDA_GAME = (function () {
         var delay = (dartSpeechDuration || 0) + 200;
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, delay);
     }
 
@@ -919,9 +913,7 @@ var BERMUDA_GAME = (function () {
         var msg = (p ? p.name : '') + ', your total score is halved. It is now ' + ev.new_score + '.';
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, 400);
         return 600 + msg.length * 80;
     }

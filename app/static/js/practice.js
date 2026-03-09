@@ -1451,9 +1451,7 @@ var PRACTICE = (function() {
         var msg = _state.playerName + ', you are targeting ' + label +
                   '. Your current score is ' + _state.bobs27Score + '.';
         setTimeout(function() {
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, 300);
     }
 
@@ -1728,9 +1726,7 @@ var PRACTICE = (function() {
                 if (SPEECH.isEnabled()) {
                     setTimeout(function() {
                         var msg = 'Score is ' + _state.bobs27Score + '.';
-                        window.speechSynthesis && window.speechSynthesis.speak(
-                            Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-                        );
+                        SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
                     }, 600);
                 }
             }
@@ -1892,9 +1888,7 @@ var PRACTICE = (function() {
         var msg = _state.playerName + ', you need ' + _state.c121Score + '. ' +
                   dartsLeft + ' darts remaining.';
         setTimeout(function() {
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, 300);
     }
 
@@ -2156,11 +2150,7 @@ var PRACTICE = (function() {
             _lockBoard(false);
             if (SPEECH.isEnabled()) {
                 setTimeout(function() {
-                    window.speechSynthesis && window.speechSynthesis.speak(
-                        Object.assign(new SpeechSynthesisUtterance(
-                            'Checkout! Next target: ' + _state.c121Target
-                        ), { rate: 1.0 })
-                    );
+                    SPEECH.speak('Checkout! Next target: ' + _state.c121Target, { rate: 1.0 });
                 }, 600);
             }
             return;
@@ -2179,11 +2169,7 @@ var PRACTICE = (function() {
             if (SPEECH.isEnabled()) {
                 var left = _state.c121DartLimit - _state.c121DartsUsed;
                 setTimeout(function() {
-                    window.speechSynthesis && window.speechSynthesis.speak(
-                        Object.assign(new SpeechSynthesisUtterance(
-                            _state.c121Score + ' left. ' + left + ' darts remaining.'
-                        ), { rate: 1.0 })
-                    );
+                    SPEECH.speak(_state.c121Score + ' left. ' + left + ' darts remaining.', { rate: 1.0 });
                 }, 900);
             }
             // If all darts used and not checked out — fail
@@ -2619,9 +2605,7 @@ var PRACTICE = (function() {
         if (SPEECH.isEnabled()) {
             var dartMsg = points === 2 ? '2 points' : points === 1 ? '1 point' : 'Miss';
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(dartMsg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(dartMsg, { rate: 1.0, pitch: 1.0 });
         }
 
         // Pill
@@ -2649,11 +2633,7 @@ var PRACTICE = (function() {
                 var ts = _state.warmupTurnScore;
                 setTimeout(function() {
                     window.speechSynthesis && window.speechSynthesis.cancel();
-                    window.speechSynthesis && window.speechSynthesis.speak(
-                        Object.assign(new SpeechSynthesisUtterance(
-                            ts + (ts === 1 ? ' point this turn.' : ' points this turn.')
-                        ), { rate: 1.0, pitch: 1.0 })
-                    );
+                    SPEECH.speak(ts + (ts === 1 ? ' point this turn.' : ' points this turn.'), { rate: 1.0, pitch: 1.0 });
                 }, 900);
             }
         }
@@ -2732,9 +2712,7 @@ var PRACTICE = (function() {
         }
 
         if (_state.warmupTimerSec === 30 && SPEECH.isEnabled()) {
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance('30 seconds remaining.'), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak('30 seconds remaining.', { rate: 1.0, pitch: 1.0 });
         }
 
         if (_state.warmupTimerSec <= 0) {
@@ -2759,11 +2737,7 @@ var PRACTICE = (function() {
 
         if (SPEECH.isEnabled()) {
             var seg = WARMUP_SEGMENTS[_state.warmupSegmentIndex];
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(
-                    'Time up on ' + seg + '. You scored ' + segScore + ' points.'
-                ), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak('Time up on ' + seg + '. You scored ' + segScore + ' points.', { rate: 1.0, pitch: 1.0 });
         }
 
         // Advance to next segment or finish
@@ -2808,12 +2782,8 @@ var PRACTICE = (function() {
         var hs  = _state.warmupHighScore;
         var seg = WARMUP_SEGMENTS[0];
         setTimeout(function() {
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(
-                    _state.playerName + ', your current high score is ' + hs + '. ' +
-                    'You are targeting segment ' + seg + '.'
-                ), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(_state.playerName + ', your current high score is ' + hs + '. ' +
+                    'You are targeting segment ' + seg + '.', { rate: 1.0, pitch: 1.0 });
         }, 400);
     }
 
@@ -2821,11 +2791,7 @@ var PRACTICE = (function() {
         if (!SPEECH.isEnabled()) return;
         var seg = WARMUP_SEGMENTS[_state.warmupSegmentIndex];
         setTimeout(function() {
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(
-                    'You are targeting segment ' + seg + '.'
-                ), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak('You are targeting segment ' + seg + '.', { rate: 1.0, pitch: 1.0 });
         }, 400);
     }
 
@@ -2836,9 +2802,7 @@ var PRACTICE = (function() {
             ? 'New high score of ' + hs + '!'
             : 'Your current high score is ' + hs + '.';
         setTimeout(function() {
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, 800);
     }
 
@@ -3151,9 +3115,7 @@ var PRACTICE = (function() {
                 ? (runs === 1 ? 'Single. ' : runs === 2 ? 'Double. ' : 'Treble. ') + runs + (runs === 1 ? ' run.' : ' runs.')
                 : 'Out.';
             setTimeout(function() {
-                window.speechSynthesis && window.speechSynthesis.speak(
-                    Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-                );
+                SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
             }, 200);
         }
 
@@ -3190,11 +3152,7 @@ var PRACTICE = (function() {
                 if (SPEECH.isEnabled()) {
                     var outsLeft = 3 - _state.baseballOuts;
                     setTimeout(function() {
-                        window.speechSynthesis && window.speechSynthesis.speak(
-                            Object.assign(new SpeechSynthesisUtterance(
-                                outsLeft + (outsLeft === 1 ? ' out' : ' outs') + ' remaining.'
-                            ), { rate: 1.0, pitch: 1.0 })
-                        );
+                        SPEECH.speak(outsLeft + (outsLeft === 1 ? ' out' : ' outs') + ' remaining.', { rate: 1.0, pitch: 1.0 });
                     }, 700);
                 }
             }
@@ -3348,9 +3306,7 @@ var PRACTICE = (function() {
             ? _state.playerName + ', welcome to Baseball Darts. In this inning you are targeting number ' + _state.baseballTarget + '.'
             : 'New innings! The new target number is ' + _state.baseballTarget + '.';
         setTimeout(function() {
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, 400);
     }
 
@@ -3361,9 +3317,7 @@ var PRACTICE = (function() {
                   runs + (runs === 1 ? ' run' : ' runs') + ' this inning. ' +
                   _state.baseballRuns + ' total runs.';
         setTimeout(function() {
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, 500);
     }
 
@@ -3397,9 +3351,7 @@ var PRACTICE = (function() {
             ? 'You made a new high score of ' + runs + '!'
             : 'Your current high score is ' + highScore + '.';
         setTimeout(function() {
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, 600);
     }
 

@@ -767,9 +767,7 @@ var KILLER_GAME = (function () {
         if (!SPEECH.isEnabled()) return;
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(text), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(text, { rate: 1.0, pitch: 1.0 });
         }, delay || 200);
     }
 
@@ -781,9 +779,7 @@ var KILLER_GAME = (function () {
         // Chain with delays
         msgs.forEach(function (msg, idx) {
             setTimeout(function () {
-                window.speechSynthesis && window.speechSynthesis.speak(
-                    Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-                );
+                SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
             }, 600 + idx * 2200);
         });
     }
@@ -805,10 +801,7 @@ var KILLER_GAME = (function () {
         });
         if (msgs.length === 0) return;
         window.speechSynthesis && window.speechSynthesis.cancel();
-        window.speechSynthesis && window.speechSynthesis.speak(
-            Object.assign(new SpeechSynthesisUtterance(msgs.join(' ')),
-                          { rate: 1.0, pitch: 1.0 })
-        );
+        SPEECH.speak(msgs.join(' '), { rate: 1.0, pitch: 1.0 });
     }
 
     function _speakDart(segment, multiplier, hitsScored, events) {
@@ -835,9 +828,7 @@ var KILLER_GAME = (function () {
         var msg = parts.join(' ');
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(msg), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, 200);
     }
 

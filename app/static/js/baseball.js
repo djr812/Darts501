@@ -533,11 +533,7 @@ var BASEBALL_GAME = (function () {
             if (SPEECH.isEnabled()) {
                 var outsLeft = 3 - inn.outs;
                 setTimeout(function () {
-                    window.speechSynthesis && window.speechSynthesis.speak(
-                        Object.assign(new SpeechSynthesisUtterance(
-                            outsLeft + (outsLeft === 1 ? ' out' : ' outs') + ' remaining.'
-                        ), { rate: 1.0, pitch: 1.0 })
-                    );
+                    SPEECH.speak(outsLeft + (outsLeft === 1 ? ' out' : ' outs') + ' remaining.', { rate: 1.0, pitch: 1.0 });
                 }, 700);
             }
         }
@@ -796,9 +792,7 @@ var BASEBALL_GAME = (function () {
         if (!SPEECH.isEnabled()) return;
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
-            window.speechSynthesis && window.speechSynthesis.speak(
-                Object.assign(new SpeechSynthesisUtterance(text), { rate: 1.0, pitch: 1.0 })
-            );
+            SPEECH.speak(text, { rate: 1.0, pitch: 1.0 });
         }, delay || 200);
     }
 
