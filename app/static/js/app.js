@@ -112,10 +112,12 @@
         try {
             const players = await resolvePlayers(config.players);
 
+            const cpuPlayer = players.find(p => p.isCpu);
             const match = await API.startMatch({
-                player_ids:   players.map(p => p.id),
-                sets_to_win:  config.setsToWin,
-                legs_per_set: config.legsPerSet,
+                player_ids:     players.map(p => p.id),
+                sets_to_win:    config.setsToWin,
+                legs_per_set:   config.legsPerSet,
+                cpu_difficulty: cpuPlayer ? (state.cpuDifficulty || 'medium') : undefined,
             });
             const leg = await API.startLeg({
                 match_id:   match.id,

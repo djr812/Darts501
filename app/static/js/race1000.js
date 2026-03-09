@@ -66,8 +66,9 @@ var RACE1000_GAME = (function () {
             .then(function (players) {
                 _resolvedPlayers = players;
                 return API.createRace1000Match({
-                    player_ids: players.map(function (p) { return p.id; }),
-                    variant:    _state.variant,
+                    player_ids:     players.map(function (p) { return p.id; }),
+                    variant:        _state.variant,
+                    cpu_difficulty: _state.cpuPlayerId ? _state.cpuDifficulty : undefined,
                 });
             })
             .then(function (s) {

@@ -734,7 +734,15 @@ const STATS = (() => {
 
                     const oppText = session.is_practice
                         ? session.game_type
-                        : (session.opponent || '—');
+                        : (() => {
+                            let opp = session.opponent || '—';
+                            if (session.cpu_difficulty && opp.includes('CPU')) {
+                                const label = session.cpu_difficulty.charAt(0).toUpperCase()
+                                            + session.cpu_difficulty.slice(1);
+                                opp = opp.replace('CPU', 'CPU (' + label + ')');
+                            }
+                            return opp;
+                        })();
 
                     const gameLabel = (session.game_type || '').toUpperCase();
 

@@ -176,9 +176,14 @@ def create_shanghai_match():
     cursor = db.cursor()
 
     # Create match record
+    cpu_difficulty = data.get("cpu_difficulty")
+    if cpu_difficulty not in ("easy", "medium", "hard"):
+        cpu_difficulty = None
+
     cursor.execute(
-        "INSERT INTO matches (game_type, legs_to_win, sets_to_win, legs_per_set, "
-        "session_type, status) VALUES ('shanghai', 1, 1, 1, 'match', 'active')"
+        "INSERT INTO matches (game_type, cpu_difficulty, legs_to_win, sets_to_win, legs_per_set, "
+        "session_type, status) VALUES ('shanghai', %s, 1, 1, 1, 'match', 'active')",
+        (cpu_difficulty,)
     )
     match_id = cursor.lastrowid
 

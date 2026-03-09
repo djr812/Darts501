@@ -24,6 +24,7 @@ var NINE_LIVES_GAME = (function () {
         multiplier:         1,
         turnNumber:         1,
         setComplete:        false,
+        cpuPlayerId:        null,
     };
 
     // Buffered throws for current set (submitted on NEXT)
@@ -63,7 +64,8 @@ var NINE_LIVES_GAME = (function () {
             .then(function (players) {
                 _resolvedPlayers = players;
                 return API.createNineLivesMatch({
-                    player_ids: players.map(function (p) { return p.id; }),
+                    player_ids:     players.map(function (p) { return p.id; }),
+                    cpu_difficulty: _state.cpuPlayerId ? _state.cpuDifficulty : undefined,
                 });
             })
             .then(function (s) {
@@ -103,6 +105,7 @@ var NINE_LIVES_GAME = (function () {
                     .then(function (rec) { return rec || API.createPlayer('CPU'); })
                     .then(function (rec) {
                         _state.cpuDifficulty = sel.difficulty || 'medium';
+                        _state.cpuPlayerId = String(rec.id);
                         result.push({ id: rec.id, name: 'CPU', isCpu: true });
                     });
             } else if (sel.mode === 'existing') {
@@ -135,7 +138,9 @@ var NINE_LIVES_GAME = (function () {
     }
 
     function _isCpuPlayer(p) {
-        return p && (p.isCpu === true || p.name === 'CPU');
+        if (!p) return false;
+        if (_state.cpuPlayerId && String(p.id) === _state.cpuPlayerId) return true;
+        return p.isCpu === true || p.name === 'CPU';
     }
 
     function _currentPlayer() {

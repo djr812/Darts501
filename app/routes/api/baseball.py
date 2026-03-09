@@ -250,9 +250,14 @@ def create_baseball_match():
     db = get_db()
     cursor = db.cursor()
 
+    cpu_difficulty = data.get("cpu_difficulty")  # 'easy'|'medium'|'hard' or None
+    if cpu_difficulty not in ("easy", "medium", "hard"):
+        cpu_difficulty = None
+
     # Create base match record
     cursor.execute(
-        "INSERT INTO matches (game_type, status) VALUES ('baseball', 'active')"
+        "INSERT INTO matches (game_type, cpu_difficulty, status) VALUES ('baseball', %s, 'active')",
+        (cpu_difficulty,)
     )
     match_id = cursor.lastrowid
 

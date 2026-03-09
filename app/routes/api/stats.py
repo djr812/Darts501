@@ -759,6 +759,7 @@ def get_player_history(player_id):
             m.id            AS match_id,
             m.game_type,
             m.session_type,
+            m.cpu_difficulty,
             COALESCE(m.ended_at,
                 CASE m.game_type
                     WHEN 'race1000'   THEN (SELECT g.ended_at FROM race1000_games   g WHERE g.match_id = m.id LIMIT 1)
@@ -934,6 +935,7 @@ def get_player_history(player_id):
             "game_type":   row["game_type"],
             "is_practice": is_practice,
             "opponent":    opponents,
+            "cpu_difficulty": row["cpu_difficulty"] if row["cpu_difficulty"] else None,
             "result":      result,
             "avg":         avg,
             "score":       score,   # game-specific score (non-01 games); None for 01

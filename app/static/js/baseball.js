@@ -58,7 +58,7 @@ var BASEBALL_GAME = (function () {
         _resolvePlayers(config.players)
             .then(function (players) {
                 _resolvedPlayers = players;
-                return API.createBaseballMatch({ player_ids: players.map(function (p) { return p.id; }) });
+                return API.createBaseballMatch({ player_ids: players.map(function (p) { return p.id; }), cpu_difficulty: _state.cpuPlayerId ? _state.cpuDifficulty : undefined });
             })
             .then(function (state) {
                 _applyState(state);

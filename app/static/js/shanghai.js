@@ -33,6 +33,7 @@ var SHANGHAI_GAME = (function () {
         multiplier:     1,
         cpuDifficulty:  'medium',
         cpuRunning:     false,
+        cpuPlayerId:    null,
         onEnd:          null,
     };
 
@@ -48,8 +49,9 @@ var SHANGHAI_GAME = (function () {
         _resolvePlayers(config.players)
             .then(function (players) {
                 return API.createShanghaiMatch({
-                    player_ids: players.map(function (p) { return p.id; }),
-                    num_rounds: config.numRounds || 7,
+                    player_ids:     players.map(function (p) { return p.id; }),
+                    num_rounds:     config.numRounds || 7,
+                    cpu_difficulty: _state.cpuPlayerId ? _state.cpuDifficulty : undefined,
                 })
                 .then(function (state) {
                     return { players: players, state: state };
@@ -90,6 +92,7 @@ var SHANGHAI_GAME = (function () {
                         return rec;
                     })
                     .then(function (rec) {
+                        _state.cpuPlayerId = String(rec.id);
                         result.push({ id: rec.id, name: 'CPU', isCpu: true,
                                       difficulty: sel.difficulty || 'medium' });
                     });

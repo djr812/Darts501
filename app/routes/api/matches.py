@@ -32,12 +32,16 @@ def create_match():
     db = get_db()
     cursor = db.cursor()
 
+    cpu_difficulty = data.get("cpu_difficulty")
+    if cpu_difficulty not in ("easy", "medium", "hard"):
+        cpu_difficulty = None
+
     cursor.execute(
         """
-        INSERT INTO matches (game_type, legs_to_win, sets_to_win, legs_per_set)
-        VALUES ('501', %s, %s, %s)
+        INSERT INTO matches (game_type, cpu_difficulty, legs_to_win, sets_to_win, legs_per_set)
+        VALUES ('501', %s, %s, %s, %s)
         """,
-        (legs_per_set, sets_to_win, legs_per_set)
+        (cpu_difficulty, legs_per_set, sets_to_win, legs_per_set)
     )
     match_id = cursor.lastrowid
 

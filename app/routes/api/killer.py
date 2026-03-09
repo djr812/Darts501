@@ -246,8 +246,13 @@ def create_killer_match():
     db = get_db()
     cursor = db.cursor()
 
+    cpu_difficulty = data.get("cpu_difficulty")  # 'easy'|'medium'|'hard' or None
+    if cpu_difficulty not in ("easy", "medium", "hard"):
+        cpu_difficulty = None
+
     cursor.execute(
-        "INSERT INTO matches (game_type, status) VALUES ('killer', 'active')"
+        "INSERT INTO matches (game_type, cpu_difficulty, status) VALUES ('killer', %s, 'active')",
+        (cpu_difficulty,)
     )
     match_id = cursor.lastrowid
 
