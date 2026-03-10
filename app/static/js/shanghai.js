@@ -499,14 +499,17 @@ var SHANGHAI_GAME = (function () {
         // Speech: "{Name} your number is {target}"
         if (SPEECH.isEnabled()) {
             var target = _state.tiebreak ? 'Bull' : String(_state.targetNumber);
+            var announceMsg = player.name + ', your number is ' + target;
+            var announceDur = 300 + 300 + announceMsg.length * 120;
             setTimeout(function () {
                 SPEECH.announceShanghai
                     ? SPEECH.announceShanghai(player.name, target)
-                    : SPEECH.announcePlayer(player.name + ', your number is ' + target);
+                    : SPEECH.announcePlayer(announceMsg);
             }, 300);
-        }
-
-        if (player.isCpu) {
+            if (player.isCpu) {
+                setTimeout(function () { _runCpuTurn(); }, announceDur);
+            }
+        } else if (player.isCpu) {
             _runCpuTurn();
         }
     }
@@ -779,7 +782,7 @@ var SHANGHAI_GAME = (function () {
         var target   = _state.targetNumber;
         var profile  = _getCpuProfile();
         var dartsLeft = 3;
-        var delay    = 900;
+        var delay    = 1800;  // increased for Daniel voice — dart phrases avg ~1.5–1.9s
 
         // CPU aims: treble of target, falls back per variance
         function throwNext() {
@@ -789,7 +792,7 @@ var SHANGHAI_GAME = (function () {
                 _enableNext(true);
                 if (SPEECH.isEnabled()) {
                     var turnScore = _state.pendingDarts.reduce(function (s, d) { return s + d.points; }, 0);
-                    setTimeout(function () { SPEECH.announceTurnEnd(turnScore, 0); }, 500);
+                    setTimeout(function () { SPEECH.announceTurnEnd(turnScore, 0); }, 1800);
                 }
                 return;
             }
@@ -819,7 +822,7 @@ var SHANGHAI_GAME = (function () {
             }, delay);
         }
 
-        setTimeout(function () { throwNext(); }, 600);
+        setTimeout(function () { throwNext(); }, 400);
     }
 
 
