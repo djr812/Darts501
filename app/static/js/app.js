@@ -20,6 +20,7 @@
         startingScore:    501,
         players:          [],   // [{ id, name, score, isCpu }]
         currentIndex:     0,
+        legCount:         0,   // increments each leg — used to rotate who throws first
         activeMultiplier: 1,
         activeTurnId:     null,
         dartsThisTurn:    0,
@@ -152,7 +153,8 @@
 
     function _startLeg(legId) {
         state.legId            = legId;
-        state.currentIndex     = 0;
+        state.legCount         = (state.legCount || 0) + 1;
+        state.currentIndex     = (state.legCount - 1) % state.players.length;
         state.activeMultiplier = 1;
         state.activeTurnId     = null;
         state.dartsThisTurn    = 0;
