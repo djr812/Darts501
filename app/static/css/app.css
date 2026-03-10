@@ -425,22 +425,12 @@ body.mode-stats #app {
 }
 
 .score-ring-dart {
-    /* Counter-rotate so icon reads normally */
-    -webkit-transform: rotate(90deg);
-    transform: rotate(90deg);
-    -webkit-transform-origin: 64px 64px;
-    transform-origin: 64px 64px;
     font-size: 18px;
     text-anchor: middle;
     dominant-baseline: central;
 }
 
 .score-ring-text {
-    /* Counter-rotate so text reads normally */
-    -webkit-transform: rotate(90deg) translate(0, 0);
-    transform: rotate(90deg);
-    -webkit-transform-origin: 64px 64px;
-    transform-origin: 64px 64px;
     font-family: var(--font-mono);
     font-size: 38px;
     font-weight: 400;
@@ -450,18 +440,7 @@ body.mode-stats #app {
     letter-spacing: -0.02em;
 }
 
-.player-card.active .score-ring-dart {
-    /* Counter-rotate so icon reads normally */
-    -webkit-transform: rotate(90deg);
-    transform: rotate(90deg);
-    -webkit-transform-origin: 64px 64px;
-    transform-origin: 64px 64px;
-    font-size: 18px;
-    text-anchor: middle;
-    dominant-baseline: central;
-}
-
-.score-ring-text {
+.player-card.active .score-ring-text {
     fill: #ffffff;
 }
 

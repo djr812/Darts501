@@ -839,6 +839,7 @@ const UI = (() => {
         dartIcon.setAttribute('x', _RING_CX);
         dartIcon.setAttribute('y', '38');
         dartIcon.setAttribute('dy', '0.35em');
+        dartIcon.setAttribute('transform', 'rotate(90 ' + _RING_CX + ' ' + _RING_CY + ')');
         dartIcon.setAttribute('class', 'score-ring-dart');
         dartIcon.id = `ring-dart-${player.id}`;
         dartIcon.textContent = '🎯';
@@ -849,7 +850,8 @@ const UI = (() => {
         const text = document.createElementNS(ns, 'text');
         text.setAttribute('x', _RING_CX);
         text.setAttribute('y', _RING_CY);
-        text.setAttribute('dy', '0.32em');  // iOS 12 doesn't support dominant-baseline; 0.32em centres better at large sizes
+        text.setAttribute('dy', '0.32em');
+        text.setAttribute('transform', 'rotate(90 ' + _RING_CX + ' ' + _RING_CY + ')');
         text.setAttribute('class', 'score-ring-text');
         text.id = `score-${player.id}`;
         text.textContent = player.score;
