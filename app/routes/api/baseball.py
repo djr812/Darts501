@@ -515,3 +515,40 @@ def end_baseball_match(match_id):
     )
     db.commit()
     return jsonify({"match_id": match_id, "status": "cancelled"}), 200
+
+
+@baseball_bp.route("/baseball/matches/<int:match_id>/restart", methods=["POST"])
+def restart_baseball_match(match_id):
+    """Wipe all throws and innings, reset the game to inning 1."""
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id FROM baseball_games WHERE match_id = %s", (match_id,))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({"error": "match not found"}), 404
+    game_id = row["id"]
+
+    # Delete all throws for this game (via innings join to scope correctly)
+    cursor.execute(
+        "DELETE bt FROM baseball_throws bt "
+        "JOIN baseball_innings bi ON bi.id = bt.inning_id "
+        "WHERE bi.game_id = %s",
+        (game_id,)
+    )
+
+    # Delete all innings
+    cursor.execute("DELETE FROM baseball_innings WHERE game_id = %s", (game_id,))
+
+    # Reset game state — keep same start_number for fairness
+    cursor.execute(
+        "UPDATE baseball_games SET current_inning=1, current_player_index=0, "
+        "status='active', winner_ids=NULL, ended_at=NULL WHERE id = %s",
+        (game_id,)
+    )
+    cursor.execute(
+        "UPDATE matches SET status='active' WHERE id = %s", (match_id,)
+    )
+
+    db.commit()
+    return jsonify(_get_game_state(db, match_id)), 200

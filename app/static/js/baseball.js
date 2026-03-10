@@ -197,7 +197,14 @@ var BASEBALL_GAME = (function () {
         endBtn.type = 'button';
         endBtn.textContent = '✕ END';
         endBtn.addEventListener('click', _onEnd);
+        var restartBtn = document.createElement('button');
+        restartBtn.id = 'bbmp-restart-btn';
+        restartBtn.className = 'gh-btn gh-btn-red';
+        restartBtn.type = 'button';
+        restartBtn.textContent = '↺ RESTART';
+        restartBtn.addEventListener('click', _onRestart);
         centreSlot.appendChild(endBtn);
+        centreSlot.appendChild(restartBtn);
         header.appendChild(centreSlot);
 
         var rightSlot = document.createElement('div');
@@ -221,27 +228,38 @@ var BASEBALL_GAME = (function () {
         header.appendChild(rightSlot);
         app.appendChild(header);
 
-        // ── Scoreboard ───────────────────────────────────────────────
+        // ── Sidebar (left column) ─────────────────────────────────────
+        var sidebar = document.createElement('aside');
+        sidebar.id = 'bbmp-sidebar';
+        sidebar.className = 'bbmp-sidebar';
+
+        // Scoreboard table inside sidebar
         var scoreBoard = document.createElement('div');
         scoreBoard.id = 'bbmp-scoreboard';
         scoreBoard.className = 'bbmp-scoreboard';
-        app.appendChild(scoreBoard);
         _renderScoreboard(scoreBoard);
+        sidebar.appendChild(scoreBoard);
 
-        // ── Status bar ───────────────────────────────────────────────
+        app.appendChild(sidebar);
+
+        // ── Board (right column) ──────────────────────────────────────
+        var board = document.createElement('main');
+        board.id = 'bbmp-board';
+        board.className = 'bbmp-board';
+
+        // Status banner
         var statusBar = document.createElement('div');
         statusBar.id = 'bbmp-status';
-        statusBar.className = 'bbmp-status';
-        app.appendChild(statusBar);
-        _updateStatus();
+        statusBar.className = 'bbmp-status-banner';
+        board.appendChild(statusBar);
 
-        // ── Dart pills ───────────────────────────────────────────────
+        // Dart pills
         var pills = document.createElement('div');
         pills.id = 'bbmp-pills';
-        pills.className = 'practice-pills';
-        app.appendChild(pills);
+        pills.className = 'bbmp-pills';
+        board.appendChild(pills);
 
-        // ── Multiplier tabs ──────────────────────────────────────────
+        // Multiplier tabs
         _state.multiplier = 1;
         var tabs = document.createElement('div');
         tabs.id = 'bbmp-tabs';
@@ -269,15 +287,23 @@ var BASEBALL_GAME = (function () {
             tabs.appendChild(btn);
         });
         document.body.dataset.multiplier = 1;
-        app.appendChild(tabs);
+        board.appendChild(tabs);
 
-        // ── Segment grid ─────────────────────────────────────────────
-        var segBoard = document.createElement('main');
-        segBoard.id = 'bbmp-board';
-        app.appendChild(segBoard);
-        segBoard.appendChild(_buildGrid());
-        segBoard.appendChild(_buildBullRow());
+        // Segment grid + bull row
+        board.appendChild(_buildGrid());
+        board.appendChild(_buildBullRow());
 
+        // Footer hint
+        var footer = document.createElement('footer');
+        footer.className = 'bbmp-footer';
+        var footerMsg = document.createElement('span');
+        footerMsg.id = 'bbmp-footer-msg';
+        footer.appendChild(footerMsg);
+        board.appendChild(footer);
+
+        app.appendChild(board);
+
+        _updateStatus();
         _applyTargetHighlight();
     }
 
@@ -473,21 +499,23 @@ var BASEBALL_GAME = (function () {
     // ─────────────────────────────────────────────────────────────────
 
     function _updateStatus() {
-        var el = document.getElementById('bbmp-status');
-        if (!el) return;
-        var player = _currentPlayer();
-        var name   = player ? player.name.toUpperCase() : '';
-        var inn    = _currentInningData();
-        var outs   = inn ? inn.outs : 0;
-        var target = _targetNumber();
+        var banner  = document.getElementById('bbmp-status');
+        var footer  = document.getElementById('bbmp-footer-msg');
+        var player  = _currentPlayer();
+        var name    = player ? player.name.toUpperCase() : '';
+        var inn     = _currentInningData();
+        var outs    = inn ? inn.outs : 0;
+        var target  = _targetNumber();
         if (_state.status !== 'active') {
-            el.textContent = 'GAME OVER';
+            if (banner) banner.textContent = 'GAME OVER';
+            if (footer) footer.textContent = '';
             return;
         }
-        var outsLeft = 3 - outs;
-        el.textContent = name + '  ·  INNING ' + _state.currentInning + ' / 9' +
-            '  ·  TARGET ' + target +
-            '  ·  ' + outsLeft + (outsLeft === 1 ? ' OUT' : ' OUTS') + ' REMAINING';
+        var outsLeft  = 3 - outs;
+        var bannerTxt = name + '  —  INNING ' + _state.currentInning + ' / 9  —  TARGET ' + target;
+        var footerTxt = outsLeft + (outsLeft === 1 ? ' OUT' : ' OUTS') + ' REMAINING  ·  HIT ' + target + ' TO SCORE RUNS';
+        if (banner) banner.textContent = bannerTxt;
+        if (footer) footer.textContent = footerTxt;
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -681,6 +709,37 @@ var BASEBALL_GAME = (function () {
     // ─────────────────────────────────────────────────────────────────
     // End / abandon
     // ─────────────────────────────────────────────────────────────────
+
+    function _onRestart() {
+        UI.showConfirmModal({
+            title:        'RESTART MATCH?',
+            message:      'All scores will be wiped and the match will restart from scratch. This cannot be undone.',
+            confirmLabel: 'YES, RESTART',
+            confirmClass: 'confirm-btn-danger',
+            onConfirm:    _doRestart,
+        });
+    }
+
+    function _doRestart() {
+        UI.setLoading(true);
+        API.restartBaseballMatch(_state.matchId)
+            .then(function (state) {
+                _applyState(state);
+                _buildScreen();
+                UI.showToast('MATCH RESTARTED', 'info', 2000);
+                if (_isCpuPlayer(_currentPlayer())) {
+                    _runCpuTurn();
+                } else {
+                    _announceCurrentPlayer(true);
+                }
+            })
+            .catch(function (err) {
+                UI.showToast('RESTART FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
+            })
+            .finally(function () {
+                UI.setLoading(false);
+            });
+    }
 
     function _onEnd() {
         UI.showConfirmModal({

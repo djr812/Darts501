@@ -441,6 +441,10 @@ const API = (() => {
         return request('POST', '/api/killer/matches/' + matchId + '/restart', {});
     }
 
+    async function restartBaseballMatch(matchId) {
+        return request('POST', '/api/baseball/matches/' + matchId + '/restart', {});
+    }
+
     async function getWarmupHighScore(playerId) {
         return request('GET', '/api/baseball/highscore/' + playerId + '?game_type=warmup');
     }
@@ -520,6 +524,7 @@ const API = (() => {
         killerUndo,
         endKillerMatch,
         restartKillerMatch,
+        restartBaseballMatch,
         getWarmupHighScore,
         submitWarmupScore,
         getBaseballHighScore,

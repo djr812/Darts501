@@ -2112,68 +2112,106 @@ body.mode-practice #app {
     line-height: 1;
 }
 
-/* ── Baseball Multiplayer ──────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   BASEBALL — two-column layout matching 501 / Shanghai / Killer
+   ═══════════════════════════════════════════════════════════════ */
+
+body.mode-baseball #app {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 280px 1fr;
+    grid-template-areas:
+        "header  header"
+        "sidebar board";
+    width: 100vw;
+    height: 100vh;
+    gap: 0;
+}
+
+/* ── Sidebar ── */
+#bbmp-sidebar {
+    grid-area: sidebar;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    padding: var(--gap);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: var(--gap);
+}
+
+/* Scoreboard inside sidebar */
 .bbmp-scoreboard {
     width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     -webkit-flex-shrink: 0;
     flex-shrink: 0;
-    padding: 4px 6px 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
 }
 
 .bbmp-sb-row {
     display: -webkit-box;
-    display: -webkit-flex;
     display: flex;
     -webkit-box-align: center;
-    -webkit-align-items: center;
     align-items: center;
     border-bottom: 1px solid var(--border);
-    min-height: 28px;
+    min-height: 30px;
+}
+
+.bbmp-sb-row:last-child {
+    border-bottom: none;
 }
 
 .bbmp-sb-row.bbmp-sb-active {
-    background: rgba(255,255,255,0.05);
+    background: var(--accent-glow);
 }
 
 .bbmp-sb-head {
-    background: var(--bg-raised);
+    background: var(--bg-surface);
 }
 
 .bbmp-sb-name {
     font-family: var(--font-mono);
-    font-size: 0.6rem;
-    letter-spacing: 0.06em;
+    font-size: 0.58rem;
+    letter-spacing: 0.05em;
     color: var(--text-secondary);
-    min-width: 60px;
-    max-width: 80px;
+    width: 54px;
+    min-width: 54px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 2px 4px;
+    padding: 3px 4px;
     -webkit-flex-shrink: 0;
     flex-shrink: 0;
+    border-right: 1px solid var(--border);
 }
 
 .bbmp-sb-active .bbmp-sb-name {
     color: var(--accent);
+    font-weight: 700;
 }
 
 .bbmp-sb-cell {
     font-family: var(--font-display);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
     text-align: center;
     color: var(--text-primary);
-    -webkit-flex: 1;
+    -webkit-box-flex: 1;
     flex: 1;
-    min-width: 22px;
-    padding: 2px 1px;
+    min-width: 20px;
+    padding: 3px 1px;
 }
 
 .bbmp-sb-inn-head {
     font-family: var(--font-mono);
-    font-size: 0.55rem;
+    font-size: 0.52rem;
     color: var(--text-dim);
     font-weight: 400;
 }
@@ -2184,63 +2222,137 @@ body.mode-practice #app {
 }
 
 .bbmp-sb-total {
-    font-size: 1.0rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--accent);
-    min-width: 28px;
+    min-width: 26px;
     border-left: 1px solid var(--border);
 }
 
 .bbmp-sb-total-head {
     font-family: var(--font-mono);
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     font-weight: 700;
     color: var(--accent);
-    min-width: 28px;
+    min-width: 26px;
     border-left: 1px solid var(--border);
 }
 
+/* Outs row — sits below scoreboard in sidebar */
 .bbmp-outs-row {
     display: -webkit-box;
-    display: -webkit-flex;
     display: flex;
     -webkit-box-align: center;
-    -webkit-align-items: center;
     align-items: center;
-    gap: 6px;
-    padding: 4px 6px 2px;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
 }
 
 .bbmp-outs-label {
     font-family: var(--font-mono);
-    font-size: 0.55rem;
-    color: var(--text-dim);
+    font-size: 0.6rem;
     letter-spacing: 0.1em;
+    color: var(--text-dim);
     margin-right: 2px;
 }
 
-.bbmp-status {
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
-    letter-spacing: 0.08em;
-    color: var(--text-secondary);
-    text-align: center;
-    padding: 2px 8px 4px;
-    -webkit-flex-shrink: 0;
-    flex-shrink: 0;
-    white-space: nowrap;
+/* ── Board (right column) ── */
+.bbmp-board {
+    grid-area: board;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    padding: var(--gap);
     overflow: hidden;
-    text-overflow: ellipsis;
+    gap: var(--gap);
 }
 
-.bbmp-tabs {
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    gap: 6px;
-    padding: 4px 8px;
+/* Status banner */
+.bbmp-status-banner {
     -webkit-flex-shrink: 0;
     flex-shrink: 0;
+    padding: 6px 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-align: center;
+}
+
+/* Dart pills */
+.bbmp-pills {
+    display: -webkit-box;
+    display: flex;
+    gap: 6px;
+    min-height: 32px;
+    padding: 2px 0;
+    -webkit-box-align: center;
+    align-items: center;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+
+/* Multiplier tabs */
+.bbmp-tabs {
+    display: -webkit-box;
+    display: flex;
+    gap: var(--gap);
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.bbmp-tabs .tab-btn {
+    -webkit-box-flex: 1;
+    flex: 1;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-transition: all 0.1s ease;
+    transition: all 0.1s ease;
+}
+.bbmp-tabs .tab-btn:active { -webkit-transform: scale(0.97); transform: scale(0.97); }
+.bbmp-tabs .tab-btn.active-single { background: var(--single-color); color: #fff; border-color: var(--single-color); }
+.bbmp-tabs .tab-btn.active-double { background: var(--double-color); color: #fff; border-color: var(--double-color); }
+.bbmp-tabs .tab-btn.active-treble { background: var(--treble-color); color: #fff; border-color: var(--treble-color); }
+.bbmp-tabs .tab-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* Segment grid fills remaining space */
+.bbmp-board #segment-grid {
+    -webkit-box-flex: 1;
+    flex: 1;
+}
+
+/* Footer hint */
+.bbmp-footer {
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    text-align: center;
+    padding: 4px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+    margin-top: auto;
 }
 
 /* Result screen */
@@ -3868,20 +3980,6 @@ body.mode-killer #app {
 .dart-pill.pill-hot {
     border-color: var(--accent-dim);
     color: var(--accent);
-}
-
-/* Practice board — fills remaining space */
-#bbmp-board {
-    -webkit-box-flex: 1;
-    -webkit-flex: 1;
-    flex: 1;
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    -webkit-box-orient: vertical;
-    -webkit-flex-direction: column;
-    flex-direction: column;
-    overflow: hidden;
 }
 
 #practice-board {
