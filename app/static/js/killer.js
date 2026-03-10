@@ -965,7 +965,7 @@ var KILLER_GAME = (function () {
         }
 
         var msg = parts.join(' ');
-        return 300 + msg.length * 120;
+        return 500 + msg.length * 150;
     }
 
     function _speakDart(segment, multiplier, hitsScored, events) {
@@ -1017,7 +1017,7 @@ var KILLER_GAME = (function () {
         function _throwNext() {
             if (dartsThrown >= 3 || _pendingWinner !== null) {
                 _state.cpuTurnRunning = false;
-                setTimeout(_onNext, 700);
+                setTimeout(_onNext, 1800);
                 return;
             }
             var dart      = _cpuChooseDart();
