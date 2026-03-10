@@ -519,3 +519,36 @@ def end_killer_match(match_id):
     cursor.execute("UPDATE matches SET status='cancelled' WHERE id=%s", (match_id,))
     db.commit()
     return jsonify({"match_id": match_id, "status": "cancelled"}), 200
+
+
+@killer_bp.route("/killer/matches/<int:match_id>/restart", methods=["POST"])
+def restart_killer_match(match_id):
+    db     = get_db()
+    cursor = db.cursor()
+
+    # Get the game id
+    cursor.execute("SELECT id FROM killer_games WHERE match_id = %s", (match_id,))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({"error": "match not found"}), 404
+    game_id = row["id"]
+
+    # Delete all throws for this game
+    cursor.execute("DELETE FROM killer_throws WHERE game_id = %s", (game_id,))
+
+    # Reset all player state to defaults
+    cursor.execute(
+        "UPDATE killer_players SET hits=0, is_killer=0, lives=3, eliminated=0 "
+        "WHERE game_id = %s",
+        (game_id,)
+    )
+
+    # Reset game state
+    cursor.execute(
+        "UPDATE killer_games SET current_player_index=0, status='active', "
+        "winner_id=NULL, ended_at=NULL WHERE id = %s",
+        (game_id,)
+    )
+
+    db.commit()
+    return jsonify(_get_state(db, match_id)), 200
