@@ -595,8 +595,8 @@ var KILLER_GAME = (function () {
 
     // Apply a single throw to a working-copy players array (no _state mutation)
     function _applyThrowToWorking(players, segment, multiplier, throwerIdStr, targetMul) {
-        if (segment === 0 || multiplier < targetMul) return;
-        var rawHits = multiplier === targetMul ? 1 : (multiplier - targetMul + 1);
+        if (segment === 0 || multiplier !== targetMul) return;
+        var rawHits = 1;
         var target  = players.find(function (pl) { return pl.assigned_number === segment; });
         if (!target) return;
         var thrower = players.find(function (pl) { return String(pl.id) === throwerIdStr; });
@@ -935,7 +935,7 @@ var KILLER_GAME = (function () {
         // Simulate the throw on a working copy to discover what events fire
         var cpu       = _currentPlayer();
         var targetMul = _state.variant === 'doubles' ? 2 : 3;
-        if (cpu && segment !== 0 && multiplier >= targetMul) {
+        if (cpu && segment !== 0 && multiplier === targetMul) {
             var working = _state.players.map(function (pl) {
                 return { id: pl.id, hits: pl.hits, is_killer: pl.is_killer,
                          lives: pl.lives, eliminated: pl.eliminated,

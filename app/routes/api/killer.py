@@ -72,14 +72,11 @@ def _get_state(db, match_id):
 
 
 def _hits_for_dart(segment, multiplier, variant):
-    """How many hits does this dart score (for gaining/losing killer status / lives)."""
+    """How many hits does this dart score (for gaining/losing killer status / lives).
+    Only the exact required multiplier counts — a treble on a doubles game is a miss.
+    """
     target_multiplier = 2 if variant == "doubles" else 3
-    if multiplier == target_multiplier:
-        return 1
-    if multiplier > target_multiplier:
-        # e.g. treble on a doubles game
-        return multiplier - target_multiplier + 1
-    return 0
+    return 1 if multiplier == target_multiplier else 0
 
 
 def _apply_throw(db, game_id, match_id, variant, thrower_pid, segment, multiplier, turn_number, dart_number):
