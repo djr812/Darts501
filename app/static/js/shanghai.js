@@ -168,11 +168,10 @@ var SHANGHAI_GAME = (function () {
         app.style.cssText = '';
         document.body.className = 'mode-shanghai';
 
-        // ── Header ──────────────────────────────────────────────────
+        // ── Header (kept identical to before) ───────────────────────
         var header = document.createElement('div');
         header.className = 'sh-header game-header';
 
-        // ── Left: game name + details + rules ──
         var leftSlot = document.createElement('div');
         leftSlot.className = 'gh-left';
         var titleWrap = document.createElement('div');
@@ -194,7 +193,6 @@ var SHANGHAI_GAME = (function () {
         leftSlot.appendChild(rulesBtn);
         header.appendChild(leftSlot);
 
-        // ── Centre: End ──
         var centreSlot = document.createElement('div');
         centreSlot.className = 'gh-centre';
         var endBtn = document.createElement('button');
@@ -213,7 +211,6 @@ var SHANGHAI_GAME = (function () {
         centreSlot.appendChild(restartBtn);
         header.appendChild(centreSlot);
 
-        // ── Right: Undo + Next ──
         var rightSlot = document.createElement('div');
         rightSlot.className = 'gh-right';
         var undoBtn = document.createElement('button');
@@ -233,30 +230,66 @@ var SHANGHAI_GAME = (function () {
         rightSlot.appendChild(undoBtn);
         rightSlot.appendChild(nextBtn);
         header.appendChild(rightSlot);
-
         app.appendChild(header);
 
-        // ── Scoreboard ──────────────────────────────────────────────
+        // ── Sidebar (left column) ────────────────────────────────────
+        // Player score cards + scoreboard table
+        var sidebar = document.createElement('aside');
+        sidebar.id = 'sh-sidebar';
+        sidebar.className = 'sh-sidebar';
+
+        // One score card per player (name + total score + dart pills)
+        _state.players.forEach(function (p) {
+            var card = document.createElement('div');
+            card.className = 'sh-score-card';
+            card.id = 'sh-card-' + p.id;
+
+            var nameEl = document.createElement('div');
+            nameEl.className = 'sh-card-name';
+            nameEl.textContent = p.name.toUpperCase();
+            card.appendChild(nameEl);
+
+            var scoreEl = document.createElement('div');
+            scoreEl.className = 'sh-card-total';
+            scoreEl.id = 'sh-total-' + p.id;
+            scoreEl.textContent = _state.scores[String(p.id)] || 0;
+            card.appendChild(scoreEl);
+
+            var pillsEl = document.createElement('div');
+            pillsEl.className = 'sh-card-pills';
+            pillsEl.id = 'sh-card-pills-' + p.id;
+            card.appendChild(pillsEl);
+
+            sidebar.appendChild(card);
+        });
+
+        // Scoreboard table below the cards
         var scoreboard = document.createElement('div');
         scoreboard.id = 'sh-scoreboard';
         scoreboard.className = 'sh-scoreboard';
-        app.appendChild(scoreboard);
+        sidebar.appendChild(scoreboard);
+
+        app.appendChild(sidebar);
         _renderScoreboard();
 
-        // ── Target banner ────────────────────────────────────────────
+        // ── Board (right column) ─────────────────────────────────────
+        var board = document.createElement('main');
+        board.id = 'sh-board';
+        board.className = 'sh-board';
+
+        // Target banner
         var banner = document.createElement('div');
         banner.id = 'sh-target-banner';
         banner.className = 'sh-target-banner';
-        app.appendChild(banner);
-        _updateTargetBanner();
+        board.appendChild(banner);
 
-        // ── Dart pills ───────────────────────────────────────────────
+        // Dart pills (current turn)
         var pills = document.createElement('div');
         pills.id = 'sh-pills';
         pills.className = 'sh-pills';
-        app.appendChild(pills);
+        board.appendChild(pills);
 
-        // ── Multiplier tabs ──────────────────────────────────────────
+        // Multiplier tabs
         var tabs = document.createElement('div');
         tabs.id = 'sh-tabs';
         tabs.className = 'sh-tabs';
@@ -283,12 +316,9 @@ var SHANGHAI_GAME = (function () {
             tabs.appendChild(btn);
         });
         _setMultiplierTab(1);
-        app.appendChild(tabs);
+        board.appendChild(tabs);
 
-        // ── Segment grid ─────────────────────────────────────────────
-        // Shows all 20 numbers + BULL + MISS
-        // Non-target hits are accepted but score 0 (board can't be restricted
-        // because players might accidentally tap — we just score 0)
+        // Segment grid — 4×5 of numbers 1–20
         var grid = document.createElement('div');
         grid.id = 'sh-seg-grid';
         grid.className = 'sh-seg-grid';
@@ -306,19 +336,12 @@ var SHANGHAI_GAME = (function () {
             });
             grid.appendChild(btn);
         });
+        board.appendChild(grid);
 
-        // Bull button
-        var bullBtn = document.createElement('button');
-        bullBtn.className = 'sh-seg-btn sh-bull-btn';
-        bullBtn.type = 'button';
-        bullBtn.textContent = 'BULL';
-        bullBtn.addEventListener('click', function () {
-            if (_state.turnComplete || _state.cpuRunning) return;
-            _throwDart(25);
-        });
-        grid.appendChild(bullBtn);
+        // Bull + Miss row
+        var bullRow = document.createElement('div');
+        bullRow.className = 'sh-bull-row';
 
-        // Miss button
         var missBtn = document.createElement('button');
         missBtn.className = 'sh-seg-btn sh-miss-btn';
         missBtn.type = 'button';
@@ -327,10 +350,46 @@ var SHANGHAI_GAME = (function () {
             if (_state.turnComplete || _state.cpuRunning) return;
             _throwDart(0);
         });
-        grid.appendChild(missBtn);
+        bullRow.appendChild(missBtn);
 
-        app.appendChild(grid);
+        var outerBtn = document.createElement('button');
+        outerBtn.className = 'sh-seg-btn sh-outer-btn';
+        outerBtn.type = 'button';
+        outerBtn.innerHTML = 'OUTER<br><small>25</small>';
+        outerBtn.addEventListener('click', function () {
+            if (_state.turnComplete || _state.cpuRunning) return;
+            _throwDart(25, 1);
+        });
+        bullRow.appendChild(outerBtn);
+
+        var bullBtn = document.createElement('button');
+        bullBtn.className = 'sh-seg-btn sh-bull-btn';
+        bullBtn.type = 'button';
+        bullBtn.innerHTML = 'BULL<br><small>50</small>';
+        bullBtn.addEventListener('click', function () {
+            if (_state.turnComplete || _state.cpuRunning) return;
+            _throwDart(25, 2);
+        });
+        bullRow.appendChild(bullBtn);
+
+        // Spacer to match 501 bull-row 4-column grid
+        bullRow.appendChild(document.createElement('div'));
+
+        board.appendChild(bullRow);
+
+        // Status bar
+        var statusBar = document.createElement('footer');
+        statusBar.id = 'sh-status-bar';
+        statusBar.className = 'sh-status-bar';
+        var statusMsg = document.createElement('span');
+        statusMsg.id = 'sh-status';
+        statusMsg.textContent = 'SELECT MULTIPLIER THEN SEGMENT';
+        statusBar.appendChild(statusMsg);
+        board.appendChild(statusBar);
+
+        app.appendChild(board);
         _applyTargetHighlight();
+        _updateTargetBanner();
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -358,13 +417,7 @@ var SHANGHAI_GAME = (function () {
             nameEl.className = 'sh-player-name';
             nameEl.textContent = p.name.toUpperCase();
 
-            var scoreEl = document.createElement('div');
-            scoreEl.className = 'sh-player-total';
-            scoreEl.id = 'sh-total-' + p.id;
-            scoreEl.textContent = _state.scores[String(p.id)] || 0;
-
             header.appendChild(nameEl);
-            header.appendChild(scoreEl);
             col.appendChild(header);
 
             // Round rows
@@ -404,11 +457,28 @@ var SHANGHAI_GAME = (function () {
     }
 
     function _updateActivePlayer() {
+        // Update score cards
+        document.querySelectorAll('.sh-score-card').forEach(function (el) {
+            el.classList.remove('sh-active-player');
+        });
+        var card = document.getElementById('sh-card-' + _state.currentPlayerId);
+        if (card) card.classList.add('sh-active-player');
+        // Update scoreboard columns
         document.querySelectorAll('.sh-player-col').forEach(function (el) {
             el.classList.remove('sh-active-player');
         });
         var col = document.getElementById('sh-pcol-' + _state.currentPlayerId);
         if (col) col.classList.add('sh-active-player');
+        // Update status bar
+        var player = _currentPlayer();
+        var statusEl = document.getElementById('sh-status');
+        if (statusEl && player) {
+            if (player.isCpu) {
+                statusEl.textContent = 'CPU IS THINKING...';
+            } else {
+                statusEl.textContent = player.name.toUpperCase() + ' — SELECT MULTIPLIER THEN SEGMENT';
+            }
+        }
     }
 
     function _markRoundDone(playerId, roundNumber, score, isShanghai) {
@@ -471,8 +541,9 @@ var SHANGHAI_GAME = (function () {
         });
         var target = _state.targetNumber;
         if (target === 25) {
-            var bull = document.querySelector('.sh-bull-btn');
-            if (bull) bull.classList.add('sh-seg-target');
+            document.querySelectorAll('.sh-bull-btn, .sh-outer-btn').forEach(function (b) {
+                b.classList.add('sh-seg-target');
+            });
         } else {
             var btn = document.querySelector('.sh-seg-btn[data-seg="' + target + '"]');
             if (btn) btn.classList.add('sh-seg-target');
