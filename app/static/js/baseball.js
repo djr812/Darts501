@@ -1024,10 +1024,16 @@ var BASEBALL_GAME = (function () {
     }
 
     function _cpuProfile() {
+        // missChance: probability per dart of going completely off-target (= an out).
+        // This is checked FIRST in _cpuApplyVariance before any multiplier variance,
+        // guaranteeing that every difficulty level produces outs regularly.
+        //   easy:   ~55% chance of an out per dart  → usually 1-3 outs per inning
+        //   medium: ~30% chance of an out per dart  → usually 0-2 outs per inning
+        //   hard:   ~15% chance of an out per dart  → usually 0-1 outs per inning, occasionally 0
         var profiles = {
-            easy:   { trebleHit: 0.40, trebleSingle: 0.35, doubleHit: 0.50, doubleSingle: 0.30, singleHit: 0.82 },
-            medium: { trebleHit: 0.68, trebleSingle: 0.20, doubleHit: 0.65, doubleSingle: 0.20, singleHit: 0.92 },
-            hard:   { trebleHit: 0.86, trebleSingle: 0.09, doubleHit: 0.80, doubleSingle: 0.13, singleHit: 0.97 },
+            easy:   { missChance: 0.55, trebleHit: 0.40, trebleSingle: 0.35, doubleHit: 0.50, doubleSingle: 0.30, singleHit: 0.75 },
+            medium: { missChance: 0.30, trebleHit: 0.68, trebleSingle: 0.20, doubleHit: 0.65, doubleSingle: 0.20, singleHit: 0.88 },
+            hard:   { missChance: 0.15, trebleHit: 0.86, trebleSingle: 0.09, doubleHit: 0.80, doubleSingle: 0.13, singleHit: 0.95 },
         };
         return profiles[_state.cpuDifficulty] || profiles.medium;
     }
@@ -1038,6 +1044,10 @@ var BASEBALL_GAME = (function () {
             var idx = BOARD_RING.indexOf(seg);
             if (idx === -1) return seg;
             return BOARD_RING[(idx + (Math.random() < 0.5 ? 1 : -1) + BOARD_RING.length) % BOARD_RING.length];
+        }
+        // Apply guaranteed miss chance first — this ensures outs happen at all difficulty levels
+        if (Math.random() < profile.missChance) {
+            return { segment: adjacent(segment), multiplier: 1 };
         }
         var r = Math.random();
         if (multiplier === 3) {
