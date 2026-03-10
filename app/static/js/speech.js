@@ -328,7 +328,7 @@ var SPEECH = (function() {
      */
     function announceCricketWin(playerName) {
         if (!_enabled) return;
-        _speak(playerName + '! You are winner! HAHAHA', true, { rate: 0.88, pitch: 1.25, volume: 1.0 });
+        _speak(playerName + ', You are winner! Hah! Hah! Hah!', true, { rate: 0.88, pitch: 1.25, volume: 1.0 });
     }
 
     function announceTimer(phrase) {
