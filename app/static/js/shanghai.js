@@ -18,6 +18,7 @@ var SHANGHAI_GAME = (function () {
         matchId:        null,
         gameId:         null,
         numRounds:      7,
+        targetSequence: null,  // array of target numbers for 7-round random variant
         players:        [],      // [{ id, name, isCpu }]
         scores:         {},      // { playerId: total }
         roundsByPlayer: {},      // { playerId: [{ round_number, score, shanghai }] }
@@ -118,6 +119,9 @@ var SHANGHAI_GAME = (function () {
         _state.matchId         = s.match_id;
         _state.gameId          = s.game_id;
         _state.numRounds       = s.num_rounds;
+        _state.targetSequence  = s.target_sequence
+            ? s.target_sequence.split(',').map(Number)
+            : null;
         _state.status          = s.status;
         _state.winnerId        = s.winner_id;
         _state.tiebreak        = !!s.tiebreak;
@@ -430,6 +434,10 @@ var SHANGHAI_GAME = (function () {
                 row.className = 'sh-round-row';
                 row.id = 'sh-round-' + p.id + '-' + rn;
 
+                // Determine the target number label for this round
+                var roundTarget = _state.targetSequence
+                    ? _state.targetSequence[rn - 1]
+                    : rn;
                 var roundData = roundMap[rn];
                 if (roundData) {
                     row.classList.add('sh-round-done');
@@ -437,12 +445,12 @@ var SHANGHAI_GAME = (function () {
                     var displayVal = roundData.shanghai
                         ? '🎯 S!'
                         : (roundData.score > 0 ? roundData.score : '—');
-                    row.textContent = displayVal;
+                    row.textContent = '[' + roundTarget + '] ' + displayVal;
                 } else if (rn === _state.currentRound && String(p.id) === String(_state.currentPlayerId)) {
                     row.classList.add('sh-round-active');
-                    row.textContent = '▶';
+                    row.textContent = '[' + roundTarget + '] ▶';
                 } else {
-                    row.textContent = '';
+                    row.textContent = '[' + roundTarget + ']';
                 }
                 col.appendChild(row);
             }

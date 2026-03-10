@@ -43,7 +43,7 @@ def _get_state(db, match_id):
     cursor = db.cursor()
 
     cursor.execute(
-        "SELECT sg.id, sg.match_id, sg.num_rounds, sg.status, sg.winner_id, sg.tiebreak "
+        "SELECT sg.id, sg.match_id, sg.num_rounds, sg.target_sequence, sg.status, sg.winner_id, sg.tiebreak "
         "FROM shanghai_games sg WHERE sg.match_id = %s",
         (match_id,)
     )
@@ -93,7 +93,13 @@ def _get_state(db, match_id):
         target_number = 25
     else:
         current_round = min_submitted + 1
-        target_number = current_round if current_round <= game["num_rounds"] else None
+        if game.get("target_sequence"):
+            # 7-round random variant — look up from stored sequence
+            seq = [int(x) for x in game["target_sequence"].split(",")]
+            target_number = seq[current_round - 1] if current_round <= len(seq) else None
+        else:
+            # 20-round sequential variant
+            target_number = current_round if current_round <= game["num_rounds"] else None
 
     # Current player = first player who hasn't submitted current_round yet
     current_player_id = None
@@ -125,6 +131,7 @@ def _get_state(db, match_id):
         "match_id":           match_id,
         "game_id":            game_id,
         "num_rounds":         game["num_rounds"],
+        "target_sequence":    game.get("target_sequence"),  # None for 20-round
         "status":             game["status"],
         "winner_id":          game["winner_id"],
         "tiebreak":           bool(game["tiebreak"]),
@@ -172,6 +179,14 @@ def create_shanghai_match():
     if num_rounds not in (7, 20):
         return jsonify({"error": "num_rounds must be 7 or 20"}), 400
 
+    # For 7-round games, pick 7 distinct random targets from 1-20
+    import random
+    if num_rounds == 7:
+        targets = random.sample(range(1, 21), 7)
+        target_sequence = ','.join(str(t) for t in targets)
+    else:
+        target_sequence = None
+
     db     = get_db()
     cursor = db.cursor()
 
@@ -194,8 +209,8 @@ def create_shanghai_match():
         )
 
     cursor.execute(
-        "INSERT INTO shanghai_games (match_id, num_rounds, status) VALUES (%s, %s, 'active')",
-        (match_id, num_rounds)
+        "INSERT INTO shanghai_games (match_id, num_rounds, target_sequence, status) VALUES (%s, %s, %s, 'active')",
+        (match_id, num_rounds, target_sequence)
     )
     db.commit()
 

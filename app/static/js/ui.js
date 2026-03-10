@@ -1849,7 +1849,7 @@ const UI = (() => {
                 },
                 {
                     heading: 'Round Targets',
-                    body: 'Round 1 targets the 1, Round 2 targets the 2, and so on up to Round 7 (or Round 20 in the long game). Darts hitting any other number score zero — but are not a penalty.'
+                    body: 'In the 20-round game, Round 1 targets 1, Round 2 targets 2, and so on up to 20. In the 7-round game, 7 target numbers are chosen at random from 1–20 at the start of each match — the sequence is unique every game. Darts hitting any number other than the current target score zero, but are not a penalty.'
                 },
                 {
                     heading: 'Scoring',
