@@ -555,13 +555,18 @@ var SHANGHAI_GAME = (function () {
             _lockBoard(true);
             UI.showToast('SHANGHAI! 🎯', 'checkout', 3000);
             if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) SOUNDS.checkout();
-            _enableNext(true);
             _enableUndo(false);
+            if (_state.cpuRunning) {
+                // Auto-submit for CPU
+                setTimeout(function () { _onNext(); }, 2200);
+            } else {
+                _enableNext(true);
+            }
             return;
         }
 
-        // After 3rd dart — lock board, show NEXT
-        if (_state.pendingDarts.length >= 3) {
+        // After 3rd dart — lock board, show NEXT (or let _runCpuTurn handle for CPU)
+        if (_state.pendingDarts.length >= 3 && !_state.cpuRunning) {
             _state.turnComplete = true;
             _lockBoard(true);
             _enableNext(true);
@@ -789,11 +794,15 @@ var SHANGHAI_GAME = (function () {
             if (dartsLeft === 0) {
                 _state.cpuRunning = false;
                 _state.turnComplete = true;
-                _enableNext(true);
+                // Auto-advance after announcing turn score — no NEXT press needed for CPU
+                var turnScore = _state.pendingDarts.reduce(function (s, d) { return s + d.points; }, 0);
+                var announceDelay = 1800;  // wait for last dart speech to finish
+                var turnMsg = 'Scored ' + turnScore;
+                var advanceDelay = announceDelay + 300 + turnMsg.length * 120 + 400;
                 if (SPEECH.isEnabled()) {
-                    var turnScore = _state.pendingDarts.reduce(function (s, d) { return s + d.points; }, 0);
-                    setTimeout(function () { SPEECH.announceTurnEnd(turnScore, 0); }, 1800);
+                    setTimeout(function () { SPEECH.announceTurnEnd(turnScore, 0); }, announceDelay);
                 }
+                setTimeout(function () { _onNext(); }, advanceDelay);
                 return;
             }
 
