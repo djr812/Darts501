@@ -30,6 +30,7 @@ var BASEBALL_GAME = (function () {
         // Local UI state
         setComplete:        false,  // board locked after 3rd dart in a set
         inningComplete:     false,  // 3 outs reached — inning is over
+        inningEndSpeechDur: 0,      // estimated ms for inning-end speech (used by CPU)
         // CPU
         cpuDifficulty:      'medium',
         cpuTurnRunning:     false,
@@ -582,7 +583,7 @@ var BASEBALL_GAME = (function () {
         if (nb) nb.disabled = false;
 
         if (_state.inningComplete) {
-            _speakInningEnd(inn);
+            _state.inningEndSpeechDur = _speakInningEnd(inn);
             if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
                 setTimeout(function () { SOUNDS.checkout && SOUNDS.checkout(); }, 300);
             }
@@ -928,13 +929,15 @@ var BASEBALL_GAME = (function () {
     }
 
     function _speakInningEnd(inn) {
-        if (!SPEECH.isEnabled()) return;
+        if (!SPEECH.isEnabled()) return 0;
         var player = _currentPlayer();
         var name   = player ? player.name : '';
         var runs   = inn ? inn.runs : 0;
         var msg    = 'Inning ' + _state.currentInning + ' over for ' + name + '. ' +
                      runs + (runs === 1 ? ' run' : ' runs') + ' this inning.';
         _speak(msg, 500);
+        // Return estimated ms until speech finishes (500ms delay + startup + per-char rate)
+        return 500 + 300 + msg.length * 150;
     }
 
     function _speakResult(titleText, hsResults) {
@@ -971,7 +974,12 @@ var BASEBALL_GAME = (function () {
         function _throwNext() {
             if (dartsThrown >= 3 || _state.setComplete) {
                 _state.cpuTurnRunning = false;
-                setTimeout(_onNext, 700);
+                // If the inning just ended, wait for the "Inning over for..." speech to finish
+                var endDelay = _state.inningComplete
+                    ? Math.max(1800, (_state.inningEndSpeechDur || 0) + 600)
+                    : 700;
+                _state.inningEndSpeechDur = 0;
+                setTimeout(_onNext, endDelay);
                 return;
             }
             var dart      = _cpuChooseDart();
