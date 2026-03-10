@@ -157,6 +157,7 @@ body.mode-stats #app {
 /* ── Shared game header bar (501/201/Cricket/Shanghai/Practice) ── */
 .game-header,
 #header {
+    grid-area: header;
     display: -webkit-box;
     display: -webkit-flex;
     display: flex;
@@ -2919,62 +2920,63 @@ body.mode-practice #app {
 }
 
 /* ── Killer Darts ───────────────────────────────────────────────────── */
-.killer-board {
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    -webkit-box-orient: vertical;
-    -webkit-flex-direction: column;
-    flex-direction: column;
-    gap: 4px;
-    padding: 4px 6px;
-    -webkit-flex-shrink: 0;
-    flex-shrink: 0;
+/* ═══════════════════════════════════════════════════════════════
+   KILLER — two-column layout matching 501 / Shanghai style
+   ═══════════════════════════════════════════════════════════════ */
+
+body.mode-killer #app {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 280px 1fr;
+    grid-template-areas:
+        "header  header"
+        "sidebar board";
+    width: 100vw;
+    height: 100vh;
+    gap: 0;
 }
 
-.killer-player-row {
+/* ── Sidebar ── */
+#killer-sidebar {
+    grid-area: sidebar;
     display: -webkit-box;
-    display: -webkit-flex;
     display: flex;
-    -webkit-box-align: center;
-    -webkit-align-items: center;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 8px;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    padding: var(--gap);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: var(--gap);
+}
+
+/* Player card */
+.killer-player-card {
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    padding: 10px 12px;
     background: var(--bg-raised);
-    -webkit-transition: background 0.15s;
-    transition: background 0.15s;
+    text-align: center;
+    -webkit-transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s;
 }
 
 .killer-active {
     border-color: var(--accent);
-    background: rgba(255,255,255,0.06);
+    background: var(--accent-glow);
 }
 
 .killer-eliminated {
     opacity: 0.35;
-    text-decoration: line-through;
-}
-
-.killer-name-wrap {
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    -webkit-box-orient: vertical;
-    -webkit-flex-direction: column;
-    flex-direction: column;
-    min-width: 80px;
-    -webkit-flex: 1;
-    flex: 1;
 }
 
 .killer-player-name {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    letter-spacing: 0.06em;
-    color: var(--text-primary);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
 }
 
 .killer-active .killer-player-name {
@@ -2983,31 +2985,35 @@ body.mode-practice #app {
 
 .killer-player-number {
     font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 700;
+    font-size: 2.6rem;
+    font-weight: 900;
     color: var(--double-color, #e67e22);
     line-height: 1;
+    margin-bottom: 6px;
 }
 
+.killer-active .killer-player-number {
+    color: var(--accent);
+}
+
+/* Hits pips row */
 .killer-hits {
     display: -webkit-box;
-    display: -webkit-flex;
     display: flex;
     -webkit-box-align: center;
-    -webkit-align-items: center;
     align-items: center;
-    gap: 4px;
-    min-width: 56px;
     -webkit-box-pack: center;
-    -webkit-justify-content: center;
     justify-content: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    min-height: 20px;
 }
 
 .killer-hit-pip {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    border: 1px solid var(--text-dim);
+    border: 2px solid var(--text-dim);
     background: transparent;
     display: inline-block;
 }
@@ -3019,31 +3025,28 @@ body.mode-practice #app {
 
 .killer-badge {
     font-family: var(--font-display);
-    font-size: 1.1rem;
+    font-size: 1.4rem;
     font-weight: 900;
     color: #e74c3c;
     letter-spacing: 0.05em;
 }
 
+/* Lives pips row */
 .killer-lives {
     display: -webkit-box;
-    display: -webkit-flex;
     display: flex;
-    gap: 5px;
+    gap: 6px;
     -webkit-box-align: center;
-    -webkit-align-items: center;
     align-items: center;
-    min-width: 54px;
     -webkit-box-pack: center;
-    -webkit-justify-content: center;
     justify-content: center;
 }
 
 .killer-life-pip {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    border: 1px solid var(--text-dim);
+    border: 2px solid var(--text-dim);
     background: transparent;
     display: inline-block;
 }
@@ -3053,28 +3056,84 @@ body.mode-practice #app {
     border-color: #27ae60;
 }
 
-.killer-status {
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
-    letter-spacing: 0.07em;
-    color: var(--text-secondary);
-    text-align: center;
-    padding: 3px 8px;
-    -webkit-flex-shrink: 0;
-    flex-shrink: 0;
-    white-space: nowrap;
+/* ── Board (right column) ── */
+.killer-seg-board {
+    grid-area: board;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    padding: var(--gap);
     overflow: hidden;
-    text-overflow: ellipsis;
+    gap: var(--gap);
 }
 
-.killer-tabs {
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    gap: 6px;
-    padding: 4px 8px;
+/* Status banner — shows current player + target */
+.killer-status-banner {
     -webkit-flex-shrink: 0;
     flex-shrink: 0;
+    padding: 6px 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-align: center;
+}
+
+/* Current-turn dart pills */
+.killer-pills {
+    display: -webkit-box;
+    display: flex;
+    gap: 6px;
+    min-height: 32px;
+    padding: 2px 0;
+    -webkit-box-align: center;
+    align-items: center;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+
+/* Multiplier tabs — match 501 style */
+.killer-tabs {
+    display: -webkit-box;
+    display: flex;
+    gap: var(--gap);
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.killer-tabs .tab-btn {
+    -webkit-box-flex: 1;
+    flex: 1;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-transition: all 0.1s ease;
+    transition: all 0.1s ease;
+}
+.killer-tabs .tab-btn:active { -webkit-transform: scale(0.97); transform: scale(0.97); }
+.killer-tabs .tab-btn.active-single { background: var(--single-color); color: #fff; border-color: var(--single-color); }
+.killer-tabs .tab-btn.active-double { background: var(--double-color); color: #fff; border-color: var(--double-color); }
+.killer-tabs .tab-btn.active-treble { background: var(--treble-color); color: #fff; border-color: var(--treble-color); }
+.killer-tabs .tab-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* Segment grid — reuse #segment-grid styles, scoped to killer board */
+.killer-seg-board #segment-grid {
+    -webkit-box-flex: 1;
+    flex: 1;
 }
 
 /* Highlight opponent assigned numbers on the grid */
@@ -3082,6 +3141,20 @@ body.mode-practice #app {
     border-color: #8e44ad;
     color: #d7bde2;
     background: rgba(142,68,173,0.1);
+}
+
+/* Footer hint */
+.killer-footer {
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    text-align: center;
+    padding: 4px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+    margin-top: auto;
 }
 
 /* Result table */

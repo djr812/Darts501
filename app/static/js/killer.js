@@ -155,7 +155,7 @@ var KILLER_GAME = (function () {
         app.style.cssText = '';
         document.body.className = 'mode-killer';
 
-        // ── Header ────────────────────────────────────────────────────────────
+        // ── Header (unchanged) ───────────────────────────────────────────────
         var header = document.createElement('div');
         header.className = 'game-header';
 
@@ -211,27 +211,33 @@ var KILLER_GAME = (function () {
         header.appendChild(rightSlot);
         app.appendChild(header);
 
-        // ── Scoreboard ────────────────────────────────────────────────────────
-        var board = document.createElement('div');
-        board.id = 'killer-board';
-        board.className = 'killer-board';
-        app.appendChild(board);
-        _renderBoard(board);
+        // ── Sidebar (left column) — player cards ─────────────────────────────
+        var sidebar = document.createElement('aside');
+        sidebar.id = 'killer-sidebar';
+        sidebar.className = 'killer-sidebar';
+        _state.players.forEach(function (p) {
+            sidebar.appendChild(_buildPlayerCard(p));
+        });
+        app.appendChild(sidebar);
 
-        // ── Status ────────────────────────────────────────────────────────────
+        // ── Board (right column) ─────────────────────────────────────────────
+        var board = document.createElement('main');
+        board.id = 'killer-seg-board';
+        board.className = 'killer-seg-board';
+
+        // Status banner
         var statusEl = document.createElement('div');
         statusEl.id = 'killer-status';
-        statusEl.className = 'killer-status';
-        app.appendChild(statusEl);
-        _updateStatus();
+        statusEl.className = 'killer-status-banner';
+        board.appendChild(statusEl);
 
-        // ── Dart pills ────────────────────────────────────────────────────────
+        // Dart pills
         var pills = document.createElement('div');
         pills.id = 'killer-pills';
-        pills.className = 'practice-pills';
-        app.appendChild(pills);
+        pills.className = 'killer-pills';
+        board.appendChild(pills);
 
-        // ── Multiplier tabs ───────────────────────────────────────────────────
+        // Multiplier tabs
         _state.multiplier = 1;
         var tabs = document.createElement('div');
         tabs.id = 'killer-tabs';
@@ -259,57 +265,74 @@ var KILLER_GAME = (function () {
             tabs.appendChild(btn);
         });
         document.body.dataset.multiplier = 1;
-        app.appendChild(tabs);
+        board.appendChild(tabs);
 
-        // ── Segment grid ──────────────────────────────────────────────────────
-        var segBoard = document.createElement('main');
-        segBoard.id = 'killer-seg-board';
-        app.appendChild(segBoard);
-        segBoard.appendChild(_buildGrid());
-        segBoard.appendChild(_buildBullRow());
+        // Segment grid
+        board.appendChild(_buildGrid());
 
+        // Bull / Miss row
+        board.appendChild(_buildBullRow());
+
+        // Footer status bar
+        var footer = document.createElement('footer');
+        footer.className = 'killer-footer';
+        var footerMsg = document.createElement('span');
+        footerMsg.id = 'killer-footer-msg';
+        footerMsg.textContent = 'SELECT MULTIPLIER THEN SEGMENT';
+        footer.appendChild(footerMsg);
+        board.appendChild(footer);
+
+        app.appendChild(board);
+
+        _renderBoard();
+        _updateStatus();
         _applyHighlights();
+    }
+
+    function _buildPlayerCard(p) {
+        var card = document.createElement('div');
+        card.className = 'killer-player-card';
+        card.id = 'killer-row-' + p.id;
+        if (String(p.id) === String(_state.currentPlayerId)) card.classList.add('killer-active');
+        if (p.eliminated) card.classList.add('killer-eliminated');
+
+        // Name
+        var nameEl = document.createElement('div');
+        nameEl.className = 'killer-player-name';
+        nameEl.textContent = p.name.toUpperCase();
+        card.appendChild(nameEl);
+
+        // Assigned number — large, prominent
+        var numEl = document.createElement('div');
+        numEl.className = 'killer-player-number';
+        numEl.textContent = p.assigned_number;
+        card.appendChild(numEl);
+
+        // Hits row (pips toward K, or K badge)
+        var hitsEl = document.createElement('div');
+        hitsEl.id = 'killer-hits-' + p.id;
+        hitsEl.className = 'killer-hits';
+        _renderHits(hitsEl, p);
+        card.appendChild(hitsEl);
+
+        // Lives row
+        var livesEl = document.createElement('div');
+        livesEl.id = 'killer-lives-' + p.id;
+        livesEl.className = 'killer-lives';
+        _renderLives(livesEl, p);
+        card.appendChild(livesEl);
+
+        return card;
     }
 
     // ── Scoreboard ────────────────────────────────────────────────────────────
 
-    function _renderBoard(container) {
-        container.innerHTML = '';
+    function _renderBoard() {
+        var sidebar = document.getElementById('killer-sidebar');
+        if (!sidebar) return;
+        sidebar.innerHTML = '';
         _state.players.forEach(function (p) {
-            var row = document.createElement('div');
-            row.id = 'killer-row-' + p.id;
-            row.className = 'killer-player-row' +
-                (String(p.id) === String(_state.currentPlayerId) ? ' killer-active' : '') +
-                (p.eliminated ? ' killer-eliminated' : '');
-
-            // Name + number
-            var nameEl = document.createElement('div');
-            nameEl.className = 'killer-player-name';
-            nameEl.textContent = p.name.toUpperCase();
-            var numEl = document.createElement('div');
-            numEl.className = 'killer-player-number';
-            numEl.textContent = p.assigned_number;
-            var nameWrap = document.createElement('div');
-            nameWrap.className = 'killer-name-wrap';
-            nameWrap.appendChild(nameEl);
-            nameWrap.appendChild(numEl);
-            row.appendChild(nameWrap);
-
-            // Hits progress (toward killer status) or K badge
-            var hitsEl = document.createElement('div');
-            hitsEl.id = 'killer-hits-' + p.id;
-            hitsEl.className = 'killer-hits';
-            _renderHits(hitsEl, p);
-            row.appendChild(hitsEl);
-
-            // Lives pips
-            var livesEl = document.createElement('div');
-            livesEl.id = 'killer-lives-' + p.id;
-            livesEl.className = 'killer-lives';
-            _renderLives(livesEl, p);
-            row.appendChild(livesEl);
-
-            container.appendChild(row);
+            sidebar.appendChild(_buildPlayerCard(p));
         });
     }
 
@@ -358,9 +381,9 @@ var KILLER_GAME = (function () {
     function _updateBoardFromWorking() {
         var working = _workingPlayerState();
         working.forEach(function (wp) {
-            var row = document.getElementById('killer-row-' + wp.id);
-            if (row) {
-                row.className = 'killer-player-row' +
+            var card = document.getElementById('killer-row-' + wp.id);
+            if (card) {
+                card.className = 'killer-player-card' +
                     (String(wp.id) === String(_state.currentPlayerId) ? ' killer-active' : '') +
                     (wp.eliminated ? ' killer-eliminated' : '');
             }
@@ -373,9 +396,9 @@ var KILLER_GAME = (function () {
 
     function _updateBoard() {
         _state.players.forEach(function (p) {
-            var row = document.getElementById('killer-row-' + p.id);
-            if (row) {
-                row.className = 'killer-player-row' +
+            var card = document.getElementById('killer-row-' + p.id);
+            if (card) {
+                card.className = 'killer-player-card' +
                     (String(p.id) === String(_state.currentPlayerId) ? ' killer-active' : '') +
                     (p.eliminated ? ' killer-eliminated' : '');
             }
@@ -387,18 +410,22 @@ var KILLER_GAME = (function () {
     }
 
     function _updateStatus() {
-        var el = document.getElementById('killer-status');
-        if (!el) return;
+        var el     = document.getElementById('killer-status');
+        var footer = document.getElementById('killer-footer-msg');
         var p = _currentPlayer();
         if (!p) return;
         var targetStr = _state.variant === 'doubles' ? 'D' : 'T';
+        var statusText, footerText;
         if (p.is_killer) {
-            el.textContent = p.name.toUpperCase() + '  ·  KILLER  ·  AIM FOR OPPONENT ' + targetStr + 's';
+            statusText = p.name.toUpperCase() + '  —  KILLER';
+            footerText = 'AIM FOR OPPONENT ' + targetStr + 's TO TAKE A LIFE';
         } else {
             var needed = 3 - p.hits;
-            el.textContent = p.name.toUpperCase() + '  ·  HIT ' + targetStr + p.assigned_number +
-                '  ·  ' + needed + ' HIT' + (needed === 1 ? '' : 'S') + ' TO BECOME KILLER';
+            statusText = p.name.toUpperCase() + '  —  TARGET: ' + targetStr + p.assigned_number;
+            footerText = needed + ' HIT' + (needed === 1 ? '' : 'S') + ' TO BECOME KILLER';
         }
+        if (el) el.textContent = statusText;
+        if (footer) footer.textContent = footerText;
     }
 
     // ── Segment grid ──────────────────────────────────────────────────────────
