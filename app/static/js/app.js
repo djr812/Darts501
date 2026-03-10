@@ -189,7 +189,7 @@
         if (player.isCpu) {
             UI.setStatus('CPU IS THINKING...');
             UI.setUndoEnabled(false);
-            setTimeout(_runCpuTurn, 400);
+            setTimeout(_runCpuTurn, 1600);  // allow announcePlayer speech to finish
         } else {
             UI.setStatus(`${player.name.toUpperCase()}'S TURN — SELECT MULTIPLIER`);
             UI.setUndoEnabled(true);
@@ -354,12 +354,12 @@
                     UI.setStatus('CPU BUST!', 'bust');
                     state.turnComplete = true;
                     // Auto-advance after pause so human can see the bust
-                    setTimeout(_advancePlayer, 1400);
+                    setTimeout(_advancePlayer, 2200);  // allow bust announcement to finish
 
                 } else {
                     // Used 3 darts normally
                     state.turnComplete = true;
-                    setTimeout(_advancePlayer, 1000);
+                    setTimeout(_advancePlayer, 2000);  // allow turn-end announcement to finish
                 }
             }
         );

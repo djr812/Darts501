@@ -24,8 +24,8 @@ const CPU = (() => {
     // Clockwise board order — used for adjacent-segment drift
     const BOARD_RING = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
 
-    const DART_DELAY       = 900;
-    const TURN_START_DELAY = 600;
+    const DART_DELAY       = 1800;  // increased for Daniel voice — phrases avg ~1.5–2s
+    const TURN_START_DELAY = 1400;  // allows 'CPU's turn to throw' to finish before first dart
 
     // ---------------------------------------------------------------------------
     // Difficulty profiles
