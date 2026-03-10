@@ -834,10 +834,22 @@ const UI = (() => {
         arc.id = `ring-arc-${player.id}`;
         svg.appendChild(arc);
 
+        // Dart icon — shown for the leg's first thrower
+        const dartIcon = document.createElementNS(ns, 'text');
+        dartIcon.setAttribute('x', _RING_CX);
+        dartIcon.setAttribute('y', '38');
+        dartIcon.setAttribute('dy', '0.35em');
+        dartIcon.setAttribute('class', 'score-ring-dart');
+        dartIcon.id = `ring-dart-${player.id}`;
+        dartIcon.textContent = '🎯';
+        dartIcon.style.display = 'none';
+        svg.appendChild(dartIcon);
+
         // Score text inside the ring
         const text = document.createElementNS(ns, 'text');
         text.setAttribute('x', _RING_CX);
         text.setAttribute('y', _RING_CY);
+        text.setAttribute('dy', '0.32em');  // iOS 12 doesn't support dominant-baseline; 0.32em centres better at large sizes
         text.setAttribute('class', 'score-ring-text');
         text.id = `score-${player.id}`;
         text.textContent = player.score;
@@ -983,6 +995,15 @@ const UI = (() => {
         const fraction  = Math.max(0, Math.min(1, score / starting));
         const offset    = +(_RING_CIRC * (1 - fraction)).toFixed(4);
         arc.setAttribute('stroke-dashoffset', offset);
+    }
+
+    function setLegStarter(playerId) {
+        // Show dart icon only on the leg starter's ring, hide on all others
+        document.querySelectorAll('[id^="ring-dart-"]').forEach(function (el) {
+            el.style.display = 'none';
+        });
+        var icon = document.getElementById('ring-dart-' + playerId);
+        if (icon) icon.style.display = '';
     }
 
     function setStartingScore(playerId, starting) {
@@ -1930,6 +1951,7 @@ const UI = (() => {
         setActivePlayer,
         setScore,
         setStartingScore,
+        setLegStarter,
         addDartPill,
         clearDartPills,
         setCheckoutHint,

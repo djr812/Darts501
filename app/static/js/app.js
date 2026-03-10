@@ -171,6 +171,7 @@
             UI.updatePlayerSetLegs(p.id, state.setsScore[p.id] || 0, state.legsScore[p.id] || 0);
         });
 
+        UI.setLegStarter(currentPlayer().id);
         UI.setActivePlayer(currentPlayer().id);
         UI.setMultiplierTab(1);
         UI.setNextPlayerEnabled(false);
