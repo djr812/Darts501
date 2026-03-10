@@ -277,6 +277,7 @@ var PRACTICE = (function() {
         multiplier:    1,
         turnDarts:     0,     // darts in current turn (max 3)
         turnComplete:  false, // true after 3rd dart — waiting for NEXT
+        timerExpired:  false, // true when timer hits 0 — board stays open for last darts
         onEnd:         null,  // stored so target completion can call it from any function
         // Target practice fields
         targetMode:    'free',   // 'free'|'segment'|'trebles'|'doubles'|'checkout'|'clock'
@@ -336,6 +337,7 @@ var PRACTICE = (function() {
                 _state.timerSeconds = TIMERLESS.indexOf(config.targetMode) !== -1
                     ? 0
                     : config.durationMinutes * 60;
+                _state.timerExpired = false;
                 _state.dartsThrown   = 0;
                 _state.totalScore    = 0;
                 _state.turnScore     = 0;
@@ -787,14 +789,34 @@ var PRACTICE = (function() {
                 timerEl.classList.add('timer-warning');
             }
 
-            // "30 seconds remaining" call
-            if (_state.timerSeconds === 30 && SPEECH.isEnabled()) {
-                SPEECH.announceTimer && SPEECH.announceTimer('30 seconds remaining');
+            // "Last darts" call at 20 seconds
+            if (_state.timerSeconds === 20 && SPEECH.isEnabled()) {
+                SPEECH.announceTimer && SPEECH.announceTimer('Last darts');
             }
 
             if (_state.timerSeconds <= 0) {
                 clearInterval(_state.timerInterval);
-                _endSession(onEnd);
+                _state.timerExpired = true;
+                // Don't end session yet — allow last darts to be entered.
+                // _advanceToNextTurn will call _endSession when NEXT is pressed.
+                var timerEl = document.getElementById('practice-timer');
+                if (timerEl) timerEl.textContent = 'TIME';
+                if (SPEECH.isEnabled()) {
+                    SPEECH.announceTimer && SPEECH.announceTimer('Time is up. Finish your darts.');
+                }
+                // If the board is currently locked (mid-turn NEXT pending), unlock it
+                // so the player can enter their final set
+                if (_state.turnComplete) {
+                    // They've already thrown 3 — NEXT will end the session
+                } else {
+                    // Board is open — keep it open, nothing to do
+                }
+                // Make NEXT button visible and labelled to end session
+                var nb = document.getElementById('practice-next-btn');
+                if (nb) {
+                    nb.disabled = false;
+                    nb.textContent = 'FINISH ▶';
+                }
             }
         }, 1000);
     }
@@ -1330,6 +1352,12 @@ var PRACTICE = (function() {
                 console.error('[practice] Turn submit error:', err);
                 // Non-fatal — session stats are tracked locally
             });
+        }
+
+        // If the timer has expired, this NEXT press ends the session
+        if (_state.timerExpired) {
+            _endSession(_state.onEnd);
+            return;
         }
 
         // Clear pills, unlock board, reset turn state immediately
