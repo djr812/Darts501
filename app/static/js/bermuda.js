@@ -95,10 +95,12 @@ var BERMUDA_GAME = (function () {
                 _state.onEnd = onEnd;
                 UI.setLoading(false);
                 _buildScreen();
-                var startDelay = _announceRoundAndPlayer(true);
-                if (_isCpuPlayer(_currentPlayer())) {
-                    setTimeout(_runCpuTurn, startDelay + 400);
-                }
+                var startDelay = _announceWelcome(function () {
+                    var d = _announceRoundAndPlayer(true);
+                    if (_isCpuPlayer(_currentPlayer())) {
+                        setTimeout(_runCpuTurn, d + 400);
+                    }
+                });
             })
             .catch(function (err) {
                 UI.setLoading(false);
@@ -940,6 +942,29 @@ var BERMUDA_GAME = (function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
             SPEECH.speak(text, { rate: 1.0, pitch: 1.0 });
         }, delay || 0);
+    }
+
+    function _announceWelcome(callback) {
+        if (!SPEECH.isEnabled()) {
+            if (callback) callback();
+            return;
+        }
+        var line1 = 'Welcome to Bermuda Triangle darts.';
+        var line2 = 'A game of Halve It!';
+        // Speak line1, short pause (450ms), then line2, longer pause (800ms), then callback
+        setTimeout(function () {
+            window.speechSynthesis && window.speechSynthesis.cancel();
+            SPEECH.speak(line1, { rate: 1.0, pitch: 1.0 });
+        }, 600);
+        var line1Dur = 600 + 300 + line1.length * 150;  // delay + TTS startup + chars
+        var pause1   = 450;
+        setTimeout(function () {
+            window.speechSynthesis && window.speechSynthesis.cancel();
+            SPEECH.speak(line2, { rate: 1.0, pitch: 1.0 });
+        }, line1Dur + pause1);
+        var line2Dur = line1Dur + pause1 + 300 + line2.length * 150;
+        var pause2   = 800;
+        if (callback) setTimeout(callback, line2Dur + pause2);
     }
 
     function _announceRoundAndPlayer(isFirst) {
