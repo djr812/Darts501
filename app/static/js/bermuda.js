@@ -49,6 +49,7 @@ var BERMUDA_GAME = (function () {
 
     var _pendingThrows = [];   // { segment, multiplier, points }
     var _throwHistory  = [];   // for undo
+    var _lastDartSpeechDur = 0;
 
     // ── Public ────────────────────────────────────────────────────────────────
 
@@ -539,8 +540,10 @@ var BERMUDA_GAME = (function () {
             _lockBoard(true);
             var nb = document.getElementById('bm-next-btn');
             if (nb) nb.disabled = false;
-            // Wait for dart speech to finish before speaking turn total
-            _speakTurnTotal(dartDuration);
+            // CPU turn: throwNext handles _speakTurnTotal to avoid double-firing
+            if (!_state.cpuTurnRunning) {
+                _speakTurnTotal(dartDuration);
+            }
         }
     }
 
@@ -617,22 +620,35 @@ var BERMUDA_GAME = (function () {
         var nb = document.getElementById('bm-next-btn'); if (nb) nb.disabled = true;
         var ub = document.getElementById('bm-undo-btn'); if (ub) ub.disabled = true;
 
-        var DART_DELAY  = 900;
         var dartsThrown = 0;
 
         function throwNext() {
             if (dartsThrown >= 3) {
                 _state.cpuTurnRunning = false;
                 _lockBoard(false);
-                setTimeout(_onNext, 600);
+                // Wait for last dart speech + turn total speech before _onNext
+                var lastSpeechDur = _speakTurnTotal(_lastDartSpeechDur || 0);
+                setTimeout(_onNext, Math.max(1800, lastSpeechDur + 600));
                 return;
             }
             var dart = _cpuBMChooseDart(_state.currentRound);
             dartsThrown++;
+            // Speak dart label before _onThrow so guard inside _speakDart fires correctly
+            var mulLabel = dart.multiplier === 3 ? 'Treble' : dart.multiplier === 2 ? 'Double' : '';
+            var segLabel = dart.segment === 0  ? 'Miss' :
+                           dart.segment === 25 ? (dart.multiplier === 2 ? 'Bulls Eye' : 'Outer bull') :
+                           (mulLabel ? mulLabel + ' ' + dart.segment : String(dart.segment));
+            setTimeout(function () {
+                window.speechSynthesis && window.speechSynthesis.cancel();
+                SPEECH.speak(segLabel, { rate: 1.0, pitch: 1.0 });
+            }, 200);
+            _lastDartSpeechDur = 200 + 300 + segLabel.length * 150;
             _onThrow(dart.segment, dart.multiplier);
-            setTimeout(throwNext, DART_DELAY);
+            var nextDelay = Math.max(1200, _lastDartSpeechDur + 500);
+            setTimeout(throwNext, nextDelay);
         }
 
+        _lastDartSpeechDur = 0;
         setTimeout(throwNext, 600);
     }
 
@@ -933,7 +949,8 @@ var BERMUDA_GAME = (function () {
         var msg = 'The current target is ' + ri.label + '. ' + p.name + "'s turn to throw.";
         var delay = isFirst ? 700 : 500;
         _speak(msg, delay);
-        return delay + msg.length * 85;
+        // 300ms TTS startup + 150ms/char for iOS speech rate
+        return delay + 300 + msg.length * 150;
     }
 
     function _speakDart(segment, multiplier, points) {
@@ -942,22 +959,29 @@ var BERMUDA_GAME = (function () {
         var segLabel = segment === 0  ? 'Miss' :
                        segment === 25 ? (multiplier === 2 ? 'Bulls Eye' : 'Outer bull') :
                        (mulLabel ? mulLabel + ' ' + segment : String(segment));
-        window.speechSynthesis && window.speechSynthesis.cancel();
-        SPEECH.speak(segLabel, { rate: 1.0, pitch: 1.0 });
-        // Return estimated speech duration so callers can wait before speaking again
-        return 200 + segLabel.length * 80;
+        // Only speak for human throws — CPU calls this directly before _onThrow
+        if (!_state.cpuTurnRunning) {
+            setTimeout(function () {
+                window.speechSynthesis && window.speechSynthesis.cancel();
+                SPEECH.speak(segLabel, { rate: 1.0, pitch: 1.0 });
+            }, 200);
+        }
+        // 200ms delay + 300ms TTS startup + 150ms/char
+        return 200 + 300 + segLabel.length * 150;
     }
 
     function _speakTurnTotal(dartSpeechDuration) {
-        if (!SPEECH.isEnabled()) return;
+        if (!SPEECH.isEnabled()) return 0;
         var total = _turnTotal();
-        if (total === 0) return;  // halved/miss handled in _onNext after server confirms
+        if (total === 0) return 0;  // halved/miss handled in _onNext after server confirms
         var msg = total + ' points this turn.';
-        var delay = (dartSpeechDuration || 0) + 200;
+        var delay = (dartSpeechDuration || 0) + 300;
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
             SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
         }, delay);
+        // Return total estimated duration so CPU _onNext knows when speech ends
+        return delay + 300 + msg.length * 150;
     }
 
     // Announce halved score; returns ms delay to wait before chaining next speech
@@ -968,8 +992,9 @@ var BERMUDA_GAME = (function () {
         setTimeout(function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
             SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
-        }, 400);
-        return 600 + msg.length * 80;
+        }, 500);
+        // 500ms delay + 300ms TTS startup + 150ms/char
+        return 500 + 300 + msg.length * 150;
     }
 
     function _speakWinner(winNames, isTie) {
