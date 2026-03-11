@@ -244,7 +244,14 @@ var BERMUDA_GAME = (function () {
         endBtn.type = 'button';
         endBtn.textContent = '✕ END';
         endBtn.addEventListener('click', _onEnd);
+        var restartBtn = document.createElement('button');
+        restartBtn.id = 'bm-restart-btn';
+        restartBtn.className = 'gh-btn gh-btn-red';
+        restartBtn.type = 'button';
+        restartBtn.textContent = '↺ RESTART';
+        restartBtn.addEventListener('click', _onRestart);
         centreSlot.appendChild(endBtn);
+        centreSlot.appendChild(restartBtn);
         header.appendChild(centreSlot);
 
         var rightSlot = document.createElement('div');
@@ -268,37 +275,41 @@ var BERMUDA_GAME = (function () {
         header.appendChild(rightSlot);
         app.appendChild(header);
 
-        // ── Round progress strip ──────────────────────────────────────────────
+        // ── Sidebar — player cards ─────────────────────────────────────────────
+        var sidebar = document.createElement('aside');
+        sidebar.id = 'bm-sidebar';
+        sidebar.className = 'bm-sidebar';
+        _renderBoard(sidebar);
+        app.appendChild(sidebar);
+
+        // ── Board (right column) ──────────────────────────────────────────────
+        var board = document.createElement('main');
+        board.id = 'bm-seg-board';
+        board.className = 'bm-seg-board';
+
+        // Status banner
+        var statusEl = document.createElement('div');
+        statusEl.id = 'bm-status';
+        statusEl.className = 'bm-status-banner';
+        board.appendChild(statusEl);
+
+        // Round progress strip
         var strip = document.createElement('div');
-        strip.id        = 'bm-round-strip';
+        strip.id = 'bm-round-strip';
         strip.className = 'bm-round-strip';
-        app.appendChild(strip);
+        board.appendChild(strip);
         _renderRoundStrip(strip);
 
-        // ── Scoreboard ────────────────────────────────────────────────────────
-        var board = document.createElement('div');
-        board.id        = 'bm-board';
-        board.className = 'bm-board';
-        app.appendChild(board);
-        _renderBoard(board);
-
-        // ── Status bar ────────────────────────────────────────────────────────
-        var statusEl = document.createElement('div');
-        statusEl.id        = 'bm-status';
-        statusEl.className = 'bm-status';
-        app.appendChild(statusEl);
-        _updateStatus();
-
-        // ── Dart pills ────────────────────────────────────────────────────────
+        // Dart pills
         var pills = document.createElement('div');
-        pills.id        = 'bm-pills';
-        pills.className = 'practice-pills';
-        app.appendChild(pills);
+        pills.id = 'bm-pills';
+        pills.className = 'bm-pills';
+        board.appendChild(pills);
 
-        // ── Multiplier tabs ───────────────────────────────────────────────────
+        // Multiplier tabs
         _state.multiplier = 1;
         var tabs = document.createElement('div');
-        tabs.id        = 'bm-tabs';
+        tabs.id = 'bm-tabs';
         tabs.className = 'bm-tabs';
         [
             { label: 'Single', mul: 1, cls: 'active-single' },
@@ -322,15 +333,23 @@ var BERMUDA_GAME = (function () {
             tabs.appendChild(btn);
         });
         document.body.dataset.multiplier = 1;
-        app.appendChild(tabs);
+        board.appendChild(tabs);
 
-        // ── Segment grid ──────────────────────────────────────────────────────
-        var segBoard = document.createElement('main');
-        segBoard.id = 'bm-seg-board';
-        app.appendChild(segBoard);
-        segBoard.appendChild(_buildGrid());
-        segBoard.appendChild(_buildBullRow());
+        // Segment grid + bull row
+        board.appendChild(_buildGrid());
+        board.appendChild(_buildBullRow());
 
+        // Footer hint
+        var footer = document.createElement('footer');
+        footer.className = 'bm-footer';
+        var footerMsg = document.createElement('span');
+        footerMsg.id = 'bm-footer-msg';
+        footer.appendChild(footerMsg);
+        board.appendChild(footer);
+
+        app.appendChild(board);
+
+        _updateStatus();
         _applyHighlights();
     }
 
@@ -353,9 +372,9 @@ var BERMUDA_GAME = (function () {
     function _renderBoard(container) {
         container.innerHTML = '';
         _state.players.forEach(function (p) {
-            var row = document.createElement('div');
-            row.id        = 'bm-row-' + p.id;
-            row.className = 'bm-player-row' +
+            var card = document.createElement('div');
+            card.id        = 'bm-row-' + p.id;
+            card.className = 'bm-player-card' +
                 (String(p.id) === String(_state.currentPlayerId) ? ' bm-active' : '');
 
             var nameEl = document.createElement('div');
@@ -367,24 +386,23 @@ var BERMUDA_GAME = (function () {
             scoreEl.className = 'bm-player-score';
             scoreEl.textContent = p.score;
 
-            // Turn subtotal (shown while entering darts)
             var subEl = document.createElement('div');
             subEl.id        = 'bm-sub-' + p.id;
             subEl.className = 'bm-player-sub';
             subEl.textContent = '';
 
-            row.appendChild(nameEl);
-            row.appendChild(subEl);
-            row.appendChild(scoreEl);
-            container.appendChild(row);
+            card.appendChild(nameEl);
+            card.appendChild(scoreEl);
+            card.appendChild(subEl);
+            container.appendChild(card);
         });
     }
 
     function _updateBoard() {
         _state.players.forEach(function (p) {
-            var row = document.getElementById('bm-row-' + p.id);
-            if (row) {
-                row.className = 'bm-player-row' +
+            var card = document.getElementById('bm-row-' + p.id);
+            if (card) {
+                card.className = 'bm-player-card' +
                     (String(p.id) === String(_state.currentPlayerId) ? ' bm-active' : '');
             }
             var scoreEl = document.getElementById('bm-score-' + p.id);
@@ -410,13 +428,15 @@ var BERMUDA_GAME = (function () {
     }
 
     function _updateStatus() {
-        var el = document.getElementById('bm-status');
-        if (!el) return;
+        var banner = document.getElementById('bm-status');
+        var footer = document.getElementById('bm-footer-msg');
         var p  = _currentPlayer();
         if (!p) return;
         var ri = _roundInfo();
-        el.textContent = 'ROUND ' + _state.currentRound + ' / 13  ·  ' +
-            ri.label.toUpperCase() + '  ·  ' + p.name.toUpperCase();
+        var roundStr = 'ROUND ' + _state.currentRound + ' / 13';
+        var targetStr = ri.label.toUpperCase();
+        if (banner) banner.textContent = p.name.toUpperCase() + '  —  ' + roundStr;
+        if (footer) footer.textContent = 'TARGET: ' + targetStr + '  ·  HIT TO SCORE, MISS TO HALVE';
     }
 
     // ── Segment grid ──────────────────────────────────────────────────────────
@@ -778,6 +798,34 @@ var BERMUDA_GAME = (function () {
     }
 
     // ── End ───────────────────────────────────────────────────────────────────
+
+    function _onRestart() {
+        UI.showConfirmModal({
+            title:        'RESTART MATCH?',
+            message:      'All scores will be reset and the match will restart from Round 1. This cannot be undone.',
+            confirmLabel: 'YES, RESTART',
+            confirmClass: 'confirm-btn-danger',
+            onConfirm:    _doRestart,
+        });
+    }
+
+    function _doRestart() {
+        UI.setLoading(true);
+        API.restartBermudaMatch(_state.matchId)
+            .then(function (state) {
+                _applyState(state);
+                _buildScreen();
+                UI.showToast('MATCH RESTARTED', 'info', 2000);
+                var startDelay = _announceRoundAndPlayer(true);
+                if (_isCpuPlayer(_currentPlayer())) {
+                    setTimeout(_runCpuTurn, startDelay + 400);
+                }
+            })
+            .catch(function (err) {
+                UI.showToast('RESTART FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
+            })
+            .finally(function () { UI.setLoading(false); });
+    }
 
     function _onEnd() {
         UI.showConfirmModal({

@@ -374,3 +374,32 @@ def end_bermuda_match(match_id):
     cursor.execute("UPDATE matches SET status='cancelled' WHERE id=%s", (match_id,))
     db.commit()
     return jsonify({"match_id": match_id, "status": "cancelled"}), 200
+
+
+@bermuda_bp.route("/bermuda/matches/<int:match_id>/restart", methods=["POST"])
+def restart_bermuda_match(match_id):
+    """Reset all player scores to 0 and restart from round 1, player 0."""
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id FROM bermuda_games WHERE match_id = %s", (match_id,))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({"error": "match not found"}), 404
+    game_id = row["id"]
+
+    cursor.execute("DELETE FROM bermuda_throws WHERE game_id = %s", (game_id,))
+    cursor.execute(
+        "UPDATE bermuda_players SET score = 0 WHERE game_id = %s",
+        (game_id,)
+    )
+    cursor.execute(
+        "UPDATE bermuda_games "
+        "SET current_player_index=0, current_round=1, status='active', winner_id=NULL, ended_at=NULL "
+        "WHERE id = %s",
+        (game_id,)
+    )
+    cursor.execute("UPDATE matches SET status='active' WHERE id = %s", (match_id,))
+
+    db.commit()
+    return jsonify(_get_state(db, match_id)), 200
