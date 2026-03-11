@@ -149,26 +149,25 @@ const STATS = (() => {
 
         const { records, scoring, checkout } = data;
 
-        // ── Two-column layout wrapper ──
+        // ── Full-width stats banner (4 columns) ──
+        container.appendChild(_buildStatsBanner(records, scoring, checkout));
+
+        // ── Two-column section: history (left) + heatmap/graph (right) ──
         const cols = document.createElement('div');
         cols.className = 'stats-two-col';
         container.appendChild(cols);
 
-        // ── LEFT column: session history ──
+        // LEFT: session history
         const leftCol = document.createElement('div');
         leftCol.className = 'stats-col stats-col-left';
         cols.appendChild(leftCol);
-
         _renderHistory(data.player.id, leftCol);
 
-        // ── RIGHT column: condensed stats card ──
+        // RIGHT: heatmap + trend graph
         const rightCol = document.createElement('div');
         rightCol.className = 'stats-col stats-col-right';
         cols.appendChild(rightCol);
 
-        rightCol.appendChild(_buildCondensedStats(records, scoring, checkout));
-
-        // ── Heatmap ──
         if (heatmap && heatmap.counts) {
             const hmCard = document.createElement('div');
             hmCard.className = 'stat-card heatmap-card';
@@ -180,10 +179,85 @@ const STATS = (() => {
             rightCol.appendChild(hmCard);
         }
 
-        // ── 30-day average trend ──
         if (trend && trend.days && trend.days.length > 0) {
             rightCol.appendChild(_buildDailyTrendChart(trend.days));
         }
+    }
+
+    function _buildStatsBanner(records, scoring, checkout) {
+        const banner = document.createElement('div');
+        banner.className = 'stats-banner';
+
+        const favDbl = checkout.favourite_double
+            ? checkout.favourite_double.notation + ' (×' + checkout.favourite_double.times + ')'
+            : '—';
+
+        // 4 columns: Record | Scoring A | Scoring B | Checkout
+        const columns = [
+            {
+                title: 'RECORD',
+                rows: [
+                    ['Matches played',  records.matches_played],
+                    ['Matches won',     records.matches_won + ' (' + records.match_win_rate + '%)'],
+                    ['Legs played',     records.legs_played],
+                    ['Legs won',        records.legs_won + ' (' + records.leg_win_rate + '%)'],
+                    ['Sets won',        records.sets_won],
+                ],
+            },
+            {
+                title: 'SCORING',
+                rows: [
+                    ['3-dart avg',      records.three_dart_avg !== undefined ? records.three_dart_avg : scoring.three_dart_avg],
+                    ['First 9 avg',     scoring.first9_avg],
+                    ['Best turn',       scoring.highest_turn],
+                    ['Worst turn',      scoring.lowest_turn],
+                    ['Best dart',       scoring.highest_dart],
+                ],
+            },
+            {
+                title: 'SCORING Ⅱ',
+                rows: [
+                    ['Total darts',     scoring.total_darts],
+                    ['180s',            scoring.one_eighties],
+                    ['140+',            scoring.ton_forties],
+                    ['100+',            scoring.tons],
+                    ['Busts',           scoring.busts],
+                ],
+            },
+            {
+                title: 'CHECKOUT',
+                rows: [
+                    ['Best checkout',   checkout.best_checkout        || '—'],
+                    ['Best D/O',        checkout.best_double_checkout || '—'],
+                    ['Best S/O',        checkout.best_single_checkout || '—'],
+                    ['Avg darts',       checkout.avg_darts_to_checkout || '—'],
+                    ['Fav double',      favDbl],
+                ],
+            },
+        ];
+
+        columns.forEach(function(col) {
+            const card = document.createElement('div');
+            card.className = 'stats-banner-col stat-card';
+
+            const hdr = document.createElement('div');
+            hdr.className = 'stat-card-title';
+            hdr.textContent = col.title;
+            card.appendChild(hdr);
+
+            col.rows.forEach(function(pair) {
+                const row = document.createElement('div');
+                row.className = 'stat-row';
+                row.innerHTML =
+                    '<span class="stat-label">' + _esc(pair[0]) + '</span>' +
+                    '<span class="stat-value">' + _esc(String(pair[1])) + '</span>';
+                card.appendChild(row);
+            });
+
+            banner.appendChild(card);
+        });
+
+        return banner;
     }
 
     function _buildCondensedStats(records, scoring, checkout) {
@@ -448,9 +522,7 @@ const STATS = (() => {
         const svgWrap = document.createElement('div');
         svgWrap.className = 'heatmap-svg-wrap';
         svgWrap.appendChild(svg);
-        inner.appendChild(svgWrap);
-
-        // Right: legend
+        // Left: legend (appended before SVG so it appears on the left)
         const legend = document.createElement('div');
         legend.className = 'heatmap-legend';
 
@@ -495,6 +567,7 @@ const STATS = (() => {
         legend.appendChild(barRow);
 
         inner.appendChild(legend);
+        inner.appendChild(svgWrap);
 
         const wrap = document.createElement('div');
         wrap.className = 'heatmap-wrap';

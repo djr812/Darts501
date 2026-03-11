@@ -113,7 +113,6 @@ var CRICKET_GAME = (function () {
     // ─────────────────────────────────────────────────────────────────
 
     function _buildScreen() {
-        // Clear any lingering modals that might block touch events
         ['confirm-modal', 'rules-modal'].forEach(function(id) {
             var el = document.getElementById(id);
             if (el) el.remove();
@@ -124,12 +123,11 @@ var CRICKET_GAME = (function () {
         app.style.cssText = '';
         document.body.className = 'mode-cricket';
 
-        // ── Header ──
+        // ── Header ────────────────────────────────────────────────────────────
         var header = document.createElement('div');
         header.id = 'cricket-header';
         header.className = 'cricket-header game-header';
 
-        // ── Left: game name + rules ──
         var leftSlot = document.createElement('div');
         leftSlot.className = 'gh-left';
         var titleWrap = document.createElement('div');
@@ -139,7 +137,7 @@ var CRICKET_GAME = (function () {
         titleEl.textContent = 'CRICKET';
         var subEl = document.createElement('div');
         subEl.className = 'gh-match-info';
-        subEl.textContent = _state.players.length + ' PLAYERS';
+        subEl.textContent = _state.players.length + ' PLAYERS · 15–BULL';
         titleWrap.appendChild(titleEl);
         titleWrap.appendChild(subEl);
         leftSlot.appendChild(titleWrap);
@@ -151,7 +149,6 @@ var CRICKET_GAME = (function () {
         leftSlot.appendChild(rulesBtn);
         header.appendChild(leftSlot);
 
-        // ── Centre: End ──
         var centreSlot = document.createElement('div');
         centreSlot.className = 'gh-centre';
         var endBtn = document.createElement('button');
@@ -170,7 +167,6 @@ var CRICKET_GAME = (function () {
         centreSlot.appendChild(restartBtn);
         header.appendChild(centreSlot);
 
-        // ── Right: Undo + Next ──
         var rightSlot = document.createElement('div');
         rightSlot.className = 'gh-right';
         var undoBtn = document.createElement('button');
@@ -190,17 +186,35 @@ var CRICKET_GAME = (function () {
         rightSlot.appendChild(undoBtn);
         rightSlot.appendChild(nextBtn);
         header.appendChild(rightSlot);
-
         app.appendChild(header);
 
-        // ── Scoreboard ──
-        var board = document.createElement('div');
-        board.id = 'cricket-board';
-        board.className = 'cricket-board';
-        app.appendChild(board);
-        _renderBoard(board);
+        // ── Sidebar — scoreboard ──────────────────────────────────────────────
+        var sidebar = document.createElement('aside');
+        sidebar.id = 'cricket-sidebar';
+        sidebar.className = 'cricket-sidebar';
+        _renderBoard(sidebar);
+        app.appendChild(sidebar);
 
-        // ── Multiplier tabs ──
+        // ── Board (right column) ──────────────────────────────────────────────
+        var segBoard = document.createElement('main');
+        segBoard.id = 'cricket-seg-board';
+        segBoard.className = 'cricket-seg-board';
+
+        // Status banner
+        var statusEl = document.createElement('div');
+        statusEl.id = 'cricket-status';
+        statusEl.className = 'cricket-status-banner';
+        _updateStatusBanner(statusEl);
+        segBoard.appendChild(statusEl);
+
+        // Dart pills
+        var pills = document.createElement('div');
+        pills.id = 'cricket-pills';
+        pills.className = 'cricket-pills';
+        segBoard.appendChild(pills);
+
+        // Multiplier tabs
+        _state.multiplier = 1;
         var tabs = document.createElement('div');
         tabs.id = 'cricket-tabs';
         tabs.className = 'cricket-tabs';
@@ -210,7 +224,7 @@ var CRICKET_GAME = (function () {
             { label: 'Treble', mul: 3, cls: 'active-treble' },
         ].forEach(function (t) {
             var btn = document.createElement('button');
-            btn.className = 'tab-btn';
+            btn.className = 'tab-btn' + (t.mul === 1 ? ' active-single' : '');
             btn.dataset.multiplier = t.mul;
             btn.dataset.activeClass = t.cls;
             btn.type = 'button';
@@ -226,40 +240,68 @@ var CRICKET_GAME = (function () {
             });
             tabs.appendChild(btn);
         });
-        tabs.querySelector('[data-multiplier="1"]').classList.add('active-single');
         document.body.dataset.multiplier = 1;
-        app.appendChild(tabs);
+        segBoard.appendChild(tabs);
 
-        // ── Segment entry grid ──
+        // Full segment grid (1–20)
         var grid = document.createElement('div');
         grid.id = 'cricket-seg-grid';
-        grid.className = 'cricket-seg-grid';
+        grid.className = 'segment-grid';
+        for (var seg = 1; seg <= 20; seg++) {
+            (function (s) {
+                var btn = document.createElement('button');
+                btn.className = 'seg-btn';
+                btn.dataset.segment = s;
+                btn.type = 'button';
+                btn.textContent = s;
+                btn.addEventListener('click', function () {
+                    if (_state.turnComplete) return;
+                    _throwDart(s, _state.multiplier);
+                });
+                grid.appendChild(btn);
+            })(seg);
+        }
+        segBoard.appendChild(grid);
 
-        NUMBERS.forEach(function (num) {
-            var btn = document.createElement('button');
-            btn.className = 'cricket-seg-btn';
-            btn.dataset.number = num;
-            btn.type = 'button';
-            btn.textContent = NUMBER_LABELS[num] || num;
-            btn.addEventListener('click', function () {
-                if (_state.turnComplete) return;
-                _throwDart(num);
-            });
-            grid.appendChild(btn);
-        });
-
-        // Miss button
+        // Bull row (MISS / OUTER / BULL)
+        var bullRow = document.createElement('div');
+        bullRow.className = 'bull-row';
         var missBtn = document.createElement('button');
-        missBtn.className = 'cricket-seg-btn cricket-miss-btn';
+        missBtn.className = 'seg-btn bull-btn';
         missBtn.type = 'button';
         missBtn.textContent = 'MISS';
         missBtn.addEventListener('click', function () {
             if (_state.turnComplete) return;
-            _throwDart(0);
+            _throwDart(0, 0);
         });
-        grid.appendChild(missBtn);
+        var outerBtn = document.createElement('button');
+        outerBtn.className = 'seg-btn bull-btn';
+        outerBtn.type = 'button';
+        outerBtn.textContent = 'OUTER';
+        outerBtn.addEventListener('click', function () {
+            if (_state.turnComplete) return;
+            _throwDart(25, 1);
+        });
+        var bullBtn = document.createElement('button');
+        bullBtn.className = 'seg-btn bull-btn bull-btn-inner';
+        bullBtn.type = 'button';
+        bullBtn.textContent = 'BULL';
+        bullBtn.addEventListener('click', function () {
+            if (_state.turnComplete) return;
+            _throwDart(25, 2);
+        });
+        bullRow.appendChild(missBtn);
+        bullRow.appendChild(outerBtn);
+        bullRow.appendChild(bullBtn);
+        segBoard.appendChild(bullRow);
 
-        app.appendChild(grid);
+        // Footer
+        var footer = document.createElement('footer');
+        footer.className = 'cricket-footer';
+        footer.textContent = 'CRICKET NUMBERS: 15 · 16 · 17 · 18 · 19 · 20 · BULL';
+        segBoard.appendChild(footer);
+
+        app.appendChild(segBoard);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -349,12 +391,6 @@ var CRICKET_GAME = (function () {
             container.appendChild(row);
         });
 
-        // Dart pill row (current turn darts)
-        var pillRow = document.createElement('div');
-        pillRow.id = 'cricket-pills';
-        pillRow.className = 'cricket-pills';
-        container.appendChild(pillRow);
-
         _updateRowHighlights();
     }
 
@@ -440,12 +476,13 @@ var CRICKET_GAME = (function () {
     // Throw
     // ─────────────────────────────────────────────────────────────────
 
-    function _throwDart(segment) {
+    function _throwDart(segment, multiplier) {
         if (_state.turnComplete || _state.status !== 'active') return;
 
-        var multiplier = _state.multiplier;
-        // Miss always = 0 multiplier for scoring but we send 1
-        if (segment === 0) multiplier = 1;
+        // If multiplier not supplied (e.g. legacy call), use state
+        if (multiplier === undefined) multiplier = _state.multiplier;
+        // Miss: force multiplier 0 → backend treats as miss
+        if (segment === 0) multiplier = 0;
 
         _lockBoard(true);
 
@@ -459,9 +496,10 @@ var CRICKET_GAME = (function () {
             _applyState(s);
 
             // Re-render entire board from authoritative server state
-            var board = document.getElementById('cricket-board');
+            var board = document.getElementById('cricket-sidebar');
             if (board) _renderBoard(board);
             _addPill(last.segment, last.multiplier, last.marks_added, last.points_scored);
+            _updateStatusBanner();
 
             // Sound
             if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
@@ -540,6 +578,7 @@ var CRICKET_GAME = (function () {
         document.body.dataset.multiplier = 1;
 
         _lockBoard(false);
+        _updateStatusBanner();
         _announcePlayer();
     }
 
@@ -549,7 +588,7 @@ var CRICKET_GAME = (function () {
             .then(function (s) {
                 _applyState(s);
                 // Full re-render of board to reflect undone state
-                var board = document.getElementById('cricket-board');
+                var board = document.getElementById('cricket-sidebar');
                 if (board) _renderBoard(board);
 
                 // Remove last pill
@@ -618,10 +657,20 @@ var CRICKET_GAME = (function () {
     // Board locking
     // ─────────────────────────────────────────────────────────────────
 
+    function _updateStatusBanner(el) {
+        el = el || document.getElementById('cricket-status');
+        if (!el) return;
+        var p = _state.players.find(function (pl) { return String(pl.id) === String(_state.currentPlayerId); });
+        el.textContent = p ? p.name.toUpperCase() + '  —  DART ' + (_state.dartsThisTurn + 1) + ' OF 3' : '';
+    }
+
     function _lockBoard(locked) {
-        document.querySelectorAll('.cricket-seg-btn, .cricket-tabs .tab-btn').forEach(function (btn) {
-            btn.disabled = locked;
-        });
+        var grid = document.getElementById('cricket-seg-grid');
+        if (grid) grid.querySelectorAll('.seg-btn').forEach(function (b) { b.disabled = locked; });
+        var bullRow = document.querySelector('.cricket-seg-board .bull-row');
+        if (bullRow) bullRow.querySelectorAll('.seg-btn').forEach(function (b) { b.disabled = locked; });
+        var tabs = document.getElementById('cricket-tabs');
+        if (tabs) tabs.querySelectorAll('.tab-btn').forEach(function (b) { b.disabled = locked; });
     }
 
     // ─────────────────────────────────────────────────────────────────

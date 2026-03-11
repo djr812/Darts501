@@ -674,7 +674,8 @@ body[data-multiplier="3"] .seg-btn { border-color: #1a5a2a; }
 body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--treble-color); }
 
 /* Bull row at the bottom of the board */
-#bull-row {
+#bull-row,
+.bull-row {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 2fr;
     gap: var(--gap);
@@ -1513,7 +1514,6 @@ body[data-multiplier="3"] .seg-btn:active { background: #0a3a1a; color: var(--tr
     align-items: center;
     padding: 12px 16px;
     border-bottom: 1px solid var(--border);
-    background: var(--bg-surface);
     flex-shrink: 0;
 }
 
@@ -4809,35 +4809,54 @@ body.mode-killer #app {
    CRICKET GAME MODE
    ========================================================= */
 
+/* ═══════════════════════════════════════════════════════════════
+   CRICKET — two-column layout matching 501 / Shanghai / etc.
+   ═══════════════════════════════════════════════════════════════ */
+
 body.mode-cricket {
     overflow: hidden;
     height: 100%;
 }
 
 body.mode-cricket #app {
-    display: -webkit-box;
-    display: flex;
-    -webkit-box-orient: vertical;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 280px 1fr;
+    grid-template-areas:
+        "header  header"
+        "sidebar board";
+    width: 100vw;
     height: 100vh;
-    overflow: hidden;
-    background: var(--bg-surface);
 }
 
 /* ── Header ── */
 .cricket-header {
+    grid-area: header;
     flex-shrink: 0;
 }
 
-/* ── Scoreboard ── */
-.cricket-board {
-    flex: 1;
-    overflow-y: auto;
+/* ── Sidebar (scoreboard) ── */
+#cricket-sidebar {
+    grid-area: sidebar;
     display: -webkit-box;
     display: flex;
     -webkit-box-orient: vertical;
     flex-direction: column;
-    padding: 0;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Scoreboard table */
+.cricket-board {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    -webkit-box-flex: 1;
+    flex: 1;
+    overflow-y: auto;
 }
 
 .cricket-row {
@@ -4862,22 +4881,58 @@ body.mode-cricket #app {
 .cricket-cell {
     display: -webkit-box;
     display: flex;
+    -webkit-box-align: center;
     align-items: center;
+    -webkit-box-pack: center;
     justify-content: center;
-    padding: 10px 6px;
+    padding: 8px 4px;
     border-right: 1px solid var(--border);
 }
 .cricket-cell:last-child { border-right: none; }
 
 .cricket-num-col {
-    width: 52px;
+    width: 56px;
+    -webkit-flex-shrink: 0;
     flex-shrink: 0;
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--text-primary);
     background: var(--bg-raised);
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    gap: 3px;
 }
+
+.cricket-num-label {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.cricket-num-badge {
+    font-family: var(--font-mono);
+    font-size: 0.48rem;
+    letter-spacing: 0.05em;
+    padding: 1px 3px;
+    border-radius: 3px;
+    line-height: 1.4;
+}
+
+.badge-open {
+    background: rgba(240,165,0,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(240,165,0,0.3);
+}
+
+.badge-closed {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+}
+
+.badge-none { background: none; border: none; }
 
 .cricket-player-header {
     -webkit-box-flex: 1;
@@ -4885,7 +4940,7 @@ body.mode-cricket #app {
     -webkit-box-orient: vertical;
     flex-direction: column;
     gap: 2px;
-    padding: 8px 4px;
+    padding: 6px 4px;
     -webkit-transition: background 0.2s;
     transition: background 0.2s;
 }
@@ -4897,15 +4952,17 @@ body.mode-cricket #app {
 
 .cricket-player-name {
     font-family: var(--font-display);
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
+    font-size: 0.65rem;
+    letter-spacing: 0.07em;
     color: var(--text-secondary);
     text-align: center;
 }
 
+.cricket-active-player .cricket-player-name { color: var(--accent); }
+
 .cricket-player-score {
     font-family: var(--font-display);
-    font-size: 1.4rem;
+    font-size: 1.3rem;
     font-weight: 700;
     color: var(--text-primary);
     text-align: center;
@@ -4920,14 +4977,16 @@ body.mode-cricket #app {
 .cricket-marks {
     display: -webkit-box;
     display: flex;
+    -webkit-box-align: center;
     align-items: center;
+    -webkit-box-pack: center;
     justify-content: center;
-    min-width: 32px;
-    min-height: 32px;
+    min-width: 28px;
+    min-height: 28px;
 }
 
 .cricket-mark {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
     line-height: 1;
 }
 
@@ -4935,15 +4994,15 @@ body.mode-cricket #app {
 .cricket-mark-x      { color: var(--text-primary); font-weight: 700; }
 .cricket-mark-closed {
     color: var(--accent);
-    font-size: 1.6rem;
+    font-size: 1.5rem;
     -webkit-animation: closed-pop 0.3s ease-out;
     animation: closed-pop 0.3s ease-out;
 }
 
 @-webkit-keyframes closed-pop {
-    0%   { transform: scale(0.5); opacity: 0; }
-    70%  { transform: scale(1.2); }
-    100% { transform: scale(1);   opacity: 1; }
+    0%   { -webkit-transform: scale(0.5); opacity: 0; }
+    70%  { -webkit-transform: scale(1.2); }
+    100% { -webkit-transform: scale(1);   opacity: 1; }
 }
 @keyframes closed-pop {
     0%   { transform: scale(0.5); opacity: 0; }
@@ -4951,68 +5010,102 @@ body.mode-cricket #app {
     100% { transform: scale(1);   opacity: 1; }
 }
 
+/* ── Board (right column) ── */
+.cricket-seg-board {
+    grid-area: board;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    padding: var(--gap);
+    overflow: hidden;
+    gap: var(--gap);
+}
+
+/* Status banner */
+.cricket-status-banner {
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    padding: 6px 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-align: center;
+}
+
 /* Dart pills */
 .cricket-pills {
     display: -webkit-box;
     display: flex;
     gap: 6px;
-    padding: 8px 12px;
-    min-height: 40px;
+    min-height: 32px;
+    padding: 2px 0;
+    -webkit-box-align: center;
     align-items: center;
-    flex-wrap: wrap;
-    background: var(--bg-surface);
-    border-top: 1px solid var(--border);
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    overflow-x: auto;
 }
 
-/* ── Multiplier tabs ── */
+/* Multiplier tabs */
 .cricket-tabs {
     display: -webkit-box;
     display: flex;
     gap: var(--gap);
-    padding: 8px 12px;
-    background: var(--bg-raised);
-    border-top: 1px solid var(--border);
+    -webkit-flex-shrink: 0;
     flex-shrink: 0;
 }
 
-/* ── Segment grid ── */
-.cricket-seg-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--gap);
-    padding: 10px 12px 16px;
-    background: var(--bg-surface);
-    flex-shrink: 0;
-}
-
-.cricket-seg-btn {
-    padding: 14px 8px;
-    background: var(--bg-raised);
+.cricket-tabs .tab-btn {
+    -webkit-box-flex: 1;
+    flex: 1;
+    height: 44px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    color: var(--text-primary);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
     font-family: var(--font-display);
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    text-align: center;
-    -webkit-transition: background 0.1s, border-color 0.1s;
-    transition: background 0.1s, border-color 0.1s;
-}
-.cricket-seg-btn:active {
-    background: var(--accent-glow);
-    border-color: var(--accent);
-    color: var(--accent);
-}
-.cricket-seg-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-}
-.cricket-miss-btn {
-    color: var(--text-dim);
-    font-size: 0.78rem;
     letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-transition: all 0.1s ease;
+    transition: all 0.1s ease;
+}
+.cricket-tabs .tab-btn:active { -webkit-transform: scale(0.97); transform: scale(0.97); }
+.cricket-tabs .tab-btn.active-single { background: var(--single-color); color: #fff; border-color: var(--single-color); }
+.cricket-tabs .tab-btn.active-double { background: var(--double-color); color: #fff; border-color: var(--double-color); }
+.cricket-tabs .tab-btn.active-treble { background: var(--treble-color); color: #fff; border-color: var(--treble-color); }
+.cricket-tabs .tab-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* Segment grid fills remaining space */
+.cricket-seg-board #cricket-seg-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: var(--gap);
+    -webkit-box-flex: 1;
+    flex: 1;
+}
+
+/* Footer hint */
+.cricket-footer {
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    text-align: center;
+    padding: 4px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+    margin-top: auto;
 }
 
 /* Cricket setup button style */
@@ -5042,6 +5135,7 @@ body.mode-cricket #app {
 .cricket-win-score-row {
     display: -webkit-box;
     display: flex;
+    -webkit-box-pack: justify;
     justify-content: space-between;
     padding: 8px 16px;
     background: var(--bg-raised);
@@ -5056,418 +5150,6 @@ body.mode-cricket #app {
     background: var(--accent-glow);
 }
 
-/* Cricket number column badges */
-.cricket-num-col {
-    flex-direction: column;
-    gap: 3px;
-}
-
-.cricket-num-label {
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.cricket-num-badge {
-    font-family: var(--font-mono);
-    font-size: 0.52rem;
-    letter-spacing: 0.06em;
-    padding: 1px 4px;
-    border-radius: 3px;
-    line-height: 1.4;
-}
-
-.badge-open {
-    background: rgba(240,165,0,0.15);
-    color: var(--accent);
-    border: 1px solid rgba(240,165,0,0.3);
-}
-
-.badge-closed {
-    background: rgba(255,255,255,0.05);
-    color: var(--text-dim);
-    border: 1px solid var(--border);
-    text-decoration: line-through;
-}
-
-.badge-none {
-    visibility: hidden;
-    height: 0;
-    padding: 0;
-}
-
-/* =========================================================
-   STATS TWO-COLUMN LAYOUT
-   ========================================================= */
-
-.stats-two-col {
-    display: -webkit-box;
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-    gap: 0;
-}
-
-.stats-col {
-    display: -webkit-box;
-    display: flex;
-    -webkit-box-orient: vertical;
-    flex-direction: column;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 12px;
-    gap: 10px;
-}
-
-.stats-col-left {
-    -webkit-box-flex: 1;
-    flex: 1;
-    border-right: 1px solid var(--border);
-    min-width: 0;
-}
-
-.stats-col-right {
-    width: 440px;
-    flex-shrink: 0;
-    background: var(--bg-surface);
-    overflow: hidden;           /* no column-level scroll — cards manage themselves */
-    display: -webkit-box;
-    display: flex;
-    -webkit-box-orient: vertical;
-    flex-direction: column;
-    gap: 10px;
-    padding: 12px;
-    -webkit-box-sizing: border-box;
-    box-sizing: border-box;
-}
-
-/* ── Mobile: single scrollable column ── */
-@media (max-width: 1023px) and (orientation: landscape) {
-    .stats-content {
-        overflow: visible;
-        height: auto;
-        flex: none;
-    }
-
-    .stats-two-col {
-        -webkit-box-orient: vertical;
-        -webkit-flex-direction: column;
-        flex-direction: column;
-        overflow: visible;
-        height: auto;
-        flex: none;
-    }
-
-    .stats-col {
-        overflow: visible;
-        height: auto;
-        width: 100% !important;
-        -webkit-box-sizing: border-box;
-        box-sizing: border-box;
-    }
-
-    .stats-col-left {
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-    }
-
-    .stats-col-right {
-        width: 100% !important;
-        -webkit-box-sizing: border-box;
-        box-sizing: border-box;
-    }
-
-    .condensed-stats-card {
-        max-height: none;
-    }
-
-    .condensed-stats-scroll {
-        overflow: visible;
-        height: auto;
-    }
-
-    .heatmap-inner {
-        -webkit-flex-wrap: wrap;
-        flex-wrap: wrap;
-    }
-}
-
-/* ── Condensed stats card ── */
-.condensed-stats-card {
-    padding: 0;
-    overflow: hidden;
-    max-height: 320px;
-    display: -webkit-box;
-    display: flex;
-    -webkit-box-orient: vertical;
-    flex-direction: column;
-}
-
-.condensed-stats-scroll {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    flex: 1;
-}
-
-.condensed-group-title {
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    letter-spacing: 0.22em;
-    color: var(--accent);
-    background: var(--bg-surface);
-    padding: 6px 12px 5px;
-    border-bottom: 1px solid var(--border);
-    border-top: 1px solid var(--border);
-}
-.condensed-stats-card .condensed-group-title:first-child {
-    border-top: none;
-}
-
-.condensed-stats-card .stat-row {
-    padding: 5px 12px;
-    font-size: 0.75rem;
-}
-
-.condensed-stats-card .stat-label {
-    font-size: 0.72rem;
-    color: var(--text-secondary);
-}
-
-.condensed-stats-card .stat-value {
-    font-size: 0.78rem;
-}
-
-.stat-row-highlight .stat-value {
-    color: var(--accent);
-    font-weight: 700;
-    font-size: 0.85rem;
-}
-
-/* history card inside left column — remove extra margin */
-.stats-col-left .history-card {
-    margin: 0;
-}
-
-/* =========================================================
-   STATS HEATMAP CARD
-   ========================================================= */
-
-.heatmap-card {
-    padding: 0;
-    overflow: hidden;
-}
-
-.heatmap-wrap {
-    padding: 4px 8px 8px;
-}
-
-.heatmap-inner {
-    display: -webkit-box;
-    display: flex;
-    gap: 12px;
-    padding: 8px;
-    align-items: flex-start;
-}
-
-.heatmap-svg-wrap {
-    flex-shrink: 0;
-    width: 200px;
-}
-
-.heatmap-legend {
-    -webkit-box-flex: 1;
-    flex: 1;
-    display: -webkit-box;
-    display: flex;
-    -webkit-box-orient: vertical;
-    flex-direction: column;
-    gap: 6px;
-    padding-top: 4px;
-}
-
-.heatmap-legend-title {
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    letter-spacing: 0.14em;
-    color: var(--text-secondary);
-    margin-bottom: 2px;
-}
-
-.heatmap-legend-item {
-    display: -webkit-box;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.heatmap-legend-swatch {
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
-    flex-shrink: 0;
-    border: 1px solid rgba(255,255,255,0.08);
-}
-
-.heatmap-legend-text {
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    color: var(--text-secondary);
-    line-height: 1.3;
-}
-
-.heatmap-legend-text strong {
-    color: var(--text-primary);
-    display: block;
-    font-size: 0.7rem;
-}
-
-.heatmap-gradient-bar-row {
-    display: -webkit-box;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 4px;
-}
-
-.heatmap-gradient-bar {
-    -webkit-box-flex: 1;
-    flex: 1;
-    height: 8px;
-    border-radius: 4px;
-    background: linear-gradient(
-        to right,
-        #0d0d0d 0%,
-        #4a1060 20%,
-        #c0392b 45%,
-        #c8a068 70%,
-        #2ecc71 100%
-    );
-    border: 1px solid var(--border);
-}
-
-.heatmap-gradient-lbl {
-    font-family: var(--font-mono);
-    font-size: 0.56rem;
-    color: var(--text-dim);
-    flex-shrink: 0;
-}
-
-/* =========================================================
-   HOME SCREEN
-   ========================================================= */
-
-.home-screen-inner {
-    justify-content: center;
-    gap: var(--gap-lg);
-}
-
-.home-tiles {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-    width: 100%;
-    max-width: 600px;
-}
-
-.home-tile-centred {
-    grid-column: 2;
-}
-
-.home-tile {
-    display: -webkit-box;
-    display: flex;
-    -webkit-box-orient: vertical;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    padding: 18px 10px;
-    background: var(--bg-raised);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-    -webkit-transition: border-color 0.15s, background 0.15s;
-    transition: border-color 0.15s, background 0.15s;
-    text-align: center;
-}
-
-.home-tile-soon {
-    opacity: 0.45;
-    cursor: default;
-    border-style: dashed;
-}
-
-.home-tile-soon .home-tile-sub {
-    color: var(--text-dim);
-    font-style: italic;
-}
-
-.home-tile:active {
-    border-color: var(--accent);
-    background: var(--accent-glow);
-}
-
-.home-tile-icon {
-    font-size: 1.7rem;
-    line-height: 1;
-}
-
-.home-tile-label {
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    color: var(--text-primary);
-}
-
-.home-tile-sub {
-    font-family: var(--font-mono);
-    font-size: 0.58rem;
-    letter-spacing: 0.08em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-}
-
-.home-stats-btn {
-    max-width: 600px;
-    width: 100%;
-}
-
-/* ── Match setup standard header ── */
-.setup-game-name {
-    font-family: var(--font-display);
-    font-size: 1.6rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--accent);
-    text-align: center;
-    margin-bottom: 6px;
-}
-
-/* ── Back link (bottom of all setup screens) ── */
-.setup-back-link {
-    background: transparent;
-    border: none;
-    color: var(--text-dim);
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    padding: 10px 4px 4px;
-    cursor: pointer;
-    text-align: center;
-    width: 100%;
-    -webkit-transition: color 0.15s;
-    transition: color 0.15s;
-}
-
-.setup-back-link:active {
-    color: var(--accent);
-}
-
-/* =========================================================
-   SHANGHAI GAME SCREEN
-   ========================================================= */
 
 /* ═══════════════════════════════════════════════════════════════
    SHANGHAI — two-column layout matching 501 style
@@ -6033,4 +5715,395 @@ body[data-multiplier="3"] .sh-seg-btn:active { background: #0a3a1a; color: var(-
 
 .rules-close-btn:active {
     background: rgba(167,139,250,0.18);
+}
+
+/* =========================================================
+   HOME SCREEN
+   ========================================================= */
+
+.home-screen-inner {
+    justify-content: center;
+    gap: var(--gap-lg);
+}
+
+.home-tiles {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    width: 100%;
+    max-width: 560px;
+}
+
+/* Practice tile — centred alone on the bottom row */
+.home-tile-centred {
+    grid-column: 2;
+}
+
+.home-tile {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    -webkit-box-align: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 16px;
+    min-height: 80px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    -webkit-transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s;
+    text-align: center;
+}
+
+.home-tile:active {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.home-tile-icon {
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.home-tile-label {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text-primary);
+}
+
+.home-tile-sub {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+.home-stats-btn {
+    max-width: 480px;
+    width: 100%;
+}
+
+/* ── Match setup back button ── */
+.setup-title-row {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-align: center;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 4px;
+}
+
+.setup-back-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    padding: 6px 14px;
+    cursor: pointer;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    line-height: 1;
+    -webkit-transition: border-color 0.15s, color 0.15s;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.setup-back-btn:active {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.setup-back-link {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 10px 20px;
+    cursor: pointer;
+    width: auto;
+    padding-left: 28px;
+    padding-right: 28px;
+    margin-top: 8px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    -webkit-transition: border-color 0.15s, color 0.15s;
+    transition: border-color 0.15s, color 0.15s;
+}
+.setup-back-link:active {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.setup-title-row #setup-title {
+    text-align: left;
+}
+
+/* =========================================================
+   STATS TWO-COLUMN LAYOUT
+   ========================================================= */
+
+/* ── Full-width stats banner ── */
+.stats-banner {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 6px 10px;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.stats-banner-col {
+    min-width: 0;
+}
+
+/* Tighter rows inside the banner */
+.stats-banner-col .stat-card-title {
+    padding: 4px 10px;
+    font-size: 0.58rem;
+}
+
+.stats-banner-col .stat-row {
+    padding: 3px 10px;
+}
+
+.stats-banner-col .stat-label {
+    font-size: 0.65rem;
+}
+
+.stats-banner-col .stat-value {
+    font-size: 0.78rem;
+}
+
+/* ── Two-column scrollable section (history | heatmap+graph) ── */
+.stats-two-col {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-flex: 1;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.stats-col {
+    -webkit-box-flex: 1;
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+.stats-col-left {
+    border-right: 1px solid var(--border);
+}
+
+.stats-col-right {
+}
+
+/* kept for any legacy references */
+.condensed-stats-card { padding: 0; }
+.condensed-stats-scroll { overflow: visible; }
+
+.condensed-group-title {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.22em;
+    color: var(--accent);
+    background: var(--bg-surface);
+    padding: 6px 12px 5px;
+    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+}
+.condensed-stats-card .condensed-group-title:first-child {
+    border-top: none;
+}
+
+.condensed-stats-card .stat-row {
+    padding: 5px 12px;
+}
+
+.condensed-stats-card .stat-label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.condensed-stats-card .stat-value {
+    font-size: 0.78rem;
+}
+
+.stat-row-highlight .stat-value {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+/* history/trend cards inside left column — no extra margin */
+.stats-col-left .history-card,
+.stats-col-left .trend-card {
+    margin: 0;
+}
+
+/* iOS 12 flex gap polyfill for stats columns */
+.stats-col > * + * {
+    margin-top: 12px;
+}
+
+
+/* =========================================================
+   STATS — HEATMAP CARD
+   ========================================================= */
+
+.heatmap-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.heatmap-wrap {
+    padding: 4px 8px 8px;
+}
+
+.heatmap-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 8px;
+    -webkit-box-align: center;
+    align-items: center;
+}
+
+/* Left: legend — centred in its half */
+.heatmap-legend {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    -webkit-box-align: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 4px;
+    width: 100%;
+}
+
+/* Right: SVG board — centred in its half */
+.heatmap-svg-wrap {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-align: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.heatmap-svg-wrap svg {
+    display: block;
+    width: 300px;
+    height: 300px;
+    max-width: 100%;
+}
+
+/* Legend items */
+.heatmap-legend-item {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-align: center;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+}
+
+.heatmap-legend-text {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+
+.heatmap-legend-text strong {
+    display: block;
+    color: var(--text-primary);
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+}
+
+/* Gradient bar */
+.heatmap-gradient-bar-row {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-align: center;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.heatmap-gradient-bar {
+    -webkit-box-flex: 1;
+    flex: 1;
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(to right,
+        #0d0d0d 0%,
+        #4a1060 25%,
+        #c0392b 50%,
+        #c8a068 75%,
+        #2ecc71 100%
+    );
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.heatmap-gradient-lbl {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+}
+
+.heatmap-legend-title {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+
+.heatmap-legend-item {
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-align: center;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--text-secondary);
+}
+
+.heatmap-legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
 }
