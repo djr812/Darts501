@@ -271,7 +271,7 @@ var CRICKET_GAME = (function () {
         for (var seg = 1; seg <= 20; seg++) {
             (function (s) {
                 var btn = document.createElement('button');
-                btn.className = 'seg-btn';
+                btn.className = 'seg-btn' + (s >= 15 ? ' cricket-target' : '');
                 btn.dataset.segment = s;
                 btn.type = 'button';
                 btn.textContent = s;
@@ -296,7 +296,7 @@ var CRICKET_GAME = (function () {
             _throwDart(0, 0);
         });
         var outerBtn = document.createElement('button');
-        outerBtn.className = 'seg-btn bull-btn';
+        outerBtn.className = 'seg-btn bull-btn cricket-target';
         outerBtn.type = 'button';
         outerBtn.textContent = 'OUTER';
         outerBtn.addEventListener('click', function () {
@@ -304,7 +304,7 @@ var CRICKET_GAME = (function () {
             _throwDart(25, 1);
         });
         var bullBtn = document.createElement('button');
-        bullBtn.className = 'seg-btn bull-btn bull-btn-inner';
+        bullBtn.className = 'seg-btn bull-btn bull-btn-inner cricket-target';
         bullBtn.type = 'button';
         bullBtn.textContent = 'BULL';
         bullBtn.addEventListener('click', function () {

@@ -5108,6 +5108,23 @@ body.mode-cricket #app {
     margin-top: auto;
 }
 
+/* Cricket target numbers (15-20, outer bull, bull) — purple highlight */
+.cricket-seg-board .seg-btn.cricket-target {
+    border-color: var(--accent);
+    color: #a78bfa;
+    background: rgba(124, 58, 237, 0.10);
+}
+body[data-multiplier="1"] .cricket-seg-board .seg-btn.cricket-target { border-color: var(--accent); }
+body[data-multiplier="2"] .cricket-seg-board .seg-btn.cricket-target { border-color: var(--accent); }
+body[data-multiplier="3"] .cricket-seg-board .seg-btn.cricket-target { border-color: var(--accent); }
+.cricket-seg-board .seg-btn.cricket-target:active  { background: rgba(124, 58, 237, 0.25); color: #c4b5fd; }
+.cricket-seg-board .bull-btn.cricket-target {
+    border-color: var(--accent);
+    color: #a78bfa;
+    background: rgba(124, 58, 237, 0.10);
+}
+.cricket-seg-board .bull-btn.cricket-target:active { background: rgba(124, 58, 237, 0.25); color: #c4b5fd; }
+
 /* Cricket setup button style */
 .cricket-gametype-btn {
     border-style: dashed !important;
