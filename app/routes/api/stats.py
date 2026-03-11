@@ -84,6 +84,8 @@ def get_player_stats(player_id):
     # ------------------------------------------------------------------
     # 2. Turn-level stats (3-dart average, ton/ton40/180 counts, busts)
     # ------------------------------------------------------------------
+    # The summary turn query (for busts/tons) still uses all game types
+    # via legs — unchanged so milestone/bust counts remain broad.
     cursor.execute("""
         SELECT
             COUNT(*)                                        AS total_turns,
@@ -98,11 +100,75 @@ def get_player_stats(player_id):
     """ + scope_sql,
     [player_id] + scope_params)
     turn_totals = cursor.fetchone()
+    total_darts = int(turn_totals["total_darts"] or 0)   # used in summary response
 
-    # 3-dart average = total_points / (total_darts / 3)
-    total_darts  = int(turn_totals["total_darts"] or 0)
-    total_points = int(turn_totals["total_points_scored"] or 0)
-    three_dart_avg = round((total_points / total_darts) * 3, 2) if total_darts else 0.0
+    # ------------------------------------------------------------------
+    # 3-dart average — restricted to:
+    #   • complete 501/201 games (full 3-dart turns only)
+    #   • complete Race to 1000 games (full 3-dart turns only)
+    #   • Practice – Free Throw sessions (any turn length counts per dart)
+    # ------------------------------------------------------------------
+
+    # Source 1: 501 / 201 — turns with exactly 3 darts from complete matches
+    cursor.execute("""
+        SELECT
+            COALESCE(SUM(t.darts_thrown), 0)           AS darts,
+            COALESCE(SUM(t.score_before - t.score_after), 0) AS pts
+        FROM turns t
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
+        WHERE t.player_id    = %s
+          AND t.darts_thrown  = 3
+          AND t.is_bust        = 0
+          AND t.score_after   IS NOT NULL
+          AND l.game_type     IN ('501', '201')
+          AND m.status         = 'complete'
+          AND m.session_type  != 'practice'
+    """, (player_id,))
+    r01 = cursor.fetchone()
+
+    # Source 2: Race to 1000 — group throws by turn_number, keep only
+    #           complete 3-dart turns from complete matches
+    cursor.execute("""
+        SELECT
+            COALESCE(SUM(turn_darts), 0) AS darts,
+            COALESCE(SUM(turn_pts),   0) AS pts
+        FROM (
+            SELECT
+                rt.turn_number,
+                COUNT(*)        AS turn_darts,
+                SUM(rt.points)  AS turn_pts
+            FROM race1000_throws rt
+            JOIN matches m ON m.id = rt.match_id
+            WHERE rt.player_id = %s
+              AND m.status      = 'complete'
+            GROUP BY rt.match_id, rt.turn_number
+            HAVING COUNT(*) = 3
+        ) complete_turns
+    """, (player_id,))
+    rr1k = cursor.fetchone()
+
+    # Source 3: Practice – Free Throw (all individual dart throws)
+    cursor.execute("""
+        SELECT
+            COALESCE(COUNT(th.id),      0) AS darts,
+            COALESCE(SUM(th.points),    0) AS pts
+        FROM throws th
+        JOIN turns   t  ON t.id  = th.turn_id
+        JOIN legs    l  ON l.id  = t.leg_id
+        JOIN matches m  ON m.id  = l.match_id
+        WHERE t.player_id    = %s
+          AND m.session_type  = 'practice'
+    """, (player_id,))
+    rprac = cursor.fetchone()
+
+    avg_darts  = (int(r01["darts"]   or 0) +
+                  int(rr1k["darts"]  or 0) +
+                  int(rprac["darts"] or 0))
+    avg_pts    = (int(r01["pts"]     or 0) +
+                  int(rr1k["pts"]    or 0) +
+                  int(rprac["pts"]   or 0))
+    three_dart_avg = round((avg_pts / avg_darts) * 3, 2) if avg_darts else 0.0
 
     # Bust count (all turns including bust ones)
     cursor.execute("""
@@ -386,8 +452,11 @@ def get_player_trend(player_id):
     # Exclude practice sessions
     practice_clause = " AND m.session_type != 'practice'"
 
-    # Per-match 3-dart average: sum points / sum darts * 3, grouped by match
-    # Build SQL without % formatting to avoid conflicts with %s placeholders
+    # Per-match 3-dart average restricted to qualifying game types:
+    #   501/201 complete matches  +  Race to 1000 complete matches
+    # Each source is aggregated separately then merged in Python.
+
+    # -- 501 / 201 per-match rows ------------------------------------------
     trend_sql = (
         """
         SELECT
@@ -401,6 +470,8 @@ def get_player_trend(player_id):
         WHERE t.player_id   = %s
           AND t.score_after IS NOT NULL
           AND t.is_bust      = 0
+          AND t.darts_thrown = 3
+          AND l.game_type   IN ('501', '201')
           AND m.status       = 'complete'
           AND m.session_type != 'practice'
         """
@@ -412,16 +483,65 @@ def get_player_trend(player_id):
         + str(limit)
     )
     cursor.execute(trend_sql, [player_id] + scope_params)
+    rows_01 = cursor.fetchall()
 
-    rows = cursor.fetchall()
+    # -- Race to 1000 per-match rows (complete 3-dart turns only) -----------
+    cursor.execute("""
+        SELECT
+            m.id             AS match_id,
+            DATE(m.ended_at) AS match_date,
+            SUM(t.turn_pts)  AS total_points,
+            SUM(t.turn_darts) AS total_darts
+        FROM (
+            SELECT
+                rt.match_id,
+                rt.turn_number,
+                COUNT(*)       AS turn_darts,
+                SUM(rt.points) AS turn_pts
+            FROM race1000_throws rt
+            WHERE rt.player_id = %s
+            GROUP BY rt.match_id, rt.turn_number
+            HAVING COUNT(*) = 3
+        ) t
+        JOIN matches m ON m.id = t.match_id
+        WHERE m.status = 'complete'
+        GROUP BY m.id, m.ended_at
+        ORDER BY m.ended_at DESC
+        LIMIT %s
+    """, (player_id, limit))
+    rows_r1k = cursor.fetchall()
+
+    # Merge: build a dict keyed by match_id, sum darts+points across sources
+    from collections import defaultdict
+    match_map = {}  # match_id -> {match_id, match_date, total_points, total_darts}
+
+    for row in rows_01:
+        mid = row["match_id"]
+        if mid not in match_map:
+            match_map[mid] = {"match_id": mid, "match_date": row["match_date"],
+                              "total_points": 0, "total_darts": 0}
+        match_map[mid]["total_points"] += int(row["total_points"] or 0)
+        match_map[mid]["total_darts"]  += int(row["total_darts"]  or 0)
+
+    for row in rows_r1k:
+        mid = row["match_id"]
+        if mid not in match_map:
+            match_map[mid] = {"match_id": mid, "match_date": row["match_date"],
+                              "total_points": 0, "total_darts": 0}
+        match_map[mid]["total_points"] += int(row["total_points"] or 0)
+        match_map[mid]["total_darts"]  += int(row["total_darts"]  or 0)
+
+    # Sort by date desc, take most recent `limit`, then reverse for chart L->R
+    sorted_rows = sorted(match_map.values(),
+                         key=lambda x: x["match_date"] or "", reverse=True)[:limit]
+    sorted_rows = list(reversed(sorted_rows))
 
     matches = []
-    for row in reversed(rows):   # oldest first for chart L->R
-        darts  = int(row["total_darts"] or 0)
+    for row in sorted_rows:
+        darts  = int(row["total_darts"]  or 0)
         points = int(row["total_points"] or 0)
         avg    = round((points / darts) * 3, 2) if darts else 0.0
 
-        # Fetch opponent names for this match
         cursor.execute("""
             SELECT GROUP_CONCAT(p.name SEPARATOR ', ') AS opponents
             FROM match_players mp
@@ -473,8 +593,12 @@ def get_player_daily_trend(player_id):
     day_darts  = defaultdict(int)
     day_sessions = defaultdict(int)
 
-    # ── 501/201 via turns + legs ──────────────────────────────────────────────
-    # Use turns.created_at so each turn is dated when it was actually played.
+    # Daily trend uses the same qualifying sources as the summary 3-dart avg:
+    #   • 501 / 201 — complete matches, full 3-dart turns only
+    #   • Race to 1000 — complete matches, full 3-dart turns only
+    #   • Practice – Free Throw — all individual dart throws
+
+    # ── 501 / 201 — complete matches, 3-dart turns only ──────────────────────
     cursor.execute("""
         SELECT
             DATE(t.created_at)                  AS day,
@@ -487,6 +611,8 @@ def get_player_daily_trend(player_id):
         WHERE t.player_id    = %s
           AND t.score_after  IS NOT NULL
           AND t.is_bust       = 0
+          AND t.darts_thrown  = 3
+          AND l.game_type    IN ('501', '201')
           AND m.status        = 'complete'
           AND m.session_type != 'practice'
           AND t.created_at   >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
@@ -498,111 +624,37 @@ def get_player_daily_trend(player_id):
         day_darts[d]    += int(r["darts"]    or 0)
         day_sessions[d] += int(r["sessions"] or 0)
 
-    # ── Race to 1000 ──────────────────────────────────────────────────────────
+    # ── Race to 1000 — complete matches, full 3-dart turns only ──────────────
     cursor.execute("""
-        SELECT DATE(rt.created_at) AS day, COUNT(*) AS darts, COALESCE(SUM(rt.points),0) AS pts,
-               COUNT(DISTINCT rt.match_id) AS sessions
-        FROM race1000_throws rt
-        WHERE rt.player_id = %s
-          AND rt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        GROUP BY DATE(rt.created_at)
+        SELECT
+            DATE(t.created_at)  AS day,
+            SUM(t.turn_darts)   AS darts,
+            SUM(t.turn_pts)     AS pts,
+            COUNT(DISTINCT t.match_id) AS sessions
+        FROM (
+            SELECT
+                rt.match_id,
+                rt.turn_number,
+                MIN(rt.created_at)  AS created_at,
+                COUNT(*)            AS turn_darts,
+                SUM(rt.points)      AS turn_pts
+            FROM race1000_throws rt
+            WHERE rt.player_id  = %s
+              AND rt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+            GROUP BY rt.match_id, rt.turn_number
+            HAVING COUNT(*) = 3
+        ) t
+        JOIN matches m ON m.id = t.match_id
+        WHERE m.status = 'complete'
+        GROUP BY DATE(t.created_at)
     """, (player_id,))
     for r in cursor.fetchall():
         d = str(r["day"])
         day_points[d]   += int(r["pts"]   or 0)
         day_darts[d]    += int(r["darts"] or 0)
-        day_sessions[d] += 1
+        day_sessions[d] += int(r["sessions"] or 1)
 
-    # ── Nine Lives ────────────────────────────────────────────────────────────
-    cursor.execute("""
-        SELECT DATE(nt.created_at) AS day, COUNT(*) AS darts
-        FROM nine_lives_throws nt
-        WHERE nt.player_id = %s
-          AND nt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        GROUP BY DATE(nt.created_at)
-    """, (player_id,))
-    for r in cursor.fetchall():
-        d = str(r["day"])
-        # Nine Lives darts don't have meaningful points for a 3-dart avg,
-        # but we count darts so the denominator stays honest — points stay 0
-        day_darts[d]    += int(r["darts"] or 0)
-        day_sessions[d] += 1
-
-    # ── Killer ────────────────────────────────────────────────────────────────
-    cursor.execute("""
-        SELECT DATE(kt.created_at) AS day, COUNT(*) AS darts
-        FROM killer_throws kt
-        WHERE kt.player_id = %s
-          AND kt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        GROUP BY DATE(kt.created_at)
-    """, (player_id,))
-    for r in cursor.fetchall():
-        d = str(r["day"])
-        day_darts[d]    += int(r["darts"] or 0)
-        day_sessions[d] += 1
-
-    # ── Bermuda Triangle ──────────────────────────────────────────────────────
-    cursor.execute("""
-        SELECT DATE(bt.created_at) AS day, COUNT(*) AS darts, COALESCE(SUM(bt.points),0) AS pts
-        FROM bermuda_throws bt
-        WHERE bt.player_id = %s
-          AND bt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        GROUP BY DATE(bt.created_at)
-    """, (player_id,))
-    for r in cursor.fetchall():
-        d = str(r["day"])
-        day_points[d]   += int(r["pts"]   or 0)
-        day_darts[d]    += int(r["darts"] or 0)
-        day_sessions[d] += 1
-
-    # ── Baseball ──────────────────────────────────────────────────────────────
-    cursor.execute("""
-        SELECT DATE(bt.created_at) AS day, COUNT(*) AS darts, COALESCE(SUM(bt.runs),0) AS pts
-        FROM baseball_throws bt
-        WHERE bt.player_id = %s
-          AND bt.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        GROUP BY DATE(bt.created_at)
-    """, (player_id,))
-    for r in cursor.fetchall():
-        d = str(r["day"])
-        day_points[d]   += int(r["pts"]   or 0)
-        day_darts[d]    += int(r["darts"] or 0)
-        day_sessions[d] += 1
-
-    # ── Shanghai ──────────────────────────────────────────────────────────────
-    cursor.execute("""
-        SELECT DATE(st.created_at) AS day,
-               COUNT(*) AS darts, COALESCE(SUM(st.points),0) AS pts
-        FROM shanghai_throws st
-        WHERE st.player_id = %s
-          AND st.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        GROUP BY DATE(st.created_at)
-    """, (player_id,))
-    for r in cursor.fetchall():
-        d = str(r["day"])
-        day_points[d]   += int(r["pts"]   or 0)
-        day_darts[d]    += int(r["darts"] or 0)
-        day_sessions[d] += 1
-
-    # ── Cricket ───────────────────────────────────────────────────────────────
-    cursor.execute("""
-        SELECT DATE(ct.created_at) AS day,
-               COUNT(*) AS darts, COALESCE(SUM(ct.points_scored),0) AS pts
-        FROM cricket_throws ct
-        WHERE ct.player_id = %s
-          AND ct.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        GROUP BY DATE(ct.created_at)
-    """, (player_id,))
-    for r in cursor.fetchall():
-        d = str(r["day"])
-        day_points[d]   += int(r["pts"]   or 0)
-        day_darts[d]    += int(r["darts"] or 0)
-        day_sessions[d] += 1
-
-    # ── Practice (stored in turns/legs/matches with session_type='practice') ──
-    # Use turns.created_at as the date — m.ended_at is unreliable for practice
-    # (historical sessions were backfilled to NOW() and lack real timestamps).
-    # Points from throws.points since turn score_before - score_after = 0 in practice.
+    # ── Practice – Free Throw (all individual dart throws) ───────────────────
     cursor.execute("""
         SELECT
             DATE(t.created_at)         AS day,
@@ -614,8 +666,8 @@ def get_player_daily_trend(player_id):
         JOIN legs    l  ON l.id  = t.leg_id
         JOIN matches m  ON m.id  = l.match_id
         WHERE t.player_id    = %s
-          AND m.session_type = 'practice'
-          AND t.created_at  >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+          AND m.session_type  = 'practice'
+          AND t.created_at   >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
         GROUP BY DATE(t.created_at)
     """, (player_id,))
     for r in cursor.fetchall():

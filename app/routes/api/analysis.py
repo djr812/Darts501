@@ -92,10 +92,14 @@ def get_analysis_metrics(player_id):
             SUM(th.points)     AS total_points,
             AVG(th.points)     AS avg_per_dart
         FROM throws th
-        JOIN turns t ON t.id = th.turn_id
-        JOIN legs  l ON l.id = t.leg_id
+        JOIN turns   t ON t.id  = th.turn_id
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
         WHERE t.player_id = %s
-          AND l.status    = 'complete'
+          AND (
+                (l.game_type IN ('501','201') AND m.status = 'complete' AND m.session_type != 'practice')
+                OR m.session_type = 'practice'
+              )
     """, (player_id,))
     dart_row = cursor.fetchone()
 
@@ -110,11 +114,15 @@ def get_analysis_metrics(player_id):
             AVG(t.score_before - t.score_after) AS avg_turn_score,
             SUM(t.darts_thrown)                AS total_darts
         FROM turns t
-        JOIN legs l ON l.id = t.leg_id
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
         WHERE t.player_id   = %s
           AND t.score_after IS NOT NULL
           AND t.is_bust      = 0
-          AND l.status       = 'complete'
+          AND (
+                (l.game_type IN ('501','201') AND m.status = 'complete' AND m.session_type != 'practice')
+                OR m.session_type = 'practice'
+              )
     """, (player_id,))
     turn_row = cursor.fetchone()
 
@@ -127,11 +135,15 @@ def get_analysis_metrics(player_id):
     cursor.execute("""
         SELECT (t.score_before - t.score_after) AS turn_score
         FROM turns t
-        JOIN legs l ON l.id = t.leg_id
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
         WHERE t.player_id   = %s
           AND t.score_after IS NOT NULL
           AND t.is_bust      = 0
-          AND l.status       = 'complete'
+          AND (
+                (l.game_type IN ('501','201') AND m.status = 'complete' AND m.session_type != 'practice')
+                OR m.session_type = 'practice'
+              )
     """, (player_id,))
     turn_scores  = [r["turn_score"] for r in cursor.fetchall() if r["turn_score"] is not None]
     turn_stddev  = _stddev(turn_scores)
@@ -140,9 +152,14 @@ def get_analysis_metrics(player_id):
     cursor.execute("""
         SELECT th.points
         FROM throws th
-        JOIN turns t ON t.id = th.turn_id
-        JOIN legs  l ON l.id = t.leg_id
-        WHERE t.player_id = %s AND l.status = 'complete'
+        JOIN turns   t ON t.id  = th.turn_id
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
+        WHERE t.player_id = %s
+          AND (
+                (l.game_type IN ('501','201') AND m.status = 'complete' AND m.session_type != 'practice')
+                OR m.session_type = 'practice'
+              )
     """, (player_id,))
     dart_scores = [r["points"] for r in cursor.fetchall()]
     dart_stddev = _stddev(dart_scores)
@@ -156,11 +173,15 @@ def get_analysis_metrics(player_id):
             AVG(th.points) AS avg_points,
             COUNT(*)       AS count
         FROM throws th
-        JOIN turns t ON t.id = th.turn_id
-        JOIN legs  l ON l.id = t.leg_id
+        JOIN turns   t ON t.id  = th.turn_id
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
         WHERE t.player_id = %s
-          AND l.status    = 'complete'
           AND t.is_bust   = 0
+          AND (
+                (l.game_type IN ('501','201') AND m.status = 'complete' AND m.session_type != 'practice')
+                OR m.session_type = 'practice'
+              )
         GROUP BY th.dart_number
         ORDER BY th.dart_number
     """, (player_id,))
@@ -185,11 +206,15 @@ def get_analysis_metrics(player_id):
                 (t.score_before - t.score_after) AS turn_score,
                 ROW_NUMBER() OVER (PARTITION BY t.leg_id ORDER BY t.turn_number) AS rn
             FROM turns t
-            JOIN legs l ON l.id = t.leg_id
+            JOIN legs    l ON l.id  = t.leg_id
+            JOIN matches m ON m.id  = l.match_id
             WHERE t.player_id   = %s
               AND t.score_after IS NOT NULL
               AND t.is_bust      = 0
-              AND l.status       = 'complete'
+              AND (
+                    (l.game_type IN ('501','201') AND m.status = 'complete' AND m.session_type != 'practice')
+                    OR m.session_type = 'practice'
+                  )
         ) ranked
         WHERE rn = 1
     """, (player_id,))
@@ -204,11 +229,15 @@ def get_analysis_metrics(player_id):
                 (t.score_before - t.score_after) AS turn_score,
                 ROW_NUMBER() OVER (PARTITION BY t.leg_id ORDER BY t.turn_number) AS rn
             FROM turns t
-            JOIN legs l ON l.id = t.leg_id
+            JOIN legs    l ON l.id  = t.leg_id
+            JOIN matches m ON m.id  = l.match_id
             WHERE t.player_id   = %s
               AND t.score_after IS NOT NULL
               AND t.is_bust      = 0
-              AND l.status       = 'complete'
+              AND (
+                    (l.game_type IN ('501','201') AND m.status = 'complete' AND m.session_type != 'practice')
+                    OR m.session_type = 'practice'
+                  )
         ) ranked
         WHERE rn > 1
     """, (player_id,))
@@ -225,10 +254,14 @@ def get_analysis_metrics(player_id):
             COUNT(*)       AS hit_count,
             SUM(th.points) AS total_pts
         FROM throws th
-        JOIN turns t ON t.id = th.turn_id
-        JOIN legs  l ON l.id = t.leg_id
+        JOIN turns   t ON t.id  = th.turn_id
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
         WHERE t.player_id = %s
-          AND l.status    = 'complete'
+          AND (
+                (l.game_type IN ('501','201') AND m.status = 'complete' AND m.session_type != 'practice')
+                OR m.session_type = 'practice'
+              )
         GROUP BY th.segment, th.multiplier
         ORDER BY hit_count DESC
     """, (player_id,))
@@ -285,11 +318,15 @@ def get_analysis_metrics(player_id):
             COUNT(*) AS total_double_attempts,
             SUM(CASE WHEN th.points > 0 THEN 1 ELSE 0 END) AS doubles_hit
         FROM throws th
-        JOIN turns t ON t.id = th.turn_id
-        JOIN legs  l ON l.id = t.leg_id
+        JOIN turns   t ON t.id  = th.turn_id
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
         WHERE t.player_id  = %s
           AND th.multiplier = 2
-          AND l.status      = 'complete'
+          AND (
+                (l.game_type IN ('501','201') AND m.status = 'complete' AND m.session_type != 'practice')
+                OR m.session_type = 'practice'
+              )
     """, (player_id,))
     dbl_row = cursor.fetchone()
     double_attempts = int(dbl_row["total_double_attempts"] or 0)
@@ -300,17 +337,25 @@ def get_analysis_metrics(player_id):
     cursor.execute("""
         SELECT COUNT(DISTINCT t.leg_id) AS attempts
         FROM turns t
-        JOIN legs l ON l.id = t.leg_id
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
         WHERE t.player_id   = %s
           AND t.score_before <= 170
           AND t.score_before >= 2
-          AND l.status       = 'complete'
+          AND l.game_type   IN ('501','201')
+          AND m.status       = 'complete'
+          AND m.session_type != 'practice'
     """, (player_id,))
     co_att_row = cursor.fetchone()
 
     cursor.execute("""
         SELECT COUNT(*) AS legs_won
-        FROM legs WHERE winner_id = %s AND status = 'complete'
+        FROM legs    l
+        JOIN matches m ON m.id = l.match_id
+        WHERE l.winner_id   = %s
+          AND l.status      = 'complete'
+          AND l.game_type  IN ('501','201')
+          AND m.session_type != 'practice'
     """, (player_id,))
     legs_won_row = cursor.fetchone()
 
@@ -328,8 +373,12 @@ def get_analysis_metrics(player_id):
                       AND t.is_checkout = 1 THEN 1 ELSE 0 END) AS won_2_40,
             SUM(CASE WHEN t.score_before BETWEEN 2  AND 40  THEN 1 ELSE 0 END) AS att_2_40
         FROM turns t
-        JOIN legs l ON l.id = t.leg_id
-        WHERE t.player_id = %s AND l.status = 'complete'
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
+        WHERE t.player_id      = %s
+          AND l.game_type     IN ('501','201')
+          AND m.status         = 'complete'
+          AND m.session_type  != 'practice'
     """, (player_id,))
     co_range = cursor.fetchone()
     checkout_by_range = {
@@ -353,10 +402,13 @@ def get_analysis_metrics(player_id):
             COUNT(*)               AS total_busts,
             AVG(t.score_before)    AS avg_score_before_bust
         FROM turns t
-        JOIN legs l ON l.id = t.leg_id
-        WHERE t.player_id = %s
-          AND t.is_bust   = 1
-          AND l.status    = 'complete'
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
+        WHERE t.player_id      = %s
+          AND t.is_bust         = 1
+          AND l.game_type      IN ('501','201')
+          AND m.status          = 'complete'
+          AND m.session_type   != 'practice'
     """, (player_id,))
     bust_row = cursor.fetchone()
     total_busts         = int(bust_row["total_busts"] or 0)
@@ -372,12 +424,15 @@ def get_analysis_metrics(player_id):
             COUNT(DISTINCT l.id)   AS legs_played,
             SUM(CASE WHEN l.winner_id = %s THEN 1 ELSE 0 END) AS legs_won,
             AVG(t.score_before - t.score_after) AS avg_turn
-        FROM legs l
-        JOIN turns t ON t.leg_id = l.id
-        WHERE t.player_id = %s
-          AND t.score_after IS NOT NULL
-          AND t.is_bust    = 0
-          AND l.status     = 'complete'
+        FROM legs    l
+        JOIN turns   t ON t.leg_id = l.id
+        JOIN matches m ON m.id     = l.match_id
+        WHERE t.player_id      = %s
+          AND t.score_after   IS NOT NULL
+          AND t.is_bust        = 0
+          AND l.game_type     IN ('501','201')
+          AND m.status         = 'complete'
+          AND m.session_type  != 'practice'
         GROUP BY l.game_type
     """, (player_id, player_id))
     game_type_rows = cursor.fetchall()
@@ -404,11 +459,15 @@ def get_analysis_metrics(player_id):
             SUM(CASE WHEN (t.score_before - t.score_after) >= 100
                       AND (t.score_before - t.score_after) < 140 THEN 1 ELSE 0 END) AS s100
         FROM turns t
-        JOIN legs l ON l.id = t.leg_id
+        JOIN legs    l ON l.id  = t.leg_id
+        JOIN matches m ON m.id  = l.match_id
         WHERE t.player_id   = %s
           AND t.score_after IS NOT NULL
           AND t.is_bust      = 0
-          AND l.status       = 'complete'
+          AND (
+                (l.game_type IN ('501','201') AND m.status = 'complete' AND m.session_type != 'practice')
+                OR m.session_type = 'practice'
+              )
     """, (player_id,))
     ms = cursor.fetchone()
 
@@ -419,11 +478,14 @@ def get_analysis_metrics(player_id):
         SELECT AVG(dart_count) AS avg_darts_leg
         FROM (
             SELECT l.id, SUM(t.darts_thrown) AS dart_count
-            FROM legs l
-            JOIN turns t ON t.leg_id = l.id
-            WHERE l.winner_id  = %s
-              AND l.status     = 'complete'
-              AND t.player_id  = %s
+            FROM legs    l
+            JOIN turns   t ON t.leg_id = l.id
+            JOIN matches m ON m.id     = l.match_id
+            WHERE l.winner_id      = %s
+              AND l.status         = 'complete'
+              AND t.player_id      = %s
+              AND l.game_type     IN ('501','201')
+              AND m.session_type  != 'practice'
             GROUP BY l.id
         ) per_leg
     """, (player_id, player_id))
