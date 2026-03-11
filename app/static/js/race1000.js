@@ -12,6 +12,10 @@
 var RACE1000_GAME = (function () {
 
     var WIN_TARGET = 1000;
+    var _R1K_RING_R    = 54;
+    var _R1K_RING_CX   = 64;
+    var _R1K_RING_CY   = 64;
+    var _R1K_RING_CIRC = +(2 * Math.PI * 54).toFixed(4);
 
     // ── State ─────────────────────────────────────────────────────────────────
     var _state = {
@@ -209,7 +213,14 @@ var RACE1000_GAME = (function () {
         endBtn.type = 'button';
         endBtn.textContent = '✕ END';
         endBtn.addEventListener('click', _onEnd);
+        var restartBtn = document.createElement('button');
+        restartBtn.id = 'r1k-restart-btn';
+        restartBtn.className = 'gh-btn gh-btn-red';
+        restartBtn.type = 'button';
+        restartBtn.textContent = '↺ RESTART';
+        restartBtn.addEventListener('click', _onRestart);
         centreSlot.appendChild(endBtn);
+        centreSlot.appendChild(restartBtn);
         header.appendChild(centreSlot);
 
         var rightSlot = document.createElement('div');
@@ -233,37 +244,34 @@ var RACE1000_GAME = (function () {
         header.appendChild(rightSlot);
         app.appendChild(header);
 
-        // ── Progress bar ──────────────────────────────────────────────────────
-        var progressWrap = document.createElement('div');
-        progressWrap.id        = 'r1k-progress-wrap';
-        progressWrap.className = 'r1k-progress-wrap';
-        app.appendChild(progressWrap);
-        _renderProgressBars(progressWrap);
+        // ── Sidebar — player cards with SVG rings ─────────────────────────────
+        var sidebar = document.createElement('aside');
+        sidebar.id = 'r1k-sidebar';
+        sidebar.className = 'r1k-sidebar';
+        _renderCards(sidebar);
+        app.appendChild(sidebar);
 
-        // ── Scoreboard ────────────────────────────────────────────────────────
-        var board = document.createElement('div');
-        board.id        = 'r1k-board';
-        board.className = 'r1k-board';
-        app.appendChild(board);
-        _renderBoard(board);
+        // ── Board (right column) ──────────────────────────────────────────────
+        var board = document.createElement('main');
+        board.id = 'r1k-seg-board';
+        board.className = 'r1k-seg-board';
 
-        // ── Status bar ────────────────────────────────────────────────────────
+        // Status banner
         var statusEl = document.createElement('div');
-        statusEl.id        = 'r1k-status';
-        statusEl.className = 'r1k-status';
-        app.appendChild(statusEl);
-        _updateStatus();
+        statusEl.id = 'r1k-status';
+        statusEl.className = 'r1k-status-banner';
+        board.appendChild(statusEl);
 
-        // ── Dart pills ────────────────────────────────────────────────────────
+        // Dart pills
         var pills = document.createElement('div');
-        pills.id        = 'r1k-pills';
-        pills.className = 'practice-pills';
-        app.appendChild(pills);
+        pills.id = 'r1k-pills';
+        pills.className = 'r1k-pills';
+        board.appendChild(pills);
 
-        // ── Multiplier tabs ───────────────────────────────────────────────────
+        // Multiplier tabs
         _state.multiplier = 1;
         var tabs = document.createElement('div');
-        tabs.id        = 'r1k-tabs';
+        tabs.id = 'r1k-tabs';
         tabs.className = 'r1k-tabs';
         [
             { label: 'Single', mul: 1, cls: 'active-single' },
@@ -287,137 +295,147 @@ var RACE1000_GAME = (function () {
             tabs.appendChild(btn);
         });
         document.body.dataset.multiplier = 1;
-        app.appendChild(tabs);
+        board.appendChild(tabs);
 
-        // ── Segment grid ──────────────────────────────────────────────────────
-        var segBoard = document.createElement('main');
-        segBoard.id = 'r1k-seg-board';
-        app.appendChild(segBoard);
-        segBoard.appendChild(_buildGrid());
-        segBoard.appendChild(_buildBullRow());
+        // Segment grid + bull row
+        board.appendChild(_buildGrid());
+        board.appendChild(_buildBullRow());
 
+        // Footer hint
+        var footer = document.createElement('footer');
+        footer.className = 'r1k-footer';
+        var footerMsg = document.createElement('span');
+        footerMsg.id = 'r1k-footer-msg';
+        footer.appendChild(footerMsg);
+        board.appendChild(footer);
+
+        app.appendChild(board);
+
+        _updateStatus();
         _applyHighlights();
     }
 
     // ── Progress bars ─────────────────────────────────────────────────────────
 
+    // ── Leader detection ─────────────────────────────────────────────────────
+
     function _leaderId() {
-        // Returns the id of the sole leader, or null if two or more players are tied for the lead
         var maxScore = -1;
         var leader   = null;
         var tied     = false;
         _state.players.forEach(function (p) {
-            if (p.score > maxScore) {
-                maxScore = p.score;
-                leader   = p.id;
-                tied     = false;
-            } else if (p.score === maxScore) {
-                tied = true;
-            }
+            if (p.score > maxScore) { maxScore = p.score; leader = p.id; tied = false; }
+            else if (p.score === maxScore) { tied = true; }
         });
         return (maxScore === 0 || tied) ? null : leader;
     }
 
-    function _fillClass(playerId) {
-        var lid    = _leaderId();
-        var isActive  = String(playerId) === String(_state.currentPlayerId);
-        var isLeader  = lid !== null && String(playerId) === String(lid);
-        return 'r1k-progress-fill' +
-               (isLeader  ? ' r1k-fill-leader'   : ' r1k-fill-trailing') +
-               (isActive  ? ' r1k-fill-active'   : '');
+    // Returns 'leader' or 'trailing' — drives ring colour
+    function _ringRole(playerId) {
+        var lid = _leaderId();
+        return (lid !== null && String(playerId) === String(lid)) ? 'leader' : 'trailing';
     }
 
-    function _renderProgressBars(container) {
+    // ── SVG ring helpers ──────────────────────────────────────────────────────
+
+    function _renderCards(container) {
         container.innerHTML = '';
+        var ns = 'http://www.w3.org/2000/svg';
         _state.players.forEach(function (p) {
-            var row = document.createElement('div');
-            row.className = 'r1k-progress-row';
+            var isActive = String(p.id) === String(_state.currentPlayerId);
+            var role     = _ringRole(p.id);
 
-            var label = document.createElement('span');
-            label.className   = 'r1k-progress-label';
-            label.textContent = p.name.toUpperCase();
+            var card = document.createElement('div');
+            card.id        = 'r1k-card-' + p.id;
+            card.className = 'r1k-player-card' + (isActive ? ' r1k-active' : '') + ' r1k-ring-' + role;
 
-            var track = document.createElement('div');
-            track.className = 'r1k-progress-track';
-            var fill = document.createElement('div');
-            fill.id        = 'r1k-fill-' + p.id;
-            fill.className = _fillClass(p.id);
-            var pct = Math.min(100, Math.round((p.score / WIN_TARGET) * 100));
-            fill.style.width = pct + '%';
-            track.appendChild(fill);
-
-            var scoreSpan = document.createElement('span');
-            scoreSpan.id        = 'r1k-pscore-' + p.id;
-            scoreSpan.className = 'r1k-progress-score';
-            scoreSpan.textContent = p.score;
-
-            row.appendChild(label);
-            row.appendChild(track);
-            row.appendChild(scoreSpan);
-            container.appendChild(row);
-        });
-    }
-
-    function _updateProgressBars() {
-        _state.players.forEach(function (p) {
-            var fill = document.getElementById('r1k-fill-' + p.id);
-            if (fill) {
-                var pct = Math.min(100, Math.round((p.score / WIN_TARGET) * 100));
-                fill.style.width = pct + '%';
-                fill.className = _fillClass(p.id);
-            }
-            var scoreEl = document.getElementById('r1k-pscore-' + p.id);
-            if (scoreEl) scoreEl.textContent = p.score;
-        });
-    }
-
-    // ── Scoreboard ────────────────────────────────────────────────────────────
-
-    function _renderBoard(container) {
-        container.innerHTML = '';
-        _state.players.forEach(function (p) {
-            var row = document.createElement('div');
-            row.id        = 'r1k-row-' + p.id;
-            row.className = 'r1k-player-row' +
-                (String(p.id) === String(_state.currentPlayerId) ? ' r1k-active' : '');
-
+            // Name
             var nameEl = document.createElement('div');
-            nameEl.className   = 'r1k-player-name';
+            nameEl.className = 'r1k-player-name';
             nameEl.textContent = p.name.toUpperCase();
+            card.appendChild(nameEl);
 
+            // SVG progress ring
+            var svg = document.createElementNS(ns, 'svg');
+            svg.setAttribute('viewBox', '0 0 128 128');
+            svg.setAttribute('class', 'r1k-ring-svg');
+            svg.id = 'r1k-ring-' + p.id;
+
+            var track = document.createElementNS(ns, 'circle');
+            track.setAttribute('cx', _R1K_RING_CX);
+            track.setAttribute('cy', _R1K_RING_CY);
+            track.setAttribute('r',  _R1K_RING_R);
+            track.setAttribute('class', 'r1k-ring-track');
+            svg.appendChild(track);
+
+            var arc = document.createElementNS(ns, 'circle');
+            arc.setAttribute('cx', _R1K_RING_CX);
+            arc.setAttribute('cy', _R1K_RING_CY);
+            arc.setAttribute('r',  _R1K_RING_R);
+            arc.setAttribute('class', 'r1k-ring-arc');
+            arc.setAttribute('stroke-dasharray',  _R1K_RING_CIRC);
+            // Start at 0 progress (empty arc), fill as score rises toward 1000
+            var initFraction = Math.min(1, p.score / WIN_TARGET);
+            var initOffset   = +(_R1K_RING_CIRC * (1 - initFraction)).toFixed(4);
+            arc.setAttribute('stroke-dashoffset', initOffset);
+            arc.id = 'r1k-arc-' + p.id;
+            svg.appendChild(arc);
+
+            // Score text inside ring
+            var text = document.createElementNS(ns, 'text');
+            text.setAttribute('x', _R1K_RING_CX);
+            text.setAttribute('y', _R1K_RING_CY);
+            text.setAttribute('dy', '0.32em');
+            text.setAttribute('transform', 'rotate(90 ' + _R1K_RING_CX + ' ' + _R1K_RING_CY + ')');
+            text.setAttribute('class', 'r1k-ring-text');
+            text.id = 'r1k-score-' + p.id;
+            text.textContent = p.score;
+            svg.appendChild(text);
+
+            card.appendChild(svg);
+
+            // Turn sub ("+X" delta shown during active turn)
             var subEl = document.createElement('div');
             subEl.id        = 'r1k-sub-' + p.id;
             subEl.className = 'r1k-player-sub';
-            subEl.textContent = '';
+            card.appendChild(subEl);
 
+            // "Needs N" hint
             var needEl = document.createElement('div');
             needEl.id        = 'r1k-need-' + p.id;
             needEl.className = 'r1k-player-need';
             var need = Math.max(0, WIN_TARGET - p.score);
             needEl.textContent = need > 0 ? 'NEEDS ' + need : 'DONE!';
+            card.appendChild(needEl);
 
-            var scoreEl = document.createElement('div');
-            scoreEl.id        = 'r1k-score-' + p.id;
-            scoreEl.className = 'r1k-player-score';
-            scoreEl.textContent = p.score;
-
-            row.appendChild(nameEl);
-            row.appendChild(subEl);
-            row.appendChild(needEl);
-            row.appendChild(scoreEl);
-            container.appendChild(row);
+            container.appendChild(card);
         });
     }
 
-    function _updateBoard() {
+    function _updateCards() {
         _state.players.forEach(function (p) {
-            var row = document.getElementById('r1k-row-' + p.id);
-            if (row) {
-                row.className = 'r1k-player-row' +
-                    (String(p.id) === String(_state.currentPlayerId) ? ' r1k-active' : '');
+            var isActive = String(p.id) === String(_state.currentPlayerId);
+            var role     = _ringRole(p.id);
+
+            // Card classes
+            var card = document.getElementById('r1k-card-' + p.id);
+            if (card) {
+                card.className = 'r1k-player-card' + (isActive ? ' r1k-active' : '') + ' r1k-ring-' + role;
             }
+
+            // Arc offset (counts up: more score = less offset = more arc)
+            var arc = document.getElementById('r1k-arc-' + p.id);
+            if (arc) {
+                var fraction = Math.min(1, p.score / WIN_TARGET);
+                var offset   = +(_R1K_RING_CIRC * (1 - fraction)).toFixed(4);
+                arc.setAttribute('stroke-dashoffset', offset);
+            }
+
+            // Score text
             var scoreEl = document.getElementById('r1k-score-' + p.id);
             if (scoreEl) scoreEl.textContent = p.score;
+
+            // Needs hint
             var needEl = document.getElementById('r1k-need-' + p.id);
             if (needEl) {
                 var need = Math.max(0, WIN_TARGET - p.score);
@@ -425,6 +443,9 @@ var RACE1000_GAME = (function () {
             }
         });
     }
+
+    // Keep _updateBoard as alias so _onNext call still works
+    function _updateBoard() { _updateCards(); }
 
     function _updateTurnSub() {
         var tot = _turnTotal();
@@ -442,12 +463,14 @@ var RACE1000_GAME = (function () {
     }
 
     function _updateStatus() {
-        var el = document.getElementById('r1k-status');
-        if (!el) return;
+        var banner = document.getElementById('r1k-status');
+        var footer = document.getElementById('r1k-footer-msg');
         var p = _currentPlayer();
         if (!p) return;
-        el.textContent = p.name.toUpperCase() + '  ·  ' +
-            (_state.variant === 'twenties' ? 'TARGET: 20s ONLY' : 'ALL NUMBERS');
+        var varStr = _state.variant === 'twenties' ? '20s ONLY' : 'ALL NUMBERS';
+        var need   = Math.max(0, WIN_TARGET - p.score);
+        if (banner) banner.textContent = p.name.toUpperCase() + '  —  ' + varStr;
+        if (footer) footer.textContent = need > 0 ? 'NEEDS ' + need + ' MORE TO WIN' : 'TARGET REACHED!';
     }
 
     // ── Segment grid ──────────────────────────────────────────────────────────
@@ -568,7 +591,7 @@ var RACE1000_GAME = (function () {
                 }
 
                 _updateBoard();
-                _updateProgressBars();
+                _updateCards();
                 _updateStatus();
 
                 var winnerEv   = events.find(function (e) { return e.type === 'winner'; });
@@ -795,6 +818,34 @@ var RACE1000_GAME = (function () {
     }
 
     // ── End ───────────────────────────────────────────────────────────────────
+
+    function _onRestart() {
+        UI.showConfirmModal({
+            title:        'RESTART MATCH?',
+            message:      'All scores will be reset to zero. This cannot be undone.',
+            confirmLabel: 'YES, RESTART',
+            confirmClass: 'confirm-btn-danger',
+            onConfirm:    _doRestart,
+        });
+    }
+
+    function _doRestart() {
+        UI.setLoading(true);
+        API.restartRace1000Match(_state.matchId)
+            .then(function (state) {
+                _applyState(state);
+                _buildScreen();
+                UI.showToast('MATCH RESTARTED', 'info', 2000);
+                var startDelay = _announceCurrentPlayer(true);
+                if (_isCpuPlayer(_currentPlayer())) {
+                    setTimeout(_runCpuTurn, startDelay + 400);
+                }
+            })
+            .catch(function (err) {
+                UI.showToast('RESTART FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
+            })
+            .finally(function () { UI.setLoading(false); });
+    }
 
     function _onEnd() {
         UI.showConfirmModal({

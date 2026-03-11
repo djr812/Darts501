@@ -304,3 +304,32 @@ def end_race1000_match(match_id):
     cursor.execute("UPDATE matches SET status='cancelled' WHERE id=%s", (match_id,))
     db.commit()
     return jsonify({"match_id": match_id, "status": "cancelled"}), 200
+
+
+@race1000_bp.route("/race1000/matches/<int:match_id>/restart", methods=["POST"])
+def restart_race1000_match(match_id):
+    """Reset all player scores to 0 and restart from player 0."""
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id FROM race1000_games WHERE match_id = %s", (match_id,))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({"error": "match not found"}), 404
+    game_id = row["id"]
+
+    cursor.execute("DELETE FROM race1000_throws WHERE game_id = %s", (game_id,))
+    cursor.execute(
+        "UPDATE race1000_players SET score = 0 WHERE game_id = %s",
+        (game_id,)
+    )
+    cursor.execute(
+        "UPDATE race1000_games "
+        "SET current_player_index=0, status='active', winner_id=NULL, ended_at=NULL "
+        "WHERE id = %s",
+        (game_id,)
+    )
+    cursor.execute("UPDATE matches SET status='active' WHERE id = %s", (match_id,))
+
+    db.commit()
+    return jsonify(_get_state(db, match_id)), 200
