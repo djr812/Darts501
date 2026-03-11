@@ -272,6 +272,12 @@ var SPEECH = (function() {
      * Announce whose turn it is to throw.
      * @param {string} playerName
      */
+    function announceWelcome(gameType) {
+        if (!_enabled) return;
+        var spoken = gameType === '501' ? 'Five-oh-one' : gameType === '201' ? 'Two-oh-one' : gameType;
+        _speak('Welcome to ' + spoken + ' darts.', false);
+    }
+
     function announcePlayer(playerName) {
         if (!_enabled) return;
         _speak(playerName + "'s turn to throw", false);
@@ -380,6 +386,7 @@ var SPEECH = (function() {
         setEnabled:        setEnabled,
         unlock:            unlock,
         announceDartScore: announceDartScore,
+        announceWelcome:   announceWelcome,
         announcePlayer:    announcePlayer,
         announceShanghai:  announceShanghai,
         announceTurnEnd:   announceTurnEnd,

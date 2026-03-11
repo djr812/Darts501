@@ -109,6 +109,7 @@
         state.doubleOut     = config.doubleOut;
         state.setsToWin     = config.setsToWin;
         state.legsPerSet    = config.legsPerSet;
+        state.legCount      = 0;   // reset so welcome fires on first leg of every new match
 
         try {
             const players = await resolvePlayers(config.players);
@@ -179,6 +180,10 @@
         UI.setNextPlayerEnabled(false);
         UI.setUndoEnabled(true);
         _updateMatchInfo();
+        // Announce welcome on the very first leg of the match only
+        if (state.legCount === 1) {
+            SPEECH.announceWelcome(state.gameType);
+        }
         _beginTurn();
     }
 
