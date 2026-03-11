@@ -341,9 +341,10 @@ var NINE_LIVES_GAME = (function () {
             var pip = document.createElement('span');
             if (i < lives) {
                 pip.className = 'nl-life-pip nl-life-pip-on';
+                pip.textContent = '\u{1F408}';  // 🐈 cat
             } else {
                 pip.className = 'nl-life-pip';
-                pip.textContent = 'X';
+                pip.textContent = '\u26B0';     // ⚰ coffin
             }
             container.appendChild(pip);
         }

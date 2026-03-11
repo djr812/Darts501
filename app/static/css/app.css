@@ -2923,42 +2923,26 @@ body.mode-nine-lives #app {
 .nl-lives {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
+    gap: 3px;
     -webkit-box-pack: center;
     justify-content: center;
 }
 
 .nl-life-pip {
-    width: 100%;
-    padding-bottom: 100%;
-    position: relative;
-    border-radius: 50%;
-    border: 2px solid #27ae60;
-    background: #27ae60;
+    font-size: 2rem;
+    line-height: 1.1;
+    text-align: center;
+    display: block;
     -webkit-flex-shrink: 0;
     flex-shrink: 0;
 }
 
 .nl-life-pip-on {
-    /* green filled = life remaining */
+    /* cat emoji — no extra styling needed */
 }
 
 .nl-life-pip:not(.nl-life-pip-on) {
-    background: transparent;
-    border-color: #e74c3c;
-}
-
-.nl-life-pip:not(.nl-life-pip-on)::after {
-    content: 'X';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    -webkit-transform: translate(-50%, -50%);
-    transform: translate(-50%, -50%);
-    font-size: 9px;
-    font-weight: 700;
-    color: #e74c3c;
-    line-height: 1;
+    opacity: 0.55;
 }
 
 /* ── Board (right column) ── */
