@@ -198,7 +198,14 @@ var NINE_LIVES_GAME = (function () {
         endBtn.type = 'button';
         endBtn.textContent = '✕ END';
         endBtn.addEventListener('click', _onEnd);
+        var restartBtn = document.createElement('button');
+        restartBtn.id = 'nl-restart-btn';
+        restartBtn.className = 'gh-btn gh-btn-red';
+        restartBtn.type = 'button';
+        restartBtn.textContent = '↺ RESTART';
+        restartBtn.addEventListener('click', _onRestart);
         centreSlot.appendChild(endBtn);
+        centreSlot.appendChild(restartBtn);
         header.appendChild(centreSlot);
 
         var rightSlot = document.createElement('div');
@@ -222,27 +229,31 @@ var NINE_LIVES_GAME = (function () {
         header.appendChild(rightSlot);
         app.appendChild(header);
 
-        // ── Scoreboard ────────────────────────────────────────────────────────
-        var board = document.createElement('div');
-        board.id = 'nl-board';
-        board.className = 'nl-board';
-        app.appendChild(board);
-        _renderBoard(board);
+        // ── Sidebar (left column) — player cards ──────────────────────────────
+        var sidebar = document.createElement('aside');
+        sidebar.id = 'nl-sidebar';
+        sidebar.className = 'nl-sidebar';
+        _renderBoard(sidebar);
+        app.appendChild(sidebar);
 
-        // ── Status bar ────────────────────────────────────────────────────────
+        // ── Board (right column) ──────────────────────────────────────────────
+        var board = document.createElement('main');
+        board.id = 'nl-seg-board';
+        board.className = 'nl-seg-board';
+
+        // Status banner
         var statusEl = document.createElement('div');
         statusEl.id = 'nl-status';
-        statusEl.className = 'nl-status';
-        app.appendChild(statusEl);
-        _updateStatus();
+        statusEl.className = 'nl-status-banner';
+        board.appendChild(statusEl);
 
-        // ── Dart pills ────────────────────────────────────────────────────────
+        // Dart pills
         var pills = document.createElement('div');
         pills.id = 'nl-pills';
-        pills.className = 'practice-pills';
-        app.appendChild(pills);
+        pills.className = 'nl-pills';
+        board.appendChild(pills);
 
-        // ── Multiplier tabs ───────────────────────────────────────────────────
+        // Multiplier tabs
         _state.multiplier = 1;
         var tabs = document.createElement('div');
         tabs.id = 'nl-tabs';
@@ -269,15 +280,23 @@ var NINE_LIVES_GAME = (function () {
             tabs.appendChild(btn);
         });
         document.body.dataset.multiplier = 1;
-        app.appendChild(tabs);
+        board.appendChild(tabs);
 
-        // ── Segment grid ──────────────────────────────────────────────────────
-        var segBoard = document.createElement('main');
-        segBoard.id = 'nl-seg-board';
-        app.appendChild(segBoard);
-        segBoard.appendChild(_buildGrid());
-        segBoard.appendChild(_buildBullRow());
+        // Segment grid + bull row
+        board.appendChild(_buildGrid());
+        board.appendChild(_buildBullRow());
 
+        // Footer hint
+        var footer = document.createElement('footer');
+        footer.className = 'nl-footer';
+        var footerMsg = document.createElement('span');
+        footerMsg.id = 'nl-footer-msg';
+        footer.appendChild(footerMsg);
+        board.appendChild(footer);
+
+        app.appendChild(board);
+
+        _updateStatus();
         _applyTargetHighlight();
     }
 
@@ -286,9 +305,9 @@ var NINE_LIVES_GAME = (function () {
     function _renderBoard(container) {
         container.innerHTML = '';
         _state.players.forEach(function (p) {
-            var row = document.createElement('div');
-            row.id        = 'nl-row-' + p.id;
-            row.className = 'nl-player-row' +
+            var card = document.createElement('div');
+            card.id        = 'nl-row-' + p.id;
+            card.className = 'nl-player-card' +
                 (String(p.id) === String(_state.currentPlayerId) ? ' nl-active' : '') +
                 (p.eliminated ? ' nl-eliminated' : '');
 
@@ -297,22 +316,22 @@ var NINE_LIVES_GAME = (function () {
             nameEl.className = 'nl-player-name';
             nameEl.textContent = p.name.toUpperCase();
 
-            // Target
+            // Target number — large display
             var targetEl = document.createElement('div');
             targetEl.id        = 'nl-target-' + p.id;
             targetEl.className = 'nl-player-target';
             targetEl.textContent = p.completed ? '✓' : p.target;
 
-            // Lives pips
+            // Lives pips (9 total)
             var livesEl = document.createElement('div');
             livesEl.id        = 'nl-lives-' + p.id;
             livesEl.className = 'nl-lives';
             _renderLives(livesEl, p.lives);
 
-            row.appendChild(nameEl);
-            row.appendChild(targetEl);
-            row.appendChild(livesEl);
-            container.appendChild(row);
+            card.appendChild(nameEl);
+            card.appendChild(targetEl);
+            card.appendChild(livesEl);
+            container.appendChild(card);
         });
     }
 
@@ -332,9 +351,9 @@ var NINE_LIVES_GAME = (function () {
 
     function _updateBoard() {
         _state.players.forEach(function (p) {
-            var row = document.getElementById('nl-row-' + p.id);
-            if (row) {
-                row.className = 'nl-player-row' +
+            var card = document.getElementById('nl-row-' + p.id);
+            if (card) {
+                card.className = 'nl-player-card' +
                     (String(p.id) === String(_state.currentPlayerId) ? ' nl-active' : '') +
                     (p.eliminated ? ' nl-eliminated' : '');
             }
@@ -366,12 +385,15 @@ var NINE_LIVES_GAME = (function () {
     }
 
     function _updateStatus() {
-        var el = document.getElementById('nl-status');
-        if (!el) return;
-        var p = _currentPlayer();
+        var banner = document.getElementById('nl-status');
+        var footer = document.getElementById('nl-footer-msg');
+        var p  = _currentPlayer();
         if (!p) return;
         var ws = _workingState();
-        el.textContent = p.name.toUpperCase() + '  ·  TARGET: ' + (ws.target > 20 ? '20 ✓' : ws.target);
+        var targetStr = ws.target > 20 ? '20 ✓' : ws.target;
+        var livesLeft = p.lives;
+        if (banner) banner.textContent = p.name.toUpperCase() + '  —  TARGET: ' + targetStr;
+        if (footer) footer.textContent = livesLeft + (livesLeft === 1 ? ' LIFE' : ' LIVES') + ' REMAINING  ·  MUST HIT ' + targetStr + ' TO ADVANCE';
     }
 
     // ── Segment grid ──────────────────────────────────────────────────────────
@@ -736,6 +758,37 @@ var NINE_LIVES_GAME = (function () {
     }
 
     // ── End ───────────────────────────────────────────────────────────────────
+
+    function _onRestart() {
+        UI.showConfirmModal({
+            title:        'RESTART MATCH?',
+            message:      'All progress will be wiped and the match will restart from scratch. This cannot be undone.',
+            confirmLabel: 'YES, RESTART',
+            confirmClass: 'confirm-btn-danger',
+            onConfirm:    _doRestart,
+        });
+    }
+
+    function _doRestart() {
+        UI.setLoading(true);
+        API.restartNineLivesMatch(_state.matchId)
+            .then(function (state) {
+                _applyState(state);
+                _welcomedPlayers = {};
+                _buildScreen();
+                UI.showToast('MATCH RESTARTED', 'info', 2000);
+                var startDelay = _announceCurrentPlayer(true);
+                if (_isCpuPlayer(_currentPlayer())) {
+                    setTimeout(_runCpuTurn, startDelay + 400);
+                }
+            })
+            .catch(function (err) {
+                UI.showToast('RESTART FAILED: ' + err.message.toUpperCase(), 'bust', 3000);
+            })
+            .finally(function () {
+                UI.setLoading(false);
+            });
+    }
 
     function _onEnd() {
         UI.showConfirmModal({

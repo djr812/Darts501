@@ -445,6 +445,10 @@ const API = (() => {
         return request('POST', '/api/baseball/matches/' + matchId + '/restart', {});
     }
 
+    async function restartNineLivesMatch(matchId) {
+        return request('POST', '/api/nine_lives/matches/' + matchId + '/restart', {});
+    }
+
     async function getWarmupHighScore(playerId) {
         return request('GET', '/api/baseball/highscore/' + playerId + '?game_type=warmup');
     }
@@ -525,6 +529,7 @@ const API = (() => {
         endKillerMatch,
         restartKillerMatch,
         restartBaseballMatch,
+        restartNineLivesMatch,
         getWarmupHighScore,
         submitWarmupScore,
         getBaseballHighScore,

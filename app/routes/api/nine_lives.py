@@ -332,3 +332,39 @@ def end_nine_lives_match(match_id):
     cursor.execute("UPDATE matches SET status='cancelled' WHERE id=%s", (match_id,))
     db.commit()
     return jsonify({"match_id": match_id, "status": "cancelled"}), 200
+
+
+@nine_lives_bp.route("/nine_lives/matches/<int:match_id>/restart", methods=["POST"])
+def restart_nine_lives_match(match_id):
+    """Reset all players to target=1, lives=9, and restart from player 0."""
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id FROM nine_lives_games WHERE match_id = %s", (match_id,))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({"error": "match not found"}), 404
+    game_id = row["id"]
+
+    # Delete all throws for this game
+    cursor.execute("DELETE FROM nine_lives_throws WHERE game_id = %s", (game_id,))
+
+    # Reset all player state to defaults
+    cursor.execute(
+        "UPDATE nine_lives_players "
+        "SET target=1, lives=9, eliminated=0, completed=0 "
+        "WHERE game_id = %s",
+        (game_id,)
+    )
+
+    # Reset game state
+    cursor.execute(
+        "UPDATE nine_lives_games "
+        "SET current_player_index=0, status='active', winner_id=NULL, ended_at=NULL "
+        "WHERE id = %s",
+        (game_id,)
+    )
+    cursor.execute("UPDATE matches SET status='active' WHERE id = %s", (match_id,))
+
+    db.commit()
+    return jsonify(_get_state(db, match_id)), 200

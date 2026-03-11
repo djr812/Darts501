@@ -2842,132 +2842,217 @@ body.mode-baseball #app {
 }
 
 /* ── Nine Lives ─────────────────────────────────────────────────────── */
-.nl-board {
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    -webkit-box-orient: vertical;
-    -webkit-flex-direction: column;
-    flex-direction: column;
-    gap: 4px;
-    padding: 4px 6px;
-    -webkit-flex-shrink: 0;
-    flex-shrink: 0;
+/* ═══════════════════════════════════════════════════════════════
+   NINE LIVES — two-column layout matching 501 / Shanghai / Killer
+   ═══════════════════════════════════════════════════════════════ */
+
+body.mode-nine-lives #app {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 280px 1fr;
+    grid-template-areas:
+        "header  header"
+        "sidebar board";
+    width: 100vw;
+    height: 100vh;
+    gap: 0;
 }
 
-.nl-player-row {
+/* ── Sidebar ── */
+#nl-sidebar {
+    grid-area: sidebar;
     display: -webkit-box;
-    display: -webkit-flex;
     display: flex;
-    -webkit-box-align: center;
-    -webkit-align-items: center;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 8px;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    padding: var(--gap);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: var(--gap);
+}
+
+/* Player card */
+.nl-player-card {
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    padding: 10px 12px;
     background: var(--bg-raised);
+    text-align: center;
+    -webkit-transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s;
 }
 
 .nl-active {
     border-color: var(--accent);
-    background: rgba(255,255,255,0.06);
+    background: var(--accent-glow);
 }
 
 .nl-eliminated {
     opacity: 0.35;
-    text-decoration: line-through;
 }
 
 .nl-player-name {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    letter-spacing: 0.06em;
-    color: var(--text-primary);
-    -webkit-flex: 1;
-    flex: 1;
-    min-width: 60px;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
 }
 
 .nl-active .nl-player-name {
     color: var(--accent);
 }
 
+/* Current target number — large and prominent */
 .nl-player-target {
     font-family: var(--font-display);
-    font-size: 1.3rem;
-    font-weight: 700;
+    font-size: 2.6rem;
+    font-weight: 900;
     color: var(--double-color, #e67e22);
-    min-width: 32px;
-    text-align: center;
+    line-height: 1;
+    margin-bottom: 8px;
 }
 
+.nl-active .nl-player-target {
+    color: var(--accent);
+}
+
+/* Nine lives pips — 3×3 grid layout */
 .nl-lives {
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    gap: 3px;
-    -webkit-flex-wrap: nowrap;
-    flex-wrap: nowrap;
-    -webkit-flex-shrink: 0;
-    flex-shrink: 0;
-    -webkit-box-pack: end;
-    -webkit-justify-content: flex-end;
-    justify-content: flex-end;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    -webkit-box-pack: center;
+    justify-content: center;
 }
 
 .nl-life-pip {
-    width: 11px;
-    height: 11px;
+    width: 100%;
+    padding-bottom: 100%;
+    position: relative;
     border-radius: 50%;
-    border: 1px solid #27ae60;
+    border: 2px solid #27ae60;
     background: #27ae60;
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    -webkit-box-align: center;
-    -webkit-align-items: center;
-    align-items: center;
-    -webkit-box-pack: center;
-    -webkit-justify-content: center;
-    justify-content: center;
-    font-size: 0px;
     -webkit-flex-shrink: 0;
     flex-shrink: 0;
 }
 
 .nl-life-pip-on {
-    /* green circle = life remaining — default state above */
+    /* green filled = life remaining */
 }
 
 .nl-life-pip:not(.nl-life-pip-on) {
     background: transparent;
     border-color: #e74c3c;
+}
+
+.nl-life-pip:not(.nl-life-pip-on)::after {
+    content: 'X';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
     font-size: 9px;
-    color: #e74c3c;
     font-weight: 700;
+    color: #e74c3c;
     line-height: 1;
 }
 
-.nl-status {
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
-    letter-spacing: 0.07em;
-    color: var(--text-secondary);
+/* ── Board (right column) ── */
+.nl-seg-board {
+    grid-area: board;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+    padding: var(--gap);
+    overflow: hidden;
+    gap: var(--gap);
+}
+
+/* Status banner */
+.nl-status-banner {
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    padding: 6px 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
     text-align: center;
-    padding: 3px 8px;
+}
+
+/* Dart pills */
+.nl-pills {
+    display: -webkit-box;
+    display: flex;
+    gap: 6px;
+    min-height: 32px;
+    padding: 2px 0;
+    -webkit-box-align: center;
+    align-items: center;
+    -webkit-flex-shrink: 0;
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+
+/* Multiplier tabs */
+.nl-tabs {
+    display: -webkit-box;
+    display: flex;
+    gap: var(--gap);
     -webkit-flex-shrink: 0;
     flex-shrink: 0;
 }
 
-.nl-tabs {
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: flex;
-    gap: 6px;
-    padding: 4px 8px;
+.nl-tabs .tab-btn {
+    -webkit-box-flex: 1;
+    flex: 1;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-transition: all 0.1s ease;
+    transition: all 0.1s ease;
+}
+.nl-tabs .tab-btn:active { -webkit-transform: scale(0.97); transform: scale(0.97); }
+.nl-tabs .tab-btn.active-single { background: var(--single-color); color: #fff; border-color: var(--single-color); }
+.nl-tabs .tab-btn.active-double { background: var(--double-color); color: #fff; border-color: var(--double-color); }
+.nl-tabs .tab-btn.active-treble { background: var(--treble-color); color: #fff; border-color: var(--treble-color); }
+.nl-tabs .tab-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* Segment grid fills remaining space */
+.nl-seg-board #segment-grid {
+    -webkit-box-flex: 1;
+    flex: 1;
+}
+
+/* Footer hint */
+.nl-footer {
     -webkit-flex-shrink: 0;
     flex-shrink: 0;
+    text-align: center;
+    padding: 4px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+    margin-top: auto;
 }
 
 /* Result table */
