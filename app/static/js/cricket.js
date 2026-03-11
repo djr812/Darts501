@@ -28,6 +28,7 @@ var CRICKET_GAME = (function () {
         status:           'active',
         winnerId:         null,
         onEnd:            null,
+        isFirstTurn:      false,
     };
 
     // ─────────────────────────────────────────────────────────────────
@@ -49,6 +50,7 @@ var CRICKET_GAME = (function () {
             .then(function (result) {
                 _applyState(result.state);
                 _state.onEnd = onEnd;
+                _state.isFirstTurn = true;
                 UI.setLoading(false);
                 _buildScreen();
                 _announcePlayer();
@@ -676,11 +678,30 @@ var CRICKET_GAME = (function () {
 
     function _announcePlayer() {
         if (!SPEECH.isEnabled()) return;
-        var player = _state.players.find(function (p) { return p.id === _state.currentPlayerId; });
-        if (player) {
+        var player = _state.players.find(function (p) { return String(p.id) === String(_state.currentPlayerId); });
+        if (!player) return;
+        if (_state.isFirstTurn) {
+            // First turn: speak welcome then player announce as a chain,
+            // each in its own setTimeout so iOS TTS wakes up between them.
+            _state.isFirstTurn = false;
+            var welcomeMsg = 'Welcome to Cricket darts.';
+            var playerMsg  = player.name + "'s turn to throw";
             setTimeout(function () {
-                SPEECH.announcePlayer && SPEECH.announcePlayer(player.name);
-            }, 200);
+                window.speechSynthesis && window.speechSynthesis.cancel();
+                SPEECH.speak(welcomeMsg, { rate: 1.05, pitch: 1.0 });
+            }, 400);
+            // Delay player announce until after welcome finishes
+            // 400ms start delay + 300ms TTS startup + 150ms/char
+            var welcomeDur = 400 + 300 + welcomeMsg.length * 150;
+            setTimeout(function () {
+                window.speechSynthesis && window.speechSynthesis.cancel();
+                SPEECH.speak(playerMsg, { rate: 1.05, pitch: 1.0 });
+            }, welcomeDur + 300);
+        } else {
+            setTimeout(function () {
+                window.speechSynthesis && window.speechSynthesis.cancel();
+                SPEECH.speak(player.name + "'s turn to throw", { rate: 1.05, pitch: 1.0 });
+            }, 300);
         }
     }
 
