@@ -1193,17 +1193,29 @@
         var countRow = document.createElement('div');
         countRow.className = 'setup-option-row';
         var selectedCount = 2;
-        [2,3,4].forEach(function(n) {
+        var selectedDifficulty = 'medium';
+        [1,2,3,4].forEach(function(n) {
             var btn = document.createElement('button');
             btn.className = 'option-btn' + (n === 2 ? ' selected' : '');
             btn.dataset.value = n;
             btn.type = 'button';
-            btn.textContent = n;
+            if (n === 1) {
+                btn.innerHTML = '1<span class="option-hint">vs CPU</span>';
+            } else {
+                btn.textContent = n;
+            }
             btn.addEventListener('click', function() {
                 countRow.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
                 btn.classList.add('selected');
                 selectedCount = n;
-                UI.renderCricketPlayerSlots(existingPlayers, selectedCount, namesSection);
+                if (n === 1) {
+                    UI.showDifficultyModal(function(difficulty) {
+                        selectedDifficulty = difficulty;
+                        UI.renderCricketPlayerSlots(existingPlayers, 1, namesSection, difficulty);
+                    });
+                } else {
+                    UI.renderCricketPlayerSlots(existingPlayers, n, namesSection);
+                }
             });
             countRow.appendChild(btn);
         });
@@ -1226,7 +1238,7 @@
             if (!players) return;
             SPEECH.unlock();
             if (typeof SOUNDS !== 'undefined') SOUNDS.unlock();
-            CRICKET_GAME.start({ players: players }, function() {
+            CRICKET_GAME.start({ players: players, difficulty: selectedDifficulty }, function() {
                 API.getPlayers().then(function(p) {
                     UI.buildSetupScreen(p, onStartGame, _onViewStats, _onPractice, _onCricket, _onShanghai, _onBaseball, _onKiller, _onNineLives, _onBermuda, _onRace1000);
                 });

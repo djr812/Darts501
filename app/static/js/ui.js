@@ -1509,18 +1509,75 @@ const UI = (() => {
         return players;
     }
 
-    function renderCricketPlayerSlots(existingPlayers, count, container) {
-        container.innerHTML = '<div class="setup-label">PLAYERS</div>';
-        const namesRow = document.createElement('div');
-        namesRow.className = 'names-row';
-        for (let i = 0; i < count; i++) {
-            namesRow.appendChild(_buildPlayerSlot(i, count, existingPlayers));
+    function renderCricketPlayerSlots(existingPlayers, count, container, difficulty) {
+        container.innerHTML = '';
+        var grid = document.createElement('div');
+        grid.id = 'setup-names-grid';
+        grid.style.gridTemplateColumns = count <= 2 ? '1fr 1fr' : 'repeat(4, 1fr)';
+
+        // Human slot(s)
+        for (var i = 0; i < count; i++) {
+            grid.appendChild(_buildPlayerSlot(i, count, existingPlayers, false));
         }
-        container.appendChild(namesRow);
+
+        // CPU slot when 1 vs CPU
+        if (count === 1) {
+            var cpuDiff  = difficulty || 'medium';
+            var cpuLabel = (typeof CPU !== 'undefined' && CPU.LABELS)
+                ? (CPU.LABELS[cpuDiff] || cpuDiff) : cpuDiff;
+            var cpuSlot  = document.createElement('div');
+            cpuSlot.className        = 'name-slot cpu-slot';
+            cpuSlot.dataset.mode       = 'cpu';
+            cpuSlot.dataset.isCpu      = 'true';
+            cpuSlot.dataset.difficulty = cpuDiff;
+            cpuSlot.innerHTML =
+                '<div class="name-label">OPPONENT</div>' +
+                '<div class="cpu-badge">\uD83E\uDD16 CPU</div>' +
+                '<div class="cpu-difficulty">' + _esc(cpuLabel) + '</div>' +
+                '<button class="cpu-change-btn" type="button">CHANGE</button>';
+            cpuSlot.querySelector('.cpu-change-btn').addEventListener('click', function() {
+                _showDifficultyModal(function(newDifficulty) {
+                    renderCricketPlayerSlots(existingPlayers, 1, container, newDifficulty);
+                });
+            });
+            grid.appendChild(cpuSlot);
+        }
+
+        container.appendChild(grid);
+        setTimeout(function() {
+            var fi = container.querySelector('.name-input');
+            if (fi) fi.focus();
+        }, 150);
     }
 
     function collectCricketPlayers(container) {
-        return _collectPlayerSelections(container);
+        var slots = container.querySelectorAll('.name-slot');
+        if (!slots.length) { showToast('NO PLAYERS SET UP', 'bust', 2000); return null; }
+        var players = [];
+        for (var i = 0; i < slots.length; i++) {
+            var slot = slots[i];
+            if (slot.dataset.isCpu === 'true' || slot.classList.contains('cpu-slot')) {
+                players.push({ id: null, name: 'CPU', isCpu: true,
+                               difficulty: slot.dataset.difficulty || 'medium', mode: 'cpu' });
+                continue;
+            }
+            var sel  = slot.querySelector('.name-select');
+            var inp  = slot.querySelector('.name-input');
+            var mode = slot.dataset.mode || 'new';
+            if (mode === 'existing' && sel && sel.value) {
+                players.push({ id: parseInt(sel.value, 10),
+                               name: sel.options[sel.selectedIndex].textContent,
+                               isCpu: false, mode: 'existing' });
+            } else if (inp) {
+                var name = inp.value.trim();
+                if (!name) { showToast('PLEASE ENTER ALL PLAYER NAMES', 'bust', 2000); return null; }
+                players.push({ mode: 'new', name: name, isCpu: false });
+            }
+        }
+        var names  = players.filter(function(p) { return !p.isCpu; }).map(function(p) { return p.name.toLowerCase(); });
+        var unique = names.filter(function(n, i) { return names.indexOf(n) === i; });
+        if (unique.length !== names.length) { showToast('PLAYER NAMES MUST BE UNIQUE', 'bust', 2000); return null; }
+        return players;
     }
 
     // ─────────────────────────────────────────────────────────────────
