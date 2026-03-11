@@ -491,7 +491,10 @@ var NINE_LIVES_GAME = (function () {
         _addPill(segment, multiplier, isHit, isNeutral);
 
         // Per-dart speech (just the number/label)
-        _speakDart(segment, multiplier, isHit);
+        // CPU turns: speech is called by throwNext before _onThrow for correct timing
+        if (!_state.cpuTurnRunning) {
+            _speakDart(segment, multiplier, isHit);
+        }
 
         // Update working target display
         _updateBoardWorking();
@@ -598,23 +601,23 @@ var NINE_LIVES_GAME = (function () {
         var nb = document.getElementById('nl-next-btn'); if (nb) nb.disabled = true;
         var ub = document.getElementById('nl-undo-btn'); if (ub) ub.disabled = true;
 
-        var DART_DELAY = 900;
         var dartsThrown = 0;
 
         function throwNext() {
-            // Stop early if we've already hit (no benefit to throwing more in Nine Lives
-            // once target is hit — but rules say all 3 must be thrown, so continue)
+            // Stop early if all 3 darts thrown or turn already complete
             if (dartsThrown >= 3 || _state.setComplete) {
                 _state.cpuTurnRunning = false;
                 _lockBoard(false);
-                setTimeout(_onNext, 600);
+                setTimeout(_onNext, 1800);
                 return;
             }
-            var ws   = _workingState();
-            var dart = _cpuNLChooseDart(ws.target, ws.hit);
+            var ws       = _workingState();
+            var dart     = _cpuNLChooseDart(ws.target, ws.hit);
             dartsThrown++;
+            var speechDur = _speakDart(dart.segment, dart.multiplier, dart.segment === ws.target);
             _onThrow(dart.segment, dart.multiplier);
-            setTimeout(throwNext, DART_DELAY);
+            var nextDelay = Math.max(1200, speechDur + 500);
+            setTimeout(throwNext, nextDelay);
         }
 
         setTimeout(throwNext, 600);
@@ -900,17 +903,22 @@ var NINE_LIVES_GAME = (function () {
         var msg    = p.name + ', you are targeting ' + target + '.';
         _speak(msg, delay);
         // Return total time before speech finishes so callers can wait
-        return delay + msg.length * 85;
+        // 300ms TTS startup + 150ms/char for iOS speech rate
+        return delay + 300 + msg.length * 150;
     }
 
     function _speakDart(segment, multiplier, isHit) {
-        if (!SPEECH.isEnabled()) return;
+        if (!SPEECH.isEnabled()) return 0;
         var mulLabel = multiplier === 3 ? 'Treble' : multiplier === 2 ? 'Double' : '';
         var segLabel = segment === 0   ? 'Miss' :
                        segment === 25  ? (multiplier === 2 ? 'Bulls Eye' : 'Outer bull') :
                        (mulLabel ? mulLabel + ' ' + segment : String(segment));
-        window.speechSynthesis && window.speechSynthesis.cancel();
-        SPEECH.speak(segLabel, { rate: 1.0, pitch: 1.0 });
+        setTimeout(function () {
+            window.speechSynthesis && window.speechSynthesis.cancel();
+            SPEECH.speak(segLabel, { rate: 1.0, pitch: 1.0 });
+        }, 200);
+        // Return estimated duration: 200ms delay + 300ms TTS startup + 150ms/char
+        return 200 + 300 + segLabel.length * 150;
     }
 
     function _announceLifeLost(lifeLostEvents, eliminatedEvents, callback) {
@@ -928,10 +936,12 @@ var NINE_LIVES_GAME = (function () {
             return;
         }
         var msg = msgs.join(' ');
-        window.speechSynthesis && window.speechSynthesis.cancel();
-        SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
-        // Wait for life-lost speech to finish (~85ms/char) before chaining next announcement
-        var lifeLostDuration = 600 + msg.length * 85;
+        setTimeout(function () {
+            window.speechSynthesis && window.speechSynthesis.cancel();
+            SPEECH.speak(msg, { rate: 1.0, pitch: 1.0 });
+        }, 300);
+        // 300ms delay + 300ms TTS startup + 150ms/char
+        var lifeLostDuration = 300 + 300 + msg.length * 150;
         _announceEliminations(eliminatedEvents, callback, lifeLostDuration);
     }
 
