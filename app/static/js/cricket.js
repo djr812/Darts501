@@ -29,9 +29,69 @@ var CRICKET_GAME = (function () {
         winnerId:         null,
         onEnd:            null,
         isFirstTurn:      false,
+        pendingDarts:     [],      // buffered darts for current turn (flushed on NEXT)
         cpuTurnRunning:   false,
         cpuDifficulty:    'medium',
         cpuPlayerId:      null,
+    };
+
+    // ─────────────────────────────────────────────────────────────────
+    // Local Cricket scoring engine
+    // Mirrors server logic so UI can update instantly without a round-trip.
+    // ─────────────────────────────────────────────────────────────────
+
+    var _LocalCricket = {
+        processThrow: function(segment, multiplier, marks, scores, players, currentPlayerId) {
+            var valid = [15, 16, 17, 18, 19, 20, 25];
+            if (valid.indexOf(segment) === -1 || segment === 0) {
+                return { marksAdded: 0, pointsScored: 0, newMarks: marks, newScores: scores, isWin: false };
+            }
+            var pid       = String(currentPlayerId);
+            var newMarks  = JSON.parse(JSON.stringify(marks));
+            var newScores = JSON.parse(JSON.stringify(scores));
+            if (!newMarks[pid]) newMarks[pid] = {};
+            var current = newMarks[pid][String(segment)] || 0;
+            var hits    = multiplier;
+            var marksAdded = 0, pointsScored = 0;
+
+            if (current < 3) {
+                var toClose  = 3 - current;
+                marksAdded   = Math.min(hits, toClose);
+                var overflow = hits - toClose;
+                newMarks[pid][String(segment)] = Math.min(current + hits, 3);
+                if (overflow > 0) {
+                    var oppsClosed = players.every(function(p) {
+                        if (String(p.id) === pid) return true;
+                        return ((newMarks[String(p.id)] || {})[String(segment)] || 0) >= 3;
+                    });
+                    if (!oppsClosed) {
+                        pointsScored = overflow * (segment === 25 ? 25 : segment);
+                        newScores[pid] = (newScores[pid] || 0) + pointsScored;
+                    }
+                }
+            } else {
+                var oppsClosed2 = players.every(function(p) {
+                    if (String(p.id) === pid) return true;
+                    return ((newMarks[String(p.id)] || {})[String(segment)] || 0) >= 3;
+                });
+                if (!oppsClosed2) {
+                    pointsScored = hits * (segment === 25 ? 25 : segment);
+                    newScores[pid] = (newScores[pid] || 0) + pointsScored;
+                }
+            }
+
+            var myMarks   = newMarks[pid] || {};
+            var allClosed = [15,16,17,18,19,20,25].every(function(n) {
+                return (myMarks[String(n)] || 0) >= 3;
+            });
+            var myScore = newScores[pid] || 0;
+            var isWin   = allClosed && players.every(function(p) {
+                return myScore >= (newScores[String(p.id)] || 0);
+            });
+
+            return { marksAdded: marksAdded, pointsScored: pointsScored,
+                     newMarks: newMarks, newScores: newScores, isWin: isWin };
+        },
     };
 
     // ─────────────────────────────────────────────────────────────────
@@ -73,7 +133,6 @@ var CRICKET_GAME = (function () {
     function _resolvePlayers(selections, difficulty) {
         var promises = selections.map(function (sel) {
             if (sel.isCpu) {
-                // Fetch existing CPU record, create only if absent — avoids 409
                 return API.getCpuPlayer()
                     .catch(function() { return null; })
                     .then(function(record) {
@@ -497,76 +556,117 @@ var CRICKET_GAME = (function () {
     // Throw
     // ─────────────────────────────────────────────────────────────────
 
+    // ─────────────────────────────────────────────────────────────────
+    // _throwDart — LOCAL only, no server call.
+    // Scores the dart instantly from JS state and buffers it in
+    // _state.pendingDarts. Server is only contacted on _flushPendingTurn().
+    // ─────────────────────────────────────────────────────────────────
     function _throwDart(segment, multiplier) {
         if (_state.turnComplete || _state.status !== 'active') return;
 
-        // If multiplier not supplied (e.g. legacy call), use state
         if (multiplier === undefined) multiplier = _state.multiplier;
-        // Miss: force multiplier 0 → backend treats as miss
         if (segment === 0) multiplier = 0;
 
-        _lockBoard(true);
+        // Score locally
+        var result = _LocalCricket.processThrow(
+            segment, multiplier,
+            _state.marks, _state.scores,
+            _state.players, _state.currentPlayerId
+        );
 
-        API.recordCricketThrow(_state.matchId, {
-            player_id:  _state.currentPlayerId,
-            segment:    segment,
-            multiplier: multiplier,
-        })
-        .then(function (s) {
-            var last = s.last_throw;
-            _applyState(s);
+        // Apply to local state immediately
+        _state.marks  = result.newMarks;
+        _state.scores = result.newScores;
+        _state.dartsThisTurn++;
 
-            // Re-render entire board from authoritative server state
-            var board = document.getElementById('cricket-sidebar');
-            if (board) _renderBoard(board);
-            _addPill(last.segment, last.multiplier, last.marks_added, last.points_scored);
-            _updateStatusBanner();
+        // Buffer dart for server flush
+        _state.pendingDarts.push({ segment: segment, multiplier: multiplier });
 
-            // Sound
-            if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
-                if (s.status === 'complete') {
-                    SOUNDS.checkout();
-                } else if (last.points_scored > 0) {
-                    SOUNDS.ton();
-                } else {
-                    SOUNDS.dart();
-                }
-            }
+        // Update UI instantly
+        var board = document.getElementById('cricket-sidebar');
+        if (board) _renderBoard(board);
+        _addPill(segment, multiplier, result.marksAdded, result.pointsScored);
+        _updateStatusBanner();
 
-            // Check win
-            if (s.status === 'complete') {
-                _lockBoard(true);
-                setTimeout(function () { _showWinModal(s.winner_id); }, 600);
+        // Sound
+        if (typeof SOUNDS !== 'undefined' && SOUNDS.isEnabled()) {
+            if (result.isWin) SOUNDS.checkout();
+            else if (result.pointsScored > 0) SOUNDS.ton();
+            else SOUNDS.dart();
+        }
+
+        // Speech
+        if (SPEECH.isEnabled()) {
+            var speechPts = segment === 0 ? 0 : (result.pointsScored > 0 ? result.pointsScored : 1);
+            setTimeout(function() {
+                SPEECH.announceDartScore(segment, multiplier, speechPts);
+            }, 300);
+        }
+
+        // Win detected locally — flush immediately then show modal
+        if (result.isWin) {
+            _state.turnComplete = true;
+            _lockBoard(true);
+            _flushPendingTurn(function(serverState) {
+                var winnerId = serverState && serverState.winner_id
+                    ? serverState.winner_id
+                    : _state.currentPlayerId;
+                setTimeout(function() { _showWinModal(winnerId); }, 600);
+            });
+            return;
+        }
+
+        // After 3 darts — show NEXT and flush
+        if (_state.dartsThisTurn >= 3) {
+            _state.turnComplete = true;
+            var nextBtn = document.getElementById('cricket-next-btn');
+            if (nextBtn) nextBtn.disabled = false;
+            var undoBtn2 = document.getElementById('cricket-undo-btn');
+            if (undoBtn2) undoBtn2.disabled = false;
+            // Flush to server in background while player reads board
+            _flushPendingTurn(null);
+            return;
+        }
+
+        // More darts to throw
+        var undoBtn = document.getElementById('cricket-undo-btn');
+        if (undoBtn) undoBtn.disabled = false;
+    }
+
+    // Send all buffered darts to the server sequentially.
+    // onComplete(serverState) called after last dart, or null on error.
+    function _flushPendingTurn(onComplete) {
+        if (_state.pendingDarts.length === 0) {
+            if (onComplete) onComplete(null);
+            return;
+        }
+        var darts   = _state.pendingDarts.slice();
+        _state.pendingDarts = [];
+        var lastState = null;
+
+        function sendNext(i) {
+            if (i >= darts.length) {
+                // Re-sync authoritative state from server
+                if (lastState) _applyState(lastState);
+                if (onComplete) onComplete(lastState);
                 return;
             }
-
-            _state.dartsThisTurn = s.darts_this_turn;
-
-            // After 3 darts — show NEXT, wait
-            if (_state.dartsThisTurn >= 3 || s.darts_this_turn >= 3) {
-                _state.turnComplete = true;
-                var nextBtn = document.getElementById('cricket-next-btn');
-                if (nextBtn) nextBtn.disabled = false;
-                var undoBtn = document.getElementById('cricket-undo-btn');
-                if (undoBtn) undoBtn.disabled = false;
-            } else {
-                _lockBoard(false);
-                var undoBtn = document.getElementById('cricket-undo-btn');
-                if (undoBtn) undoBtn.disabled = false;
-            }
-
-            // Speech
-            if (last.points_scored > 0 && SPEECH.isEnabled()) {
-                setTimeout(function () {
-                    SPEECH.announceScore(last.points_scored);
-                }, 300);
-            }
-        })
-        .catch(function (err) {
-            _lockBoard(false);
-            UI.showToast('ERROR RECORDING DART', 'bust', 2000);
-            console.error('[cricket] throw error:', err);
-        });
+            API.recordCricketThrow(_state.matchId, {
+                player_id:  _state.currentPlayerId,
+                segment:    darts[i].segment,
+                multiplier: darts[i].multiplier,
+            })
+            .then(function(s) {
+                lastState = s;
+                sendNext(i + 1);
+            })
+            .catch(function(err) {
+                console.error('[cricket] flush error dart ' + i + ':', err);
+                // Continue flushing remaining darts even on error
+                sendNext(i + 1);
+            });
+        }
+        sendNext(0);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -574,60 +674,100 @@ var CRICKET_GAME = (function () {
     // ─────────────────────────────────────────────────────────────────
 
     function _onNext() {
-        _state.turnComplete = false;
-        _state.dartsThisTurn = 0;
-        _state.multiplier = 1;
-        _clearPills();
-
-        // Update active player header
-        _updateActivePlayer();
+        if (_state.cpuTurnRunning) return;
 
         var nextBtn = document.getElementById('cricket-next-btn');
         if (nextBtn) nextBtn.disabled = true;
         var undoBtn = document.getElementById('cricket-undo-btn');
         if (undoBtn) undoBtn.disabled = true;
 
-        // Reset multiplier tab to single
-        var tabs = document.getElementById('cricket-tabs');
-        if (tabs) {
-            tabs.querySelectorAll('.tab-btn').forEach(function (b) {
-                b.classList.remove('active-single', 'active-double', 'active-treble');
-            });
-            var singleTab = tabs.querySelector('[data-multiplier="1"]');
-            if (singleTab) singleTab.classList.add('active-single');
-        }
-        document.body.dataset.multiplier = 1;
+        // Ensure any un-flushed darts reach the server before advancing.
+        // (Normally flushed already after dart 3, but guards edge cases.)
+        function _advance() {
+            _state.turnComplete  = false;
+            _state.dartsThisTurn = 0;
+            _state.multiplier    = 1;
+            _state.pendingDarts  = [];
+            _clearPills();
+            _updateActivePlayer();
 
-        _lockBoard(false);
-        _updateStatusBanner();
-        _announcePlayer();
-        if (_isCpuTurn()) _scheduleCpuTurn();
+            // Reset multiplier tab to single
+            var tabs = document.getElementById('cricket-tabs');
+            if (tabs) {
+                tabs.querySelectorAll('.tab-btn').forEach(function (b) {
+                    b.classList.remove('active-single', 'active-double', 'active-treble');
+                });
+                var singleTab = tabs.querySelector('[data-multiplier="1"]');
+                if (singleTab) singleTab.classList.add('active-single');
+            }
+            document.body.dataset.multiplier = 1;
+
+            _lockBoard(false);
+            _updateStatusBanner();
+            _announcePlayer();
+
+            if (_isCpuTurn()) _scheduleCpuTurn();
+        }
+
+        if (_state.pendingDarts.length > 0) {
+            _flushPendingTurn(function() { _advance(); });
+        } else {
+            _advance();
+        }
     }
 
     function _onUndo() {
         if (_state.cpuTurnRunning) return;
+
+        // If the dart is still in the local buffer, pop it without a server call
+        if (_state.pendingDarts.length > 0) {
+            _state.pendingDarts.pop();
+            _state.dartsThisTurn--;
+            _state.turnComplete = false;
+
+            // Re-sync local marks/scores from server state (simplest correctness guarantee)
+            _lockBoard(true);
+            API.getCricketMatch(_state.matchId)
+                .then(function(s) {
+                    _applyState(s);
+                    var board = document.getElementById('cricket-sidebar');
+                    if (board) _renderBoard(board);
+
+                    var pills = document.getElementById('cricket-pills');
+                    if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
+
+                    var nextBtn = document.getElementById('cricket-next-btn');
+                    if (nextBtn) nextBtn.disabled = true;
+                    var undoBtn = document.getElementById('cricket-undo-btn');
+                    if (undoBtn) undoBtn.disabled = _state.dartsThisTurn === 0;
+
+                    _lockBoard(false);
+                })
+                .catch(function() { _lockBoard(false); });
+            return;
+        }
+
+        // Dart already flushed to server — use server undo
         _lockBoard(true);
         API.undoCricketThrow(_state.matchId)
             .then(function (s) {
                 _applyState(s);
-                // Full re-render of board to reflect undone state
                 var board = document.getElementById('cricket-sidebar');
                 if (board) _renderBoard(board);
 
-                // Remove last pill
                 var pills = document.getElementById('cricket-pills');
                 if (pills && pills.lastChild) pills.removeChild(pills.lastChild);
 
-                _state.turnComplete = false;
+                _state.turnComplete  = false;
+                _state.dartsThisTurn = s.darts_this_turn || 0;
                 var nextBtn = document.getElementById('cricket-next-btn');
                 if (nextBtn) nextBtn.disabled = true;
-
                 var undoBtn = document.getElementById('cricket-undo-btn');
-                if (undoBtn) undoBtn.disabled = s.darts_this_turn === 0;
+                if (undoBtn) undoBtn.disabled = _state.dartsThisTurn === 0;
 
                 _lockBoard(false);
             })
-            .catch(function (err) {
+            .catch(function () {
                 _lockBoard(false);
                 UI.showToast('UNDO FAILED', 'bust', 2000);
             });
@@ -748,164 +888,87 @@ var CRICKET_GAME = (function () {
     // Speech
     // ─────────────────────────────────────────────────────────────────
 
-    function _announcePlayer() {
-        if (!SPEECH.isEnabled()) return;
-        var player = _state.players.find(function (p) { return String(p.id) === String(_state.currentPlayerId); });
-        if (!player) return;
-        if (_state.isFirstTurn) {
-            // First turn: speak welcome then player announce as a chain,
-            // each in its own setTimeout so iOS TTS wakes up between them.
-            _state.isFirstTurn = false;
-            var welcomeMsg = 'Welcome to Cricket darts.';
-            var playerMsg  = player.name + "'s turn to throw";
-            setTimeout(function () {
-                window.speechSynthesis && window.speechSynthesis.cancel();
-                SPEECH.speak(welcomeMsg, { rate: 1.05, pitch: 1.0 });
-            }, 400);
-            // Delay player announce until after welcome finishes
-            // 400ms start delay + 300ms TTS startup + 150ms/char
-            var welcomeDur = 400 + 300 + welcomeMsg.length * 150;
-            setTimeout(function () {
-                window.speechSynthesis && window.speechSynthesis.cancel();
-                SPEECH.speak(playerMsg, { rate: 1.05, pitch: 1.0 });
-            }, welcomeDur + 300);
-        } else {
-            setTimeout(function () {
-                window.speechSynthesis && window.speechSynthesis.cancel();
-                SPEECH.speak(player.name + "'s turn to throw", { rate: 1.05, pitch: 1.0 });
-            }, 300);
-        }
-    }
-
     // ─────────────────────────────────────────────────────────────────
-    // CPU player logic
+    // CPU turn
     // ─────────────────────────────────────────────────────────────────
 
     function _isCpuTurn() {
-        return _state.cpuPlayerId !== null &&
+        return _state.cpuPlayerId &&
                String(_state.currentPlayerId) === String(_state.cpuPlayerId) &&
                _state.status === 'active';
     }
 
-    // Accuracy profiles — same structure as race1000.js
     var _CPU_PROFILES = {
         easy:   { trebleHit: 0.15, doubleHit: 0.25, singleHit: 0.65, missRate: 0.20 },
         medium: { trebleHit: 0.35, doubleHit: 0.55, singleHit: 0.85, missRate: 0.08 },
         hard:   { trebleHit: 0.72, doubleHit: 0.82, singleHit: 0.96, missRate: 0.02 },
     };
 
-    // Adjacent segments on a dartboard (clockwise order)
     var _ADJACENT = {
-        20:[1,5], 1:[20,18], 18:[1,4], 4:[18,13], 13:[4,6], 6:[13,10],
-        10:[6,15], 15:[10,2], 2:[15,17], 17:[2,3], 3:[17,19], 19:[3,7],
-        7:[19,16], 16:[7,8], 8:[16,11], 11:[8,14], 14:[11,9], 9:[14,12],
-        12:[9,5], 5:[12,20],
+        20:[5,1], 1:[20,18], 2:[15,17], 3:[19,17], 4:[18,13], 5:[20,12],
+        6:[13,10], 7:[16,19], 8:[11,16], 9:[14,12], 10:[15,6], 11:[8,14],
+        12:[9,5], 13:[4,6], 14:[11,9], 15:[2,10], 16:[8,7], 17:[3,2],
+        18:[4,1], 19:[3,7], 25:[25,25],
     };
 
-    /**
-     * Given an intended target {segment, multiplier}, apply accuracy variance.
-     * Returns {segment, multiplier} representing the actual landing.
-     */
     function _cpuApplyVariance(segment, multiplier) {
         var profile = _CPU_PROFILES[_state.cpuDifficulty] || _CPU_PROFILES.medium;
-        var rand = Math.random();
-
-        // Complete miss (random segment)
-        if (rand < profile.missRate) {
-            var allSegs = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20];
-            return { segment: allSegs[Math.floor(Math.random() * allSegs.length)], multiplier: 1 };
-        }
-
-        // Bull handling
-        if (segment === 25) {
-            if (multiplier === 2) {
-                // Aiming bull
-                if (rand < profile.trebleHit) return { segment: 25, multiplier: 2 };   // inner bull
-                if (rand < profile.doubleHit) return { segment: 25, multiplier: 1 };   // outer bull
-                return { segment: 25, multiplier: 1 };                                  // at least outer
-            } else {
-                // Aiming outer bull
-                if (rand < profile.singleHit) return { segment: 25, multiplier: 1 };
-                return { segment: 25, multiplier: 2 };   // overshot to inner
-            }
-        }
-
-        // Number segments
+        if (Math.random() < profile.missRate) return { segment: 0, multiplier: 0 };
+        var r = Math.random();
+        var actualMul;
         if (multiplier === 3) {
-            if (rand < profile.trebleHit) return { segment: segment, multiplier: 3 };
-            if (rand < profile.doubleHit) return { segment: segment, multiplier: 1 };
-            // Miss treble — hit adjacent single
-            var adj = _ADJACENT[segment] || [segment];
-            return { segment: adj[Math.floor(Math.random() * adj.length)], multiplier: 1 };
+            if (r < profile.trebleHit) actualMul = 3;
+            else if (r < profile.doubleHit) actualMul = 2;
+            else if (r < profile.singleHit) actualMul = 1;
+            else {
+                var adj = _ADJACENT[segment] || [segment];
+                return { segment: adj[Math.floor(Math.random() * adj.length)], multiplier: 1 };
+            }
+        } else if (multiplier === 2) {
+            if (r < profile.doubleHit) actualMul = 2;
+            else if (r < profile.singleHit) actualMul = 1;
+            else {
+                var adj2 = _ADJACENT[segment] || [segment];
+                return { segment: adj2[Math.floor(Math.random() * adj2.length)], multiplier: 1 };
+            }
+        } else {
+            actualMul = r < profile.singleHit ? 1 : 0;
+            if (actualMul === 0) return { segment: 0, multiplier: 0 };
         }
-        if (multiplier === 2) {
-            if (rand < profile.doubleHit) return { segment: segment, multiplier: 2 };
-            return { segment: segment, multiplier: 1 };
-        }
-        // Single
-        if (rand < profile.singleHit) return { segment: segment, multiplier: 1 };
-        var adj2 = _ADJACENT[segment] || [segment];
-        return { segment: adj2[Math.floor(Math.random() * adj2.length)], multiplier: 1 };
+        return { segment: segment, multiplier: actualMul };
     }
 
-    /**
-     * Cricket targeting strategy.
-     * Priority:
-     *   1. Close open numbers (aim treble on highest open cricket number)
-     *   2. Score on numbers we've closed but opponent hasn't
-     * Returns {segment, multiplier} as the intended aim (before variance).
-     */
     function _cpuIntend() {
-        var cpuId  = String(_state.cpuPlayerId);
-        var oppIds = _state.players
-            .filter(function(p) { return String(p.id) !== cpuId; })
-            .map(function(p) { return String(p.id); });
-
-        var cpuMarks = _state.marks[cpuId] || {};
-
-        // Numbers to close in priority order
-        var priority = [20, 19, 18, 17, 16, 15, 25];
-
-        // 1. Find the highest priority number that CPU hasn't closed yet
-        for (var i = 0; i < priority.length; i++) {
-            var num = priority[i];
-            var marks = cpuMarks[String(num)] || 0;
-            if (marks < 3) {
-                // Aim to close it — treble if possible, except bull
-                if (num === 25) {
-                    var needed = 3 - marks;
-                    return { segment: 25, multiplier: needed >= 2 ? 2 : 1 };
-                }
-                return { segment: num, multiplier: 3 };
+        var pid    = String(_state.cpuPlayerId);
+        var myMarks = _state.marks[pid] || {};
+        // Priority: close numbers 20→15→Bull
+        var targets = [20, 19, 18, 17, 16, 15, 25];
+        for (var i = 0; i < targets.length; i++) {
+            var n = targets[i];
+            if ((myMarks[String(n)] || 0) < 3) {
+                return { segment: n, multiplier: n === 25 ? 2 : 3 };
             }
         }
-
-        // 2. All closed — score on numbers opponent still has open
-        for (var j = 0; j < priority.length; j++) {
-            var scoreNum = priority[j];
-            var oppStillOpen = oppIds.some(function(oid) {
-                return ((_state.marks[oid] || {})[String(scoreNum)] || 0) < 3;
+        // All closed — score on numbers opponents still have open
+        for (var j = 0; j < targets.length; j++) {
+            var n2 = targets[j];
+            var oppOpen = _state.players.some(function(p) {
+                if (String(p.id) === pid) return false;
+                return ((_state.marks[String(p.id)] || {})[String(n2)] || 0) < 3;
             });
-            if (oppStillOpen) {
-                if (scoreNum === 25) return { segment: 25, multiplier: 2 };
-                return { segment: scoreNum, multiplier: 3 };
-            }
+            if (oppOpen) return { segment: n2, multiplier: n2 === 25 ? 2 : 3 };
         }
-
-        // Fallback — aim treble 20
         return { segment: 20, multiplier: 3 };
     }
 
     function _scheduleCpuTurn() {
-        // Small delay so speech announcement plays before board starts firing
-        var speechDelay = SPEECH.isEnabled() ? 2200 : 600;
-        setTimeout(function() { _doCpuTurn(0); }, speechDelay);
+        var delay = SPEECH.isEnabled() ? 2200 : 600;
+        setTimeout(function() { _doCpuTurn(0); }, delay);
     }
 
     function _doCpuTurn(dartIndex) {
         if (_state.status !== 'active') return;
         if (dartIndex >= 3) {
-            // All 3 darts thrown — auto-press NEXT after a beat
             setTimeout(function() {
                 _state.cpuTurnRunning = false;
                 _onNext();
@@ -919,12 +982,10 @@ var CRICKET_GAME = (function () {
         var intended = _cpuIntend();
         var actual   = _cpuApplyVariance(intended.segment, intended.multiplier);
 
-        // Stagger darts ~900ms apart so it feels natural
         setTimeout(function() {
-            if (_state.status !== 'active') {
-                _state.cpuTurnRunning = false;
-                return;
-            }
+            if (_state.status !== 'active') { _state.cpuTurnRunning = false; return; }
+
+            // CPU uses direct server call (no local buffer) so board stays authoritative
             API.recordCricketThrow(_state.matchId, {
                 player_id:  _state.cpuPlayerId,
                 segment:    actual.segment,
@@ -952,19 +1013,55 @@ var CRICKET_GAME = (function () {
                     return;
                 }
 
-                if (last.points_scored > 0 && SPEECH.isEnabled()) {
-                    setTimeout(function() { SPEECH.announceScore(last.points_scored); }, 200);
+                if (SPEECH.isEnabled()) {
+                    var speechPts = last.segment === 0 ? 0 : (last.points_scored > 0 ? last.points_scored : 1);
+                    var phrase    = last.segment === 0 ? 'Miss'
+                                  : (last.multiplier === 3 ? 'Treble ' : last.multiplier === 2 ? 'Double ' : '')
+                                    + (last.segment === 25 ? (last.multiplier === 2 ? 'Bulls Eye' : 'Outer Bull') : last.segment);
+                    var speechWait = 200 + Math.max(1200, phrase.length * 95 + 400);
+                    setTimeout(function() {
+                        SPEECH.announceDartScore(last.segment, last.multiplier, speechPts);
+                    }, 200);
+                    setTimeout(function() { _doCpuTurn(dartIndex + 1); }, speechWait);
+                } else {
+                    setTimeout(function() { _doCpuTurn(dartIndex + 1); }, 700);
                 }
-
-                // Continue to next dart
-                _doCpuTurn(dartIndex + 1);
             })
             .catch(function(err) {
                 _state.cpuTurnRunning = false;
                 _lockBoard(false);
                 console.error('[cricket] CPU throw error:', err);
             });
-        }, dartIndex === 0 ? 300 : 900);
+        }, 600);
+    }
+
+    function _announcePlayer() {
+        if (!SPEECH.isEnabled()) return;
+        var player = _state.players.find(function (p) { return String(p.id) === String(_state.currentPlayerId); });
+        if (!player) return;
+        if (_state.isFirstTurn) {
+            // First turn: speak welcome then player announce as a chain,
+            // each in its own setTimeout so iOS TTS wakes up between them.
+            _state.isFirstTurn = false;
+            var welcomeMsg = 'Welcome to Cricket darts.';
+            var playerMsg  = player.name + "'s turn to throw";
+            setTimeout(function () {
+                window.speechSynthesis && window.speechSynthesis.cancel();
+                SPEECH.speak(welcomeMsg, { rate: 1.05, pitch: 1.0 });
+            }, 400);
+            // Delay player announce until after welcome finishes
+            // 400ms start delay + 300ms TTS startup + 150ms/char
+            var welcomeDur = 400 + 300 + welcomeMsg.length * 150;
+            setTimeout(function () {
+                window.speechSynthesis && window.speechSynthesis.cancel();
+                SPEECH.speak(playerMsg, { rate: 1.05, pitch: 1.0 });
+            }, welcomeDur + 300);
+        } else {
+            setTimeout(function () {
+                window.speechSynthesis && window.speechSynthesis.cancel();
+                SPEECH.speak(player.name + "'s turn to throw", { rate: 1.05, pitch: 1.0 });
+            }, 300);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────
