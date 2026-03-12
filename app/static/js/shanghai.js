@@ -64,7 +64,7 @@ var SHANGHAI_GAME = (function () {
                 _state.onEnd = onEnd;
                 UI.setLoading(false);
                 _buildScreen();
-                _beginTurn();
+                _welcomeAndBegin(config.numRounds || 7);
             })
             .catch(function (err) {
                 UI.setLoading(false);
@@ -561,6 +561,17 @@ var SHANGHAI_GAME = (function () {
     // ─────────────────────────────────────────────────────────────────
     // Turn management
     // ─────────────────────────────────────────────────────────────────
+
+    function _welcomeAndBegin(numRounds) {
+        if (SPEECH.isEnabled()) {
+            var msg   = 'Welcome to ' + numRounds + '-Round Shanghai Darts';
+            var delay = 400 + msg.length * 130;
+            SPEECH.speak(msg, { rate: 1.05, pitch: 1.0 });
+            setTimeout(function () { _beginTurn(); }, delay);
+        } else {
+            _beginTurn();
+        }
+    }
 
     function _beginTurn() {
         _state.pendingDarts = [];

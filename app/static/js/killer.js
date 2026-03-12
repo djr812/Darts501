@@ -83,7 +83,7 @@ var KILLER_GAME = (function () {
                 _state.onEnd = onEnd;
                 UI.setLoading(false);
                 _buildScreen();
-                _announceAssignments(function () {
+                _welcomeAndAnnounce(config.variant || 'doubles', function () {
                     if (_isCpuPlayer(_currentPlayer())) {
                         _runCpuTurn();
                     }
@@ -865,6 +865,20 @@ var KILLER_GAME = (function () {
             window.speechSynthesis && window.speechSynthesis.cancel();
             SPEECH.speak(text, { rate: 1.0, pitch: 1.0 });
         }, delay || 200);
+    }
+
+    function _welcomeAndAnnounce(variant, onCpuCheck) {
+        var gameDesc = variant === 'triples' ? 'A game of Trebles' : 'A game of Doubles';
+        var msg      = 'Welcome to Killer Darts - ' + gameDesc;
+        if (SPEECH.isEnabled()) {
+            SPEECH.speak(msg, { rate: 1.05, pitch: 1.0 });
+            var welcomeDelay = 400 + msg.length * 130;
+            setTimeout(function () {
+                _announceAssignments(onCpuCheck);
+            }, welcomeDelay);
+        } else {
+            _announceAssignments(onCpuCheck);
+        }
     }
 
     function _announceAssignments(onDone) {
