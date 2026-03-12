@@ -392,21 +392,28 @@ var PRACTICE = (function() {
                 _state.legId   = session.legId;
                 _state.turnId  = session.turnId;
                 UI.setLoading(false);
-                if (_state.targetMode === 'bobs27') {
-                    _startBobs27(onEnd);
-                } else if (_state.targetMode === 'checkout121') {
-                    _startCheckout121(onEnd);
-                } else if (_state.targetMode === 'baseball') {
-                    _startBaseball(onEnd);
-                } else if (_state.targetMode === 'warmup') {
-                    _startWarmup(onEnd);
-                } else {
-                    _buildPracticeScreen(onEnd);
-                    _startTimer(onEnd);
-                    if (SPEECH.isEnabled()) {
-                        SPEECH.announcePlayer(_state.playerName);
-                    }
+                var welcomeMsg   = 'Welcome to Dart Practice';
+                var welcomeDelay = SPEECH.isEnabled() ? 400 + welcomeMsg.length * 130 : 0;
+                if (SPEECH.isEnabled()) {
+                    SPEECH.speak(welcomeMsg, { rate: 1.05, pitch: 1.0 });
                 }
+                setTimeout(function () {
+                    if (_state.targetMode === 'bobs27') {
+                        _startBobs27(onEnd);
+                    } else if (_state.targetMode === 'checkout121') {
+                        _startCheckout121(onEnd);
+                    } else if (_state.targetMode === 'baseball') {
+                        _startBaseball(onEnd);
+                    } else if (_state.targetMode === 'warmup') {
+                        _startWarmup(onEnd);
+                    } else {
+                        _buildPracticeScreen(onEnd);
+                        _startTimer(onEnd);
+                        if (SPEECH.isEnabled()) {
+                            SPEECH.announcePlayer(_state.playerName);
+                        }
+                    }
+                }, welcomeDelay);
             })
             .catch(function(err) {
                 UI.setLoading(false);

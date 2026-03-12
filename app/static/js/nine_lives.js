@@ -79,10 +79,17 @@ var NINE_LIVES_GAME = (function () {
                 _state.onEnd = onEnd;
                 UI.setLoading(false);
                 _buildScreen();
-                var startDelay = _announceCurrentPlayer(true);
-                if (_isCpuPlayer(_currentPlayer())) {
-                    setTimeout(_runCpuTurn, startDelay + 400);
+                var welcomeMsg   = 'Welcome to Nine Lives Darts';
+                var welcomeDelay = SPEECH.isEnabled() ? 400 + welcomeMsg.length * 130 : 0;
+                if (SPEECH.isEnabled()) {
+                    SPEECH.speak(welcomeMsg, { rate: 1.05, pitch: 1.0 });
                 }
+                setTimeout(function () {
+                    var startDelay = _announceCurrentPlayer(true);
+                    if (_isCpuPlayer(_currentPlayer())) {
+                        setTimeout(_runCpuTurn, startDelay + 400);
+                    }
+                }, welcomeDelay);
             })
             .catch(function (err) {
                 UI.setLoading(false);

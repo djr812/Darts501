@@ -87,12 +87,19 @@ var RACE1000_GAME = (function () {
                     }
                 });
                 _buildScreen();
-                if (_isCpuPlayer(_currentPlayer())) {
-                    // _runCpuTurn calls _announcePlayer internally and waits for it
-                    _runCpuTurn();
-                } else {
-                    _announcePlayer(true);
+                var welcomeMsg   = 'Welcome to the Race to 1000';
+                var welcomeDelay = SPEECH.isEnabled() ? 400 + welcomeMsg.length * 130 : 0;
+                if (SPEECH.isEnabled()) {
+                    SPEECH.speak(welcomeMsg, { rate: 1.05, pitch: 1.0 });
                 }
+                setTimeout(function () {
+                    if (_isCpuPlayer(_currentPlayer())) {
+                        // _runCpuTurn calls _announcePlayer internally and waits for it
+                        _runCpuTurn();
+                    } else {
+                        _announcePlayer(true);
+                    }
+                }, welcomeDelay);
             })
             .catch(function (err) {
                 UI.setLoading(false);
