@@ -60,14 +60,26 @@ def get_player_stats(player_id):
     # ------------------------------------------------------------------
     cursor.execute("""
         SELECT
-            COUNT(DISTINCT mp.match_id)          AS matches_played,
-            SUM(CASE WHEN m.winner_id = %s THEN 1 ELSE 0 END) AS matches_won,
-            COALESCE(SUM(mp.sets_won), 0)        AS sets_won,
-            COALESCE(SUM(mp.legs_won), 0)        AS legs_won_tally
+            COUNT(DISTINCT mp.match_id) AS matches_played,
+            SUM(CASE WHEN
+                COALESCE(m.winner_id,
+                    CASE m.game_type
+                        WHEN 'race1000'   THEN (SELECT g.winner_id  FROM race1000_games   g WHERE g.match_id = m.id LIMIT 1)
+                        WHEN 'nine_lives' THEN (SELECT g.winner_id  FROM nine_lives_games g WHERE g.match_id = m.id LIMIT 1)
+                        WHEN 'killer'     THEN (SELECT g.winner_id  FROM killer_games     g WHERE g.match_id = m.id LIMIT 1)
+                        WHEN 'bermuda'    THEN (SELECT g.winner_id  FROM bermuda_games    g WHERE g.match_id = m.id LIMIT 1)
+                        WHEN 'shanghai'   THEN (SELECT g.winner_id  FROM shanghai_games   g WHERE g.match_id = m.id LIMIT 1)
+                        ELSE NULL
+                    END
+                ) = %s
+            THEN 1 ELSE 0 END)           AS matches_won,
+            COALESCE(SUM(mp.sets_won), 0) AS sets_won,
+            COALESCE(SUM(mp.legs_won), 0) AS legs_won_tally
         FROM match_players mp
         JOIN matches m ON m.id = mp.match_id
         WHERE mp.player_id = %s
           AND m.status = 'complete'
+          AND (m.session_type IS NULL OR m.session_type != 'practice')
     """, (player_id, player_id))
     record_row = cursor.fetchone()
 
@@ -75,10 +87,13 @@ def get_player_stats(player_id):
     cursor.execute("""
         SELECT COUNT(*) AS legs_won
         FROM legs l
+        JOIN matches m ON m.id = l.match_id
         WHERE l.winner_id = %s
           AND l.status = 'complete'
-    """ + scope_sql.replace("l.", "l."),
-    [player_id] + scope_params)
+          AND l.game_type IN ('501', '201')
+          AND (m.session_type IS NULL OR m.session_type != 'practice')
+    """,
+    [player_id])
     legs_won_row = cursor.fetchone()
 
     # ------------------------------------------------------------------
@@ -360,10 +375,13 @@ def get_player_stats(player_id):
         SELECT COUNT(*) AS legs_played
         FROM legs l
         JOIN turns t ON t.leg_id = l.id
+        JOIN matches m ON m.id = l.match_id
         WHERE t.player_id = %s
           AND l.status = 'complete'
-    """ + scope_sql,
-    [player_id] + scope_params)
+          AND l.game_type IN ('501', '201')
+          AND (m.session_type IS NULL OR m.session_type != 'practice')
+    """,
+    [player_id])
     legs_played_row = cursor.fetchone()
 
     legs_won   = int(legs_won_row["legs_won"] or 0)

@@ -199,9 +199,9 @@ const STATS = (() => {
                 rows: [
                     ['Matches played',  records.matches_played],
                     ['Matches won',     records.matches_won + ' (' + records.match_win_rate + '%)'],
-                    ['Legs played',     records.legs_played],
-                    ['Legs won',        records.legs_won + ' (' + records.leg_win_rate + '%)'],
-                    ['Sets won',        records.sets_won],
+                    ['Legs played (x01)', records.legs_played],
+                    ['Legs won (x01)',  records.legs_won + ' (' + records.leg_win_rate + '%)'],
+                    ['Sets won (x01)',  records.sets_won],
                 ],
             },
             {
@@ -294,7 +294,7 @@ const STATS = (() => {
         group('RECORD', [
             ['Played',       records.matches_played],
             ['Won',          records.matches_won,         `(${records.match_win_rate}%)`,  true],
-            ['Legs won',     records.legs_won,             `of ${records.legs_played}`],
+            ['Legs won (x01)', records.legs_won,          `of ${records.legs_played}`],
         ]);
 
         group('SCORING', [
